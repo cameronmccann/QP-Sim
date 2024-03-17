@@ -1,20 +1,23 @@
 #---------------------------------------------------#
 # QP Project 
-# Data Analysis 
+# Data Analysis for Simulation 2 
 #' 
-#' `AnalysisFunc_Sim2()` analyzes simulated clustered data (for Simulation 1) based 
+#' `AnalysisFunc_Sim2()` analyzes simulated clustered data for Simulation 2 based 
 #' on the specified propensity score, mediation, and outcome models. The function 
-#' returns, in addition to the specified models, the estimated natural direct 
-#' effect (NDE) & natural indirect effect (NIE) as well as the simulation 
-#' condition (including the level of ICC & cluster size).  
+#' returns, in addition to the specified models, the estimated direct (Total 
+#' Natural Direct Effect; TNDE) & indirect (Pure Natural Indirect Effect; PNIE) 
+#' as well as the simulation condition (including the level of ICC & cluster size).  
 #' 
 #' @param PSmodel Model to use for propensity score (SL, FE, or RE) 
 #' @param Medmodel Mediation model to use (SL, FE, RE, or RE-Mean) 
 #' @param Outcomemodel Outcome model to use (SL, FE, RE, or RE-Mean) 
 #' @param data The data set to analyze 
-#' @param condition DF containing a row for each condition & the following variables (columns): num_clust, clust_size, num_x, & icc 
+#' @param condition DF containing a row for each condition & the following 
+#' variables (columns): num_clust, clust_size, num_x, & icc 
 #' @param condition_num condition number, which corresponds to the row number in cond
-#' @returns Returns a dataframe of generated data     <-- NEED TO UPDATE 
+#' @returns Returns a dataframe containing seed number, replication number, 
+#' the PS model used (PS), the mediator and outcome model used (outModel), 
+#' the direct effect estimate (NDE_est) and indirect effect estimate (NIE_est). 
 #' @examples
 #' AnalysisFunc_Sim2(PSmodel = "FE", Medmodel = "FE", Outcomemodel = "FE", data = data)
 #' 
@@ -155,12 +158,6 @@ AnalysisFunc_Sim2 <- function(PSmodel = "FE",
   ## Random-Effect Mean
   if (Outcomemodel == "RE-Mean") {
     ### Add mean columns 
-    # data <- merge(data, 
-    #               setNames(aggregate(x = data$t, 
-    #                                  by = list(data$school), 
-    #                                  FUN = mean), 
-    #                        c("school", "t_mean")), 
-    #               by = "school")
     data <- merge(data, 
                   setNames(aggregate(x = data$m, 
                                      by = list(data$school), 
@@ -200,19 +197,6 @@ AnalysisFunc_Sim2 <- function(PSmodel = "FE",
     direct_est = summary(out)$coef["t", "Estimate"], 
     direct_se = summary(out)$coef["t", "Std. Error"] 
   )
-  
-  
-  # resultsFE <- c(
-  #   analysisCond = "FE",
-  #   PS = "FE",
-  #   outModel = "FE",
-  #   NDE_est = summary(outFE)$coef["t", "Estimate"],
-  #   NIE_est = summary(medFE)$coef["t", "Estimate"] *
-  #     summary(outFE)$coef["t", "Estimate"],
-  #   clust_size = cond[cond_num, "clust_size"],
-  #   ICC = cond[cond_num, "iccy"],
-  #   conditionNum = cond_num
-  # )
   
   return(results)
   

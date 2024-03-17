@@ -34,12 +34,14 @@ if (!require("pacman")) install.packages("pacman")
 pacman::p_load(
   # Packages 
   doParallel, 
-  BRRR
+  foreach,
+  parallel
 )
 
 # Load Functions 
 source("Functions/AnalysisFunc_Sim1.R")
 source("Functions/genOneData_Sim1.R")
+
 
 
 # Simulation conditions  --------------------------------------------------
@@ -50,27 +52,19 @@ cond <- expand.grid(num_clust = 100,
                     icc = c(0.05, 0.2, 0.5))
 
 
-# Analysis models 
-# analysisCond <- expand.grid(
-#   "PS model" = c("SL", "FE", "RE"),
-#   "Mediator & Outcome model" = c("SL", "FE", "RE")
-# )
-
-
 
 # Set Parameters ----------------------------------------------------------
 
 ## Initialize DF to store results 
-# OverallCondResultsDF <- NULL
-# OverallPerfMeasuresDF <- NULL
 OverallPar_time <- NULL
 
 ## Set number of replications/repetitions 
-reps <- 200 #400 #10 
-## Set Date 
-date <- "2024-01-20" #Sys.Date() 
-## Create directory to store results 
-dir.create(path = paste0("Output/S1_Simulation-Output_", date))
+reps <- 2#00 #1000 
+
+## Create directory to store results & save path 
+dir.create(path = "Output/S1_Simulation-Output")
+path <- "Output/S1_Simulation-Output"
+
 
 
 # Simulation 1 ------------------------------------------------------------
@@ -81,9 +75,7 @@ for (condition in 1:nrow(cond)) {
   cond_num <- condition
   
   # Make/Register cores
-  cl <- parallel::makeCluster(parallel::detectCores() - 1)
-  doParallel::registerDoParallel(cl) # 7 cores (personal); 19 (campus/lab)
-  
+  doParallel::registerDoParallel(parallel::detectCores() - 1)
   
   # Conduct Simulation
   par_time <- system.time(
@@ -125,10 +117,10 @@ for (condition in 1:nrow(cond)) {
           # Combine results for condition
           full_DF <- as.data.frame(rbind(full_DF, temp_DF))
           
-          # print(paste0("results for ", PSmod, "_", Outmod, " Done!"))
         }
       }
       
+      # Add extra info to DF 
       results <- as.data.frame(cbind(
         seed = rep(paste0(135, i), nrow(full_DF)),
         rep = rep(i, nrow(full_DF)),
@@ -142,25 +134,23 @@ for (condition in 1:nrow(cond)) {
     }
   )
   
-  parallel::stopCluster(cl)
-  
   # Save conditions results
   saveRDS(
     cond_Results_DF,
     file = paste0(
-      "Output/S1_Simulation-Output_", 
-      date, 
+      path, 
       "/S1_Condition-", 
       condition, 
       "-Estimates.rds"
     )
   )
   
-  # cond_Results_DF
-  
   # Print message
   print(paste0("Condition ", condition, " Done!"))
   
+  if(condition == nrow(cond)) {
+    print("~~~~~ Simulation Complete ~~~~~")
+  }
   
   # Log computation time 
   OverallPar_time <- rbind(OverallPar_time,
@@ -169,24 +159,13 @@ for (condition in 1:nrow(cond)) {
 }
 
 
-# Indicate simulation is finished 
-# BRRR::skrrrahh("bigshaq1")
-BRRR::skrrrahh("gucci2")
-
-
-# Add mins to time DF & save DF 
+# Add mins to computation time log & save DF 
 OverallPar_time <- as.data.frame(OverallPar_time)
 OverallPar_time <- cbind(OverallPar_time, 
                          mins = OverallPar_time[, "elapsed"] / 60)
 
-saveRDS(
-  OverallPar_time, 
-  file = paste0(
-    "Output/S1_Simulation-Output_", 
-    date, 
-    "/S1_Computation-Time.rds"
-  )
-)
+saveRDS(OverallPar_time,
+        file = paste0(path, "/S1_Computation-Time.rds"))
 
 
 
