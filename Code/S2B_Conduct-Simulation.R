@@ -16,7 +16,7 @@
 #                       iteration are stored in the relevant Simulation-Output folder. 
 #
 #
-# Last Updated: 03/17/2024 
+# Last Updated: 03/18/2024 
 #
 #
 # Notes:
@@ -58,28 +58,25 @@ cond <- expand.grid(num_clust = 100,
 # Set Parameters ----------------------------------------------------------
 
 ## Initialize DF to store results 
-# OverallCondResultsDF <- NULL
-# OverallPerfMeasuresDF <- NULL
 OverallPar_time <- NULL
 
 ## Set number of replications/repetitions 
-reps <- 200 #400 #10 
-## Set Date 
-date <- "2024-02-20" #Sys.Date()
+reps <- 2#00 #1000 
+
 ## Create directory to store results 
-dir.create(path = paste0("Output/S2B_Simulation-Output_", date))
+dir.create(path = "Output/S2B_Simulation-Output")
+path <- "Output/S2B_Simulation-Output"
+
 
 
 # Simulation 2 ------------------------------------------------------------
 
-for (condition in 1:nrow(cond)) { #nrow(cond[1, ])) { 
+for (condition in 1:nrow(cond)) { 
   
   # set condition number
   cond_num <- condition
   
   # Make/Register cores
-  # cl <- parallel::makeCluster(parallel::detectCores() - 1)
-  # doParallel::registerDoParallel(cl) # 7 cores (personal); 19 (campus/lab)
   doParallel::registerDoParallel(parallel::detectCores() - 1)
   
   
@@ -123,10 +120,10 @@ for (condition in 1:nrow(cond)) { #nrow(cond[1, ])) {
           # Combine results for condition
           full_DF <- as.data.frame(rbind(full_DF, temp_DF))
           
-          # print(paste0("results for ", PSmod, "_", Outmod, " Done!"))
         }
       }
       
+      # Add extra info to DF 
       results <- as.data.frame(cbind(
         seed = rep(paste0(135, i), nrow(full_DF)),
         rep = rep(i, nrow(full_DF)),
@@ -137,34 +134,28 @@ for (condition in 1:nrow(cond)) { #nrow(cond[1, ])) {
         true_ps_85pctle = rep(quantile(data$ps_true, probs = c(0.85)), nrow(full_DF)), 
         true_ps_90pctle = rep(quantile(data$ps_true, probs = c(0.9)), nrow(full_DF))
       ))
-      
-      # print(paste0("condition ", condition, ": ", (i/reps)*100, "%"))
-      # print(paste0("condition ", condition, ": ", i))
-      # print(paste0("Replication ", i, " Done!")) #new code 
     }
   )
-  
-  # parallel::stopCluster(cl)
   
   # Save conditions results/simulation output 
   saveRDS(
     cond_Results_DF,
     file = paste0(
-      "Output/S2B_Simulation-Output_", 
-      date, 
+      path, 
       "/S2B_Condition-", 
       condition, 
       "-Estimates.rds"
-      )
+    )
   )
-  
-  # cond_Results_DF
   
   # Print message
   print(paste0("Condition ", condition, " Done! ", 
                "(Progress: ", condition, "/", nrow(cond), " = ", 
                round((condition/nrow(cond))*100), "% Complete)"))
 
+  if(condition == nrow(cond)) {
+    print("~~~~~ Simulation Complete ~~~~~")
+  }
   
   
   # Log computation time 
@@ -174,25 +165,13 @@ for (condition in 1:nrow(cond)) { #nrow(cond[1, ])) {
 }
 
 
-# Indicate simulation is finished 
-# BRRR::skrrrahh("bigshaq1")
-BRRR::skrrrahh("gucci2")
-
-
 # Add mins to time DF & save DF 
 OverallPar_time <- as.data.frame(OverallPar_time)
 OverallPar_time <- cbind(OverallPar_time, 
                          mins = OverallPar_time[, "elapsed"] / 60)
 
-saveRDS(
-  OverallPar_time, 
-  file = paste0(
-    "Output/S2B_Simulation-Output_", 
-    date, 
-    "/S2B_Computation-Time.rds"
-  )
-)
-
+saveRDS(OverallPar_time,
+        file = paste0(path, "/S2B_Computation-Time.rds"))
 
 
 

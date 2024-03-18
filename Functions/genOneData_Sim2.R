@@ -14,7 +14,7 @@
 #' @param num_clust Number of clusters 
 #' @param clust_size Cluster size for each cluster (i.e., number of observations per cluster) 
 #' @param num_x Number of x (level-1) confounders 
-#' @param iccx,icct,iccm,iccy The intraclass correlation (ICC) for covariate x, treatment, mediator, and outcome 
+#' @param iccx,icct,iccm,iccy The intraclass correlation (ICC) for x confounders, treatment, mediator, and outcome 
 #' @returns Returns a dataframe of generated data 
 #' @examples
 #' genOneData_Sim2(num_clust = 30, clust_size = 30)

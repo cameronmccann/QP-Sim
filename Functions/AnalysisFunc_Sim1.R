@@ -6,7 +6,8 @@
 #' on the specified propensity score, mediation, and outcome models. The function 
 #' returns, in addition to the specified models, the estimated direct (Total 
 #' Natural Direct Effect; TNDE) & indirect (Pure Natural Indirect Effect; PNIE) 
-#' as well as the simulation condition (including the level of ICC & cluster size).  
+#' as well as the simulation condition (including the level of ICC & cluster size). 
+#' The a- & b-path estimates and standard errors are returned too.  
 #' 
 #' @param PSmodel Model to use for propensity score (SL, FE, or RE) 
 #' @param Medmodel Mediation model to use (SL, FE, RE, or RE-Mean) 

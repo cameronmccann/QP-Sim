@@ -3,31 +3,23 @@
 # Data Generation for Simulation 2B 
 #' 
 #' `genOneData_Sim2B()` generates clustered data for Simulation 2B. Generated 
-#' data consisting of a level-1 treatment, covariate, mediator, and outcome as 
-#' well as a level-2 covariate, with control over the number of clusters, 
-#' cluster size, and ICC. Specifically, the dataframe returned from the 
-#' function consists of the following variables: 
-#' student ID (id); cluster ID (school); 
-#' level-1 confounders of T, M, Y relations (x1-x3); 
-#' level-1 T-Y confounders (x4-x6); a level-2 T-Y confounder (z); {{(t_ast)}}; 
-#' the true propensity score of an observation (ps_true); 
-#' level-1 treatment assignment (t); level-1 mediator value (m); and the 
-#' level-1 outcome measure (y). 
+#' data consisting of a level-1 treatment, 6 level-1 confounders, 
+#' a level-1 mediator, and a level-1 outcome as well as a level-2 confounder, 
+#' with control over the number of clusters, cluster size, and ICC. Specifically, 
+#' the dataframe returned from the function consists of the following variables: 
+#' observation ID (id); cluster ID (school); 3 level-1 confounders of T, M, Y relations (x1-x3); 
+#' 3 level-1 T-Y confounders (x4-x6); a level-2 T-Y confounder (z); (t_ast); 
+#' the true propensity score of an observation (ps_true); level-1 treatment assignment (t); 
+#' level-1 mediator value (m); and the level-1 outcome measure (y). 
 #' 
 #' @param num_clust Number of clusters 
 #' @param clust_size Cluster size for each cluster (i.e., number of observations per cluster) 
 #' @param num_x Number of x (level-1) confounders 
-#' @param iccx,icct,iccm,iccy The intraclass correlation (ICC) for covariate x, treatment, mediator, and outcome 
+#' @param iccx,icct,iccm,iccy The intraclass correlation (ICC) for x confounders, treatment, mediator, and outcome 
 #' @returns Returns a dataframe of generated data 
 #' @examples
 #' genOneData_Sim2B(num_clust = 30, clust_size = 30)
 #' 
-
-# Note: 
-#   z1 = level-2 unmeasured confounder (confounding T-Y relation) 
-#   x1-x3 = level-1 measured confounders of T, M, Y relations 
-#   x4-x6 = level-1 measured confounders of T-Y relation 
-
 genOneData_Sim2B <-
   function(num_clust,
            clust_size,

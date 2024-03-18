@@ -59,7 +59,7 @@ cond <- expand.grid(num_clust = 100,
 OverallPar_time <- NULL
 
 ## Set number of replications/repetitions 
-reps <- 2#00 #400 #10 
+reps <- 2#00 #1000 
 
 ## Create directory to store results 
 dir.create(path = "Output/S2_Simulation-Output")
@@ -146,7 +146,9 @@ for (condition in 1:nrow(cond)) {
   )
 
   # Print message
-  print(paste0("Condition ", condition, " Done!"))
+  print(paste0("Condition ", condition, " Done! ", 
+               "(Progress: ", condition, "/", nrow(cond), " = ", 
+               round((condition/nrow(cond))*100), "% Complete)"))
   
   if(condition == nrow(cond)) {
     print("~~~~~ Simulation Complete ~~~~~")

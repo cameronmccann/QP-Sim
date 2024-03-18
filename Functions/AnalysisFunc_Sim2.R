@@ -6,7 +6,8 @@
 #' on the specified propensity score, mediation, and outcome models. The function 
 #' returns, in addition to the specified models, the estimated direct (Total 
 #' Natural Direct Effect; TNDE) & indirect (Pure Natural Indirect Effect; PNIE) 
-#' as well as the simulation condition (including the level of ICC & cluster size).  
+#' as well as the simulation condition (including the level of ICC & cluster size). 
+#' The a- & b-path estimates and standard errors are returned too.  
 #' 
 #' @param PSmodel Model to use for propensity score (SL, FE, or RE) 
 #' @param Medmodel Mediation model to use (SL, FE, RE, or RE-Mean) 
@@ -14,7 +15,8 @@
 #' @param data The data set to analyze 
 #' @param condition DF containing a row for each condition & the following 
 #' variables (columns): num_clust, clust_size, num_x, & icc 
-#' @param condition_num condition number, which corresponds to the row number in cond
+#' @param condition_num condition number, which corresponds to the row number 
+#'  in condition dataframe
 #' @returns Returns a dataframe containing seed number, replication number, 
 #' the PS model used (PS), the mediator and outcome model used (outModel), 
 #' the direct effect estimate (NDE_est) and indirect effect estimate (NIE_est). 

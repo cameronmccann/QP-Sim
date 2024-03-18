@@ -146,7 +146,9 @@ for (condition in 1:nrow(cond)) {
   )
   
   # Print message
-  print(paste0("Condition ", condition, " Done!"))
+  print(paste0("Condition ", condition, " Done! ", 
+               "(Progress: ", condition, "/", nrow(cond), " = ", 
+               round((condition/nrow(cond))*100), "% Complete)"))
   
   if(condition == nrow(cond)) {
     print("~~~~~ Simulation Complete ~~~~~")
