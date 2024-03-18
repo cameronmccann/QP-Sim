@@ -1,4 +1,4 @@
-# QP-Sim 
+# QP-Sim (Simulations for Multilevel Mediation with Unmeasured Cluster-level Confounders: Evaluating Propensity Score Models)
 
 [NEED TO INCLUDE DESCRIPTION OF PROJECT] 
 
