@@ -59,7 +59,7 @@ cond <- expand.grid(num_clust = 100,
 OverallPar_time <- NULL
 
 ## Set number of replications/repetitions 
-reps <- 2#00 #1000 
+reps <- 1000 
 
 ## Create directory to store results & save path 
 dir.create(path = "Output/S1_Simulation-Output")
