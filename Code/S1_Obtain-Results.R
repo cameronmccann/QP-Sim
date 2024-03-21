@@ -14,7 +14,7 @@
 #                       This is stored in the relevant Results folder.
 #
 #
-# Last Updated: 03/20/2024
+# Last Updated: 03/21/2024
 #
 #
 # Notes:
@@ -60,7 +60,7 @@ TNDE <- treat_y
 PNIE <- treat_m * med_y
 
 # Create directory to store reporting of results 
-dir.create(path = "Output/S1_Results_")
+dir.create(path = "Output/S1_Results")
 dir.create(path = paste0("Output/S1_Results/Data"))
 dir.create(path = paste0("Output/S1_Results/Tables"))
 dir.create(path = paste0("Output/S1_Results/Figures"))
@@ -112,7 +112,7 @@ perf_measure_DF <- sim1_data %>%
   group_by(ICC, clust_size, 
            conditionNum, analysisCond) %>% 
   summarize(TNDE_relBias = (mean(TNDE_est) / TNDE) - 1, 
-            NIE_relBias = (mean(NIE_est) / PNIE) - 1, 
+            NIE_relBias = (mean(PNIE_est) / PNIE) - 1, 
             
             # TNDE_MSE = (mean(TNDE_est) - TNDE)^2 + (sd(TNDE_est)^2), 
             # PNIE_MSE = (mean(PNIE_est) - PNIE)^2 + (sd(PNIE_est)^2), 
