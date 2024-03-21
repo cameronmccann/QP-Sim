@@ -14,7 +14,7 @@
 #                       iteration in the relevant Simulation-Output folder. 
 #
 #
-# Last Updated: 03/17/2024 
+# Last Updated: 03/21/2024 
 #
 #
 # Notes:
@@ -59,7 +59,7 @@ cond <- expand.grid(num_clust = 100,
 OverallPar_time <- NULL
 
 ## Set number of replications/repetitions 
-reps <- 2#00 #1000 
+reps <- 1000 
 
 ## Create directory to store results 
 dir.create(path = "Output/S2_Simulation-Output")
