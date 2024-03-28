@@ -16,7 +16,7 @@
 #                       This is stored in the relevant Results folder.
 #
 #
-# Last Updated: 03/25/2024
+# Last Updated: 03/28/2024
 #
 #
 # Notes:
@@ -60,7 +60,7 @@ treat_y <- 1.3 # trt on outcome
 med_y <- 1 # med on outcome  
 treat_med_y <- 1.15 # trt-med interaction on outcome 
 PNDE <- treat_y
-PNIE <- treat_m * med_y + treat_med_y
+TNIE <- treat_m * med_y + treat_med_y
 
 # Create directory to store reporting of results 
 dir.create(path = "Output/S2B_Results")
@@ -120,8 +120,8 @@ perf_measure_DF <- sim2B_data %>%
             
             b_relBias = (mean(b_path_est) / med_y) - 1,
             
-            # TNDE_MSE = (mean(TNDE_est) - TNDE)^2 + (sd(TNDE_est)^2), 
-            # PNIE_MSE = (mean(PNIE_est) - PNIE)^2 + (sd(PNIE_est)^2), 
+            # PNDE_MSE = (mean(PNDE_est) - PNDE)^2 + (sd(PNDE_est)^2), 
+            # TNIE_MSE = (mean(TNIE_est) - TNIE)^2 + (sd(TNIE_est)^2), 
             
             PNDE_RMSE = sqrt((mean(PNDE_est) - PNDE)^2 + (sd(PNDE_est)^2)), 
             TNIE_RMSE = sqrt((mean(TNIE_est) - TNIE)^2 + (sd(TNIE_est)^2))
@@ -139,7 +139,7 @@ write_rds(sim2B_data,
 
 
 
-# TNDE Relative Bias Table ------------------------------------------------
+# PNDE Relative Bias Table ------------------------------------------------
 
 # Pivot wide 
 relBias_Tbl <- pivot_wider(
@@ -158,7 +158,7 @@ colnames(relBias_Tbl) <-
   stringr::str_remove(string = colnames(relBias_Tbl),
                       pattern = "_relBias")
 
-# Relative Bias TNDE Table   
+# Relative Bias PNDE Table   
 relBias_PNDE_Table <- relBias_Tbl %>% 
   select(analysisCond, starts_with("PNDE_")) %>% 
   separate(col = c("analysisCond"), into = c("PS Model", "Mediator/Outcome Model"), sep = "_") %>% 
@@ -170,7 +170,7 @@ as_hux(relBias_PNDE_Table) %>%
 
 
 
-# PNIE Relative Bias Table ------------------------------------------------
+# TNIE Relative Bias Table ------------------------------------------------
 
 # Pivot wide
 relBias_Tbl <- pivot_wider(
@@ -189,7 +189,7 @@ colnames(relBias_Tbl) <-
   stringr::str_remove(string = colnames(relBias_Tbl),
                       pattern = "_relBias")
 
-# Relative Bias PNIE Table   
+# Relative Bias TNIE Table   
 relBias_TNIE_Table <- relBias_Tbl %>%
   select(analysisCond, starts_with("TNIE_")) %>%
   separate(
