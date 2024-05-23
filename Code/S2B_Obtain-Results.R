@@ -16,7 +16,7 @@
 #                       This is stored in the relevant Results folder.
 #
 #
-# Last Updated: 03/28/2024
+# Last Updated: 05/23/2024
 #
 #
 # Notes:
@@ -207,5 +207,82 @@ as_hux(relBias_TNIE_Table) %>%
     value = 3
   )
 
+
+
+# PNDE Relative Bias Table ------------------------------------------------
+
+# Pivot wide
+rmse_Tbl <- pivot_wider(
+  perf_measure_DF[, c("ICC",
+                      "clust_size",
+                      "analysisCond",
+                      "PNDE_RMSE",
+                      "TNIE_RMSE")],
+  names_from = c(ICC, clust_size),
+  names_sep = "_",
+  values_from = c("PNDE_RMSE", "TNIE_RMSE")
+)
+
+# drop common piece of column names
+colnames(rmse_Tbl) <-
+  stringr::str_remove(string = colnames(rmse_Tbl),
+                      pattern = "_RMSE")
+
+# RMSE PNDE Table   
+rmse_PNDE_Table <- rmse_Tbl %>%
+  select(analysisCond, starts_with("PNDE_")) %>%
+  separate(
+    col = c("analysisCond"),
+    into = c("PS Model", "Mediator/Outcome Model"),
+    sep = "_"
+  ) %>%
+  arrange(`Mediator/Outcome Model`)
+
+# Display values (Copy-paste values into generate table website to obtain latex code)
+as_hux(rmse_PNDE_Table) %>%
+  set_number_format(
+    row = 1:nrow(rmse_PNDE_Table) + 1,
+    col = -c(1:2),
+    value = 3
+  )
+
+
+
+# TNIE RMSE Table ------------------------------------------------
+
+# Pivot wide
+rmse_Tbl <- pivot_wider(
+  perf_measure_DF[, c("ICC",
+                      "clust_size",
+                      "analysisCond",
+                      "PNDE_RMSE",
+                      "TNIE_RMSE")],
+  names_from = c(ICC, clust_size),
+  names_sep = "_",
+  values_from = c("PNDE_RMSE", "TNIE_RMSE")
+)
+
+# drop common piece of column names
+colnames(rmse_Tbl) <-
+  stringr::str_remove(string = colnames(rmse_Tbl),
+                      pattern = "_RMSE")
+
+# RMSE TNIE Table   
+rmse_TNIE_Table <- rmse_Tbl %>%
+  select(analysisCond, starts_with("TNIE_")) %>%
+  separate(
+    col = c("analysisCond"),
+    into = c("PS Model", "Mediator/Outcome Model"),
+    sep = "_"
+  ) %>%
+  arrange(`Mediator/Outcome Model`)
+
+# Display values (Copy-paste values into generate table website to obtain latex code)
+as_hux(rmse_TNIE_Table) %>%
+  set_number_format(
+    row = 1:nrow(rmse_TNIE_Table) + 1,
+    col = -c(1:2),
+    value = 3
+  )
 
 
