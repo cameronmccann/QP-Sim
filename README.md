@@ -3,9 +3,7 @@
 
 ## Overview
 
-This repository contains the code and documentation for a simulation study on [brief description of the study topic]. The study aims to [main objective of the study].
-
-## Table of Contents
+This repository contains the code and documentation for the present simulation study. The study aims to assess the performance of three different propensity score (PS) models for estimating mediation effects in mediation analysis with multilevel data when treatment assignment is nonrandomized and an unmeasured cluster-level confounder exists. 
 
 ## Folder Structure
 
@@ -18,21 +16,21 @@ The repository is organized as follows:
 ```
 ├── QP-Sim.Rproj
 ├── README.md    
-└── Code
-    ├── S1_Conduct-Simulation.R   # Simulation 1 code (i.e., generating & analyzing data)
-    ├── S1_Obtain-Results.R       # Script for reporting RMSE & relative bias
-    ├── S2B_Conduct-Simulation.R  # Simulation 2B code (i.e., generating & analyzing data)
-    ├── S2B_Obtain-Results.R      # Script for reporting RMSE & relative bias
-    ├── S2_Conduct-Simulation.R   # Simulation 2 code (i.e., generating & analyzing data)
-    ├── S2_Obtain-Results.R       # Script for reporting RMSE & relative bias
-└── Functions
+└── Code                          # Code to conduct simulations (i.e., generating & analyzing data) & report results (i.e., RMSE & relative bias)
+    ├── S1_Conduct-Simulation.R   
+    ├── S1_Obtain-Results.R       
+    ├── S2B_Conduct-Simulation.R  
+    ├── S2B_Obtain-Results.R      
+    ├── S2_Conduct-Simulation.R   
+    ├── S2_Obtain-Results.R       
+└── Functions                     # Functions used in simulations 
     ├── AnalysisFunc_Sim1.R
     ├── AnalysisFunc_Sim2.R
     ├── AnalysisFunc_Sim2B.R
     ├── genOneData_Sim1.R
     ├── genOneData_Sim2.R
     ├── genOneData_Sim2B.R
-└── Output
+└── Output                        # Output from simulations 
     └── S1_Results/Data
     └── S1_Simulation-Output
     └── S2B_Results/Data
