@@ -12,11 +12,12 @@
 # Script Description:
 #
 #
-# Last Updated: 07/16/2024 
+# Last Updated: 07/17/2024 
 #
 #
 # Notes:
 #   To-Do:
+#     + Drop nonoverlaping cases 
 #     + increase number of clusters to all of those greater or equal to 5 (Liu email)
 #       - write RE mediator & outcome code 
 #       - create bootstrap function
@@ -679,6 +680,8 @@ paste0("Number of non-overlapping cases: ", sum(data_re$ind_nonoverlap), " (left
 
 
 
+# # drop nonoverlap cases 
+# data_re <- data_re[data_re$ind_nonoverlap == FALSE, ]
 
 
 # SL 
@@ -740,41 +743,7 @@ sum(data_fe$nonoverlap_right)
 
 
 
-# OLD ---------------------------------------------------------------------
 
-# create dataframe for glm 
-glm_data_alc <- new_data 
-
-# extract PS 
-glm_data_alc$ps_glm <- glm.psw.alc$ps 
-
-# PS logit 
-glm_data_alc$pslogit_glm <- with(glm_data_alc, {
-  log( ps_glm/(1 - ps_glm) )
-}) 
-
-# weights  
-glm_data_alc$w_glm <- glm.psw.alc$weights
-
-
-## Drop non-overlapping cases 
-
-# find non-overlapping cases 
-caliper <- 0.05 
-
-glm_data_alc$ind_nonoverlap <- with(glm_data_alc, {
-  
-  overlap_left <- max(tapply(pslogit_glm, alcohol, min)) - sd(pslogit_glm) * caliper 
-  overlap_right <- min(tapply(pslogit_glm, alcohol, max)) + sd(pslogit_glm) * caliper 
-  ind_nonoverlap <- (pslogit_glm > overlap_right | pslogit_glm < overlap_left) 
-  
-  cat("Number of non-overlapping cases:", sum(ind_nonoverlap),
-      "::: breaks:", overlap_left, overlap_right, "\n")
-  ind_nonoverlap 
-})
-
-# drop nonoverlap cases 
-glm_data_alc <- glm_data_alc[glm_data_alc$ind_nonoverlap == FALSE, ]
 
 
 # Estimate Effects --------------------------------------------------------
