@@ -622,6 +622,89 @@ cobalt::bal.tab(sportPartic_w1 ~ feelings_w1 + age_w1 + sex_w1 +
 
 # Drop Nonoverlap ---------------------------------------------------------
 
+## SL ----------------------------------------------------------------------
+### dynamic threshold -------------------------------------------------------
+# Identify nonoverlapping cases with a caliper of 0.05
+caliper <- 0.05
+data_sl <- data
+data_sl <- data_sl %>% 
+  mutate(
+    overlap_left = max(tapply(ps_sl_logit, sportPartic_w1, min)) - sd(ps_sl_logit) * caliper,
+    overlap_right = min(tapply(ps_sl_logit, sportPartic_w1, max)) + sd(ps_sl_logit) * caliper, 
+    # ind_nonoverlap = case_when(
+    #   ps_sl_logit > overlap_right ~ TRUE,
+    #   ps_sl_logit < overlap_left ~ TRUE,
+    #   TRUE ~ FALSE
+    # ), 
+    ind_nonoverlap_left = case_when(
+      ps_sl_logit < overlap_left ~ TRUE,
+      TRUE ~ FALSE
+    ), 
+    ind_nonoverlap_right = case_when(
+      ps_sl_logit > overlap_right ~TRUE, 
+      TRUE ~ FALSE
+    ), 
+    ind_nonoverlap = case_when(
+      (ind_nonoverlap_left == TRUE | ind_nonoverlap_right == TRUE) ~ TRUE, 
+      TRUE ~ FALSE
+    )
+  )
+
+paste0(
+  "Number of non-overlapping cases: ",
+  sum(data_sl$ind_nonoverlap),
+  " (left: ",
+  sum(data_sl$ind_nonoverlap_left),
+  "; right: ",
+  sum(data_sl$ind_nonoverlap_right),
+  ")"
+)
+
+# # drop nonoverlap cases 
+# data_sl <- data_sl[data_sl$ind_nonoverlap == FALSE, ]
+
+
+## FE ----------------------------------------------------------------------
+### dynamic threshold -------------------------------------------------------
+caliper <- 0.05
+data_fe <- data
+data_fe <- data_fe %>% 
+  mutate(
+    overlap_left = max(tapply(ps_fe_logit, sportPartic_w1, min)) - sd(ps_fe_logit) * caliper,
+    overlap_right = min(tapply(ps_fe_logit, sportPartic_w1, max)) + sd(ps_fe_logit) * caliper, 
+    # ind_nonoverlap = case_when(
+    #   ps_fe_logit > overlap_right ~ TRUE,
+    #   ps_fe_logit < overlap_left ~ TRUE,
+    #   TRUE ~ FALSE
+    # ), 
+    ind_nonoverlap_left = case_when(
+      ps_fe_logit < overlap_left ~ TRUE,
+      TRUE ~ FALSE
+    ), 
+    ind_nonoverlap_right = case_when(
+      ps_fe_logit > overlap_right ~TRUE, 
+      TRUE ~ FALSE
+    ), 
+    ind_nonoverlap = case_when(
+      (ind_nonoverlap_left == TRUE | ind_nonoverlap_right == TRUE) ~ TRUE, 
+      TRUE ~ FALSE
+    )
+  )
+
+paste0(
+  "Number of non-overlapping cases: ",
+  sum(data_fe$ind_nonoverlap),
+  " (left: ",
+  sum(data_fe$ind_nonoverlap_left),
+  "; right: ",
+  sum(data_fe$ind_nonoverlap_right),
+  ")"
+)
+
+# # drop nonoverlap cases 
+# data_fe <- data_fe[data_fe$ind_nonoverlap == FALSE, ]
+
+
 ## RE ----------------------------------------------------------------------
 ### fixed threshold ---------------------------------------------------------
 # Identify nonoverlapping cases with a caliper of 0.05
@@ -676,70 +759,18 @@ data_re <- data_re %>%
     )
   )
 
-paste0("Number of non-overlapping cases: ", sum(data_re$ind_nonoverlap), " (left: ", sum(data_re$ind_nonoverlap_left), "; right: ", sum(data_re$ind_nonoverlap_right), ")")
-
-
+paste0(
+  "Number of non-overlapping cases: ",
+  sum(data_re$ind_nonoverlap),
+  " (left: ",
+  sum(data_re$ind_nonoverlap_left),
+  "; right: ",
+  sum(data_re$ind_nonoverlap_right),
+  ")"
+)
 
 # # drop nonoverlap cases 
 # data_re <- data_re[data_re$ind_nonoverlap == FALSE, ]
-
-
-# SL 
-# Identify nonoverlapping cases with a caliper of 0.05
-caliper <- 0.05
-data_sl <- data
-data_sl <- data_sl %>% 
-  mutate(
-    nonoverlap = case_when(
-      sportPartic_w1 = 1 & (ps_sl < caliper | ps_sl > (1 - caliper)) ~ TRUE, 
-      sportPartic_w1 = 0 & (ps_sl < caliper | ps_sl > (1 - caliper)) ~ TRUE, 
-      TRUE ~ FALSE
-    ), 
-    nonoverlap_left = case_when(
-      sportPartic_w1 = 1 & (ps_sl < caliper) ~ TRUE, 
-      sportPartic_w1 = 0 & (ps_sl < caliper) ~ TRUE, 
-      TRUE ~ FALSE
-    ), 
-    nonoverlap_right = case_when(
-      sportPartic_w1 = 1 & (ps_sl > (1 - caliper)) ~ TRUE, 
-      sportPartic_w1 = 0 & (ps_sl > (1 - caliper)) ~ TRUE, 
-      TRUE ~ FALSE
-    )
-  )
-
-sum(data_sl$nonoverlap)
-sum(data_sl$nonoverlap_left)
-sum(data_sl$nonoverlap_right)
-
-# FE 
-# Identify nonoverlapping cases with a caliper of 0.05
-caliper <- 0.05
-data_fe <- data
-data_fe <- data_fe %>% 
-  mutate(
-    nonoverlap = case_when(
-      sportPartic_w1 = 1 & (ps_fe < caliper | ps_fe > (1 - caliper)) ~ TRUE, 
-      sportPartic_w1 = 0 & (ps_fe < caliper | ps_fe > (1 - caliper)) ~ TRUE, 
-      TRUE ~ FALSE
-    ), 
-    nonoverlap_left = case_when(
-      sportPartic_w1 = 1 & (ps_fe < caliper) ~ TRUE, 
-      sportPartic_w1 = 0 & (ps_fe < caliper) ~ TRUE, 
-      TRUE ~ FALSE
-    ), 
-    nonoverlap_right = case_when(
-      sportPartic_w1 = 1 & (ps_fe > (1 - caliper)) ~ TRUE, 
-      sportPartic_w1 = 0 & (ps_fe > (1 - caliper)) ~ TRUE, 
-      TRUE ~ FALSE
-    )
-  )
-
-sum(data_fe$nonoverlap)
-sum(data_fe$nonoverlap_left)
-sum(data_fe$nonoverlap_right)
-
-
-
 
 
 
