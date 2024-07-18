@@ -12,7 +12,7 @@
 # Script Description:
 #
 #
-# Last Updated: 07/17/2024 
+# Last Updated: 07/18/2024 
 #
 #
 # Notes:
@@ -773,6 +773,63 @@ paste0(
 # data_re <- data_re[data_re$ind_nonoverlap == FALSE, ]
 
 
+#### Check Overlap -----------------------------------------------------------
+
+# Histogram of PS logit 
+data_re %>%
+  ggplot(aes(x = ps_re_logit, group = as.factor(sportPartic_w1), fill = as.factor(sportPartic_w1))) +
+    geom_histogram(position = "identity", alpha = 0.5, binwidth = 0.1) +
+    theme_minimal() +
+    labs(
+      title = "Mirrored Histogram of ps_fe_logit by sportPartic_w1",
+      x = "ps_fe_logit",
+      y = "Frequency",
+      fill = "sportPartic_w1"
+    )
+# Stats of PS logit 
+data_re %>% 
+  group_by(sportPartic_w1) %>% 
+  summarize(min = min(ps_re_logit), 
+            mean = mean(ps_re_logit), 
+            max = max(ps_re_logit))
+#   sportPartic_w1   min  mean   max  # Pre-drop 
+# 1              0 -1.48 0.193  2.72
+# 2              1 -2.91 0.715  2.96
+#   sportPartic_w1   min  mean   max  # Post-drop 
+# 1              0 -1.48 0.193  2.72
+# 2              1 -1.09 0.710  2.74
+
+##### OLD CODE  ---------------------------------------------------------------
+
+overlap <- function(x, trtgrp, lab = NULL, bin = 20)
+{
+  # plot a histogram of a covariate by group
+  # x   ... numeric vector (covariate)
+  # trtgrp   ... binary treatment variable
+  # lab ... label for title and x-axis
+  # bin ... number of bins for histogram
+  
+  r1 <- range(x)
+  if (!is.numeric(trtgrp)) trtgrp <- as.numeric(trtgrp) - 1
+  c.dat <- hist(x[trtgrp == 0], seq(r1[1], r1[2], length = bin), plot = F)  # histogram data for control group
+  t.dat <- hist(x[trtgrp == 1], seq(r1[1], r1[2], length = bin), plot = F)  # histogram data for treatm. group
+  t.dat$counts <- -t.dat$counts
+  t.dat$density <- -t.dat$density
+  plot(c.dat, axes = F, ylim = c(min(t.dat$density), max(c.dat$density)), freq = F,
+       main = lab, xlab = lab)
+  # if plot frequency
+  # plot(c.dat, axes = F, ylim = c(min(t.dat$counts), max(c.dat$counts)), freq = T,
+  #      main = lab, xlab = lab)
+  plot(t.dat, add = T, density = 30, freq = F)
+  axis(1)
+  ax.loc <- axis(2, labels = F)
+  axis(2, at = ax.loc, labels = abs(ax.loc))
+  y <- par('usr')[3:4]
+  text(rep(max(x), 2), c(y[2] - diff(y)*.05, y[1] + diff(y)*.05), 
+       c('Control', 'Treatment'), adj = 1, xpd = T)
+}
+
+overlap(data_re$ps_fe_logit, data_re$sportPartic_w1, bin = 100)
 
 
 
