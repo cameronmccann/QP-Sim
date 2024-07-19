@@ -17,6 +17,7 @@
 #
 # Notes:
 #   To-Do:
+#     + Standardize variables, impute missing, data, & check model collinearity & proportion of students in each demographic group 
 #     + Drop nonoverlaping cases 
 #     + increase number of clusters to all of those greater or equal to 5 (Liu email)
 #       - write RE mediator & outcome code 
@@ -376,15 +377,103 @@ data <- data %>%
 
 
 
+
+# Drop small clusters -----------------------------------------------------
+
+# First drop those missing sport participation (treatment)
+data <- data %>% 
+  filter(is.na(sportPartic_w1) != TRUE) # 4208 - 3155 = 1,053 dropped 
+
+# Calculate cluster sizes again 
+data <- data %>% 
+  group_by(CLUSTER2) %>% 
+  mutate(n = n()) %>% 
+  ungroup()
+
+# Check clusters in order of size 
+data %>% 
+  group_by(CLUSTER2) %>% 
+  summarize(n = max(n)) %>% 
+  arrange(desc(n)) %>% 
+  print(n = 132) # 123 schools (cluster sizes ranged from 1 to 81 students)
+
+# Drop cluster sizes < 5
+data <- data %>%
+  filter(n >= 5) # To avoid convergence issues, we restricted our analysis to the schools with 5 or more students (121 schools)
+
+# Drop cluster sizes < 41 
+# data <- data %>%
+#   filter(n > 40) # To avoid convergence issues, we restricted our analysis to the 15 largest schools
+# NOTE: I had convergence issues with 15 clusters, so I am trying more
+
+
+# Drop cluster sizes < 25
+# data <- data %>%
+#   filter(n >= 40) # To avoid convergence issues, we restricted our analysis to the schools with 25 or more students (62 schools)
+
+
+# cluster sizes
+data %>% 
+  group_by(CLUSTER2) %>% 
+  summarize(n = n()) %>% 
+  arrange(desc(n)) %>% 
+  print(n = 132) # 15 schools (cluster sizes ranged from 41 to 81 students)
+                # 121 schools (cluster sizes ranged from 5 to 81 students)
+                # 62 schools (cluster sizes ranged from 25 to 81 students)
+                # 40 schools (cluster sizes ranged from 40 to 81 students)
+
+
+
 # Missing Data ------------------------------------------------------------
 
-# Drop those missing sport participation (treatment)
-data <- data %>% 
-  filter(is.na(sportPartic_w1) != TRUE)
+# Check proportions of categorical variables & Scale variables (maybe create the scaled version of the mediator (selfEst_w3) after imputing data)
+head(data)
+colnames(data)
+
+head(scale(data))
+summary(data[, c(
+  "sex_w1",
+  "ethnicity_w1",
+  "white_w1",
+  "black_w1",
+  "asian_w1",
+  "nativeAmerican_w1",
+  "raceOther_w1"
+)])   # Might need to collapse asian, native american, & other b/c the proportion of students in each group is only 0.0466, 0.058, & 0.0682 
+
+
+summary(data[, c(
+  "healthInsur_w1",
+  "parentalEdu_w1",
+  "familyStruct_w1", # Maybe drop this variable or look into its meaning more (has 3 distinct values: 0, 1, 2)
+  "sport_w1",
+  "sportPartic_w1",
+  "feelings_w1",
+  "healthInsur_w3",
+  "healthInsur_w4",
+  "depress_w4"
+)])
+
+# PS model includes: "sportPartic_w1 ~ feelings_w1 + age_w1 + sex_w1 + ethnicity_w1 + white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 + parentalEdu_w1 + familyStruct_w1 + healthInsur_w1 + (1 | CLUSTER2)"
+
+# Need to scale: 
+# Scale, rename, & drop non-scaled variable
+data <- data %>%
+  mutate(
+    age_w1_sc = as.vector(scale(age_w1)),
+    parentalEdu_w1_sc = as.vector(scale(parentalEdu_w1)),
+    feelings_w1_sc = as.vector(scale(feelings_w1))
+  ) %>%
+  select(-age_w1, -parentalEdu_w1, -feelings_w1)  # Remove original columns if desired
+
+
+
+
 
 # Select variables in PS model 
 t <- data %>% 
-  select(!c(AID, CLUSTER2, sport_w1))
+  select(!c(AID, CLUSTER2, sport_w1, 
+            healthInsur_w3, healthInsur_w4)) 
 
 # Missing pattern 
 md.pattern(t, rotate.names = TRUE)
@@ -423,45 +512,82 @@ for (i in 1:length(var)) {
 # head(data[, var])
 
 
+# Add a scaled version of the mediator to use in outcome model 
+data <- data %>%
+  mutate(selfEst_w3_sc = as.vector(scale(selfEst_w3)))
+
+# Re-check 
+
+# Check proportions of categorical variables & Scale variables (maybe create the scaled version of the mediator (selfEst_w3) after imputing data)
+head(data)
+colnames(data)
+
+head(scale(data))
+summary(data[, c(
+  "sex_w1",
+  "ethnicity_w1",
+  "white_w1",
+  "black_w1",
+  "asian_w1",
+  "nativeAmerican_w1",
+  "raceOther_w1"
+)])   # Might need to collapse asian, native american, & other b/c the proportion of students in each group is only 0.0466, 0.058, & 0.0682 
+
+
+summary(data[, c(
+  "healthInsur_w1",
+  "parentalEdu_w1",
+  "familyStruct_w1", # Maybe drop this variable or look into its meaning more (has 3 distinct values: 0, 1, 2)
+  "sport_w1",
+  "sportPartic_w1",
+  "feelings_w1",
+  "healthInsur_w3",
+  "healthInsur_w4",
+  "depress_w4"
+)])
+
+
+
 
 # Descriptives & choose cluster size  -------------------------------------
 
-# Calculate cluster sizes again 
-data <- data %>% 
-  group_by(CLUSTER2) %>% 
-  mutate(n = n()) %>% 
-  ungroup()
-
-# Check clusters in order of size 
-data %>% 
-  group_by(CLUSTER2) %>% 
-  summarize(n = max(n)) %>% 
-  arrange(desc(n)) %>% 
-  print(n = 132) # 123 schools (cluster sizes ranged from 1 to 81 students)
-
-
-# Drop cluster sizes < 41 
+# # Calculate cluster sizes again 
+# data <- data %>% 
+#   group_by(CLUSTER2) %>% 
+#   mutate(n = n()) %>% 
+#   ungroup()
+# 
+# # Check clusters in order of size 
+# data %>% 
+#   group_by(CLUSTER2) %>% 
+#   summarize(n = max(n)) %>% 
+#   arrange(desc(n)) %>% 
+#   print(n = 132) # 123 schools (cluster sizes ranged from 1 to 81 students)
+# 
+# 
+# # Drop cluster sizes < 41 
+# # data <- data %>%
+# #   filter(n > 40) # To avoid convergence issues, we restricted our analysis to the 15 largest schools
+# # NOTE: I had convergence issues with 15 clusters, so I am trying more
+# 
+# # Drop cluster sizes < 5
+# # data <- data %>%
+# #   filter(n >= 5) # To avoid convergence issues, we restricted our analysis to the schools with 5 or more students (121 schools)
+# 
+# # Drop cluster sizes < 25
 # data <- data %>%
-#   filter(n > 40) # To avoid convergence issues, we restricted our analysis to the 15 largest schools
-# NOTE: I had convergence issues with 15 clusters, so I am trying more
-
-# Drop cluster sizes < 5
-# data <- data %>%
-#   filter(n >= 5) # To avoid convergence issues, we restricted our analysis to the schools with 5 or more students (121 schools)
-
-# Drop cluster sizes < 25
-data <- data %>%
-  filter(n >= 25) # To avoid convergence issues, we restricted our analysis to the schools with 25 or more students (62 schools)
-
-
-# cluster sizes
-data %>% 
-  group_by(CLUSTER2) %>% 
-  summarize(n = n()) %>% 
-  arrange(desc(n)) %>% 
-  print(n = 132) # 15 schools (cluster sizes ranged from 41 to 81 students)
-                 # 121 schools (cluster sizes ranged from 5 to 81 students)
-                 # 62 schools (cluster sizes ranged from 25 to 81 students)
+#   filter(n >= 40) # To avoid convergence issues, we restricted our analysis to the schools with 25 or more students (62 schools)
+# 
+# 
+# # cluster sizes
+# data %>% 
+#   group_by(CLUSTER2) %>% 
+#   summarize(n = n()) %>% 
+#   arrange(desc(n)) %>% 
+#   print(n = 132) # 15 schools (cluster sizes ranged from 41 to 81 students)
+#                  # 121 schools (cluster sizes ranged from 5 to 81 students)
+#                  # 62 schools (cluster sizes ranged from 25 to 81 students)
+#                  # 40 schools (cluster sizes ranged from 40 to 81 students)
 
 # Clean up environment 
 rm(imp, t, t_imp, 
@@ -480,6 +606,7 @@ med_icc <- med_var / (med_var + med_res)
 med_icc # 0.02 for med icc
         # with 121 schools (5+ in size) med icc = 0.006753599
         # with 62 schools (25+ in size) med icc = 0.01020648
+        # with 17 schools (40+ in size) med icc = 0.02445009
 
 # ICC for outcome 
 out_unconditional <- lme4::lmer(depress_w4 ~ (1 | CLUSTER2), data = data)
@@ -491,15 +618,15 @@ out_icc <- out_var / (out_var + out_res)
 out_icc # 0.016 for outcome icc
         # with 121 schools (5+ in size) outcome icc = 0.01863334
         # with 62 schools (25+ in size) outcome icc = 0.01981785
-
+        # with 17 schools (40+ in size) outcome icc = 0.01729325
 
 
 # PS ----------------------------------------------------------------------
 
 ## SL PS model -------------------------------------------------------------
-psmod_sl <- glm(formula = "sportPartic_w1 ~ feelings_w1 + age_w1 + sex_w1 + 
+psmod_sl <- glm(formula = "sportPartic_w1 ~ feelings_w1_sc + age_w1_sc + sex_w1 + 
                 ethnicity_w1 + white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
-                parentalEdu_w1 + familyStruct_w1 + healthInsur_w1",
+                parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1",
                 family = "binomial", 
                 data = data)
 data$ps_sl <- predict(psmod_sl, type = "response") 
@@ -508,9 +635,9 @@ data$ps_sl_logit <- predict(psmod_sl, type = "link")
 
 
 ## FE PS model -------------------------------------------------------------
-psmod_fe <- glm(formula = "sportPartic_w1 ~ feelings_w1 + age_w1 + sex_w1 + 
+psmod_fe <- glm(formula = "sportPartic_w1 ~ feelings_w1_sc + age_w1_sc + sex_w1 + 
                 ethnicity_w1 + white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
-                parentalEdu_w1 + familyStruct_w1 + healthInsur_w1 +
+                parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 +
                 as.factor(CLUSTER2)",
                 family = "binomial", 
                 data = data)
@@ -520,12 +647,12 @@ data$ps_fe_logit <- predict(psmod_fe, type = "link")
 
 
 ## RE PS model -------------------------------------------------------------
-psmod_re <- lme4::glmer(formula = "sportPartic_w1 ~ feelings_w1 + age_w1 + sex_w1 + 
+psmod_re <- lme4::glmer(formula = "sportPartic_w1 ~ feelings_w1_sc + age_w1_sc + sex_w1 + 
                         ethnicity_w1 + white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
-                        parentalEdu_w1 + familyStruct_w1 + healthInsur_w1 + (1 | CLUSTER2)",
+                        parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 + (1 | CLUSTER2)",
                         family = "binomial", 
-                        data = data,
-                        control = lme4::glmerControl(optimizer = "bobyqa")) # Changing optimizer
+                        data = data) 
+                        # control = lme4::glmerControl(optimizer = "bobyqa")) # Changing optimizer
 # control = glmerControl(optCtrl = list(maxfun = 100000))) # Increase max iterations to 1000
 # control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000))) # Increase max iterations to 1000
 data$ps_re <- predict(psmod_re, type = "response")
@@ -797,12 +924,21 @@ sl_overlap <- list()
     ggplot(aes(x = ps_sl_logit, 
                group = sportPartic_w1, 
                fill = sportPartic_w1)) +
-    geom_histogram(position = "identity",
-                   alpha = 0.7,
-                   binwidth = 0.1) +
+      geom_histogram(position = "identity",
+                     alpha = 0.5,
+                     binwidth = 0.1) +
+      geom_density(aes(y = ..count.. * 0.1, 
+                       color = sportPartic_w1),  
+                   size = 0.5,        
+                   alpha = 0, 
+                   trim = TRUE, 
+                   show.legend = FALSE) +      # Set alpha to 1 (no transparency)
     facet_wrap(~ source, ncol = 1) +
+    scale_fill_manual(values = c("blue", "darkorange")) +
+    scale_color_manual(values = c("blue", "darkorange")) +
     theme_minimal() +
     labs(# title = "Histogram of ps_sl_logit by sportPartic_w1",
+      y = "count",
       fill = "trt (Sport Participation)") +
     theme(legend.position = "bottom"))
 
@@ -824,6 +960,15 @@ sl_overlap$post_summary <- data_sl %>%
 sl_overlap$histogram
 sl_overlap$pre_summary
 sl_overlap$post_summary
+
+# > sl_overlap$pre_summary            # With 17 largest schools 
+#   sportPartic_w1    min  mean   max
+# 1              0 -1.17  0.370  2.32
+# 2              1 -0.816 0.681  1.79
+# > sl_overlap$post_summary
+#   sportPartic_w1    min  mean   max
+# 1              0 -0.837 0.383  1.76
+# 2              1 -0.816 0.681  1.79
 
 # > sl_overlap$pre_summary            # With 62 largest schools 
 #   sportPartic_w1   min  mean   max
@@ -864,9 +1009,18 @@ fe_overlap <- list()
     geom_histogram(position = "identity",
                    alpha = 0.7,
                    binwidth = 0.1) +
+    geom_density(aes(y = ..count.. * 0.1, 
+                     color = sportPartic_w1),  
+                 size = 0.5,        
+                 alpha = 0, 
+                 trim = TRUE, 
+                 show.legend = FALSE) +      # Set alpha to 1 (no transparency)
     facet_wrap(~ source, ncol = 1) +
+    scale_fill_manual(values = c("blue", "darkorange")) +
+    scale_color_manual(values = c("blue", "darkorange")) +
     theme_minimal() +
     labs(# title = "Histogram of ps_fe_logit by sportPartic_w1",
+      y = "count",
       fill = "trt (Sport Participation)") +
     theme(legend.position = "bottom"))
 
@@ -888,6 +1042,15 @@ fe_overlap$post_summary <- data_fe %>%
 fe_overlap$histogram
 fe_overlap$pre_summary
 fe_overlap$post_summary
+
+# > fe_overlap$pre_summary            # With 17 largest schools 
+#   sportPartic_w1   min  mean   max
+# 1              0 -2.14 0.146  3.69
+# 2              1 -1.27 1.02   4.47
+# > fe_overlap$post_summary
+#   sportPartic_w1   min  mean   max
+# 1              0 -1.30 0.176  3.69
+# 2              1 -1.27 0.965  3.71
 
 # > fe_overlap$pre_summary            # With 62 largest schools 
 #   sportPartic_w1   min  mean   max
@@ -928,9 +1091,18 @@ re_overlap <- list()
   geom_histogram(position = "identity",
                  alpha = 0.7,
                  binwidth = 0.1) +
-  facet_wrap(~ source, ncol = 1) +
+    geom_density(aes(y = ..count.. * 0.1, 
+                     color = sportPartic_w1),  
+                 size = 0.5,        
+                 alpha = 0, 
+                 trim = TRUE, 
+                 show.legend = FALSE) +      # Set alpha to 1 (no transparency)
+    facet_wrap(~ source, ncol = 1) +
+    scale_fill_manual(values = c("blue", "darkorange")) +
+    scale_color_manual(values = c("blue", "darkorange")) +
   theme_minimal() +
   labs(# title = "Histogram of ps_re_logit by sportPartic_w1",
+    y = "count",
     fill = "trt (Sport Participation)") +
   theme(legend.position = "bottom"))
 
@@ -952,6 +1124,15 @@ re_overlap$post_summary <- data_re %>%
 re_overlap$histogram
 re_overlap$pre_summary
 re_overlap$post_summary
+
+# > re_overlap$pre_summary            # With 17 largest schools 
+#   sportPartic_w1   min  mean   max
+# 1              0 -1.78 0.186  2.83
+# 2              1 -1.11 0.903  3.54
+# > re_overlap$post_summary
+#   sportPartic_w1   min  mean   max
+# 1              0 -1.07 0.218  2.83
+# 2              1 -1.11 0.843  2.85
 
 # > re_overlap$pre_summary            # With 62 largest schools 
 #   sportPartic_w1   min  mean   max
@@ -1453,6 +1634,12 @@ print(boot_ci_rere)
 paste0("Number of converged mediator models: ", sum(mediator_converged), " (", (sum(mediator_converged)/length(mediator_converged))*100, "%)")
 paste0("Number of converged outcome models: ", sum(outcome_converged), " (", (sum(outcome_converged)/length(outcome_converged))*100, "%)")
 paste0("Number of iterations with both models converged: ", sum(mediator_converged & outcome_converged), " (", (sum(mediator_converged & outcome_converged)/length(mediator_converged & outcome_converged))*100, "%)")
+
+# 2.5%       97.5% 
+# -0.29022769  0.02240406 
+# [1] "Number of converged mediator models: 34 (68%)"
+# [1] "Number of converged outcome models: 20 (40%)"
+# [1] "Number of iterations with both models converged: 12 (24%)"   # With 17 largest schools & dropped nonoverlapping cases (SL: 5, FE: 15, RE: 20) 
 
 # 2.5%       97.5% 
 # -0.10019603  0.06098333 
