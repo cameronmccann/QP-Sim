@@ -12,7 +12,7 @@
 # Script Description:
 #
 #
-# Last Updated: 07/18/2024 
+# Last Updated: 07/19/2024 
 #
 #
 # Notes:
@@ -409,7 +409,6 @@ t_imp <- complete(imp, "long", include = TRUE)
 
 # head(t); head(t_imp[t_imp$.imp == 1, ])
 
-
 # replace missing values in original data set
 var <- colnames(t)
 for (i in 1:length(var)) {
@@ -447,8 +446,12 @@ data %>%
 # NOTE: I had convergence issues with 15 clusters, so I am trying more
 
 # Drop cluster sizes < 5
+# data <- data %>%
+#   filter(n >= 5) # To avoid convergence issues, we restricted our analysis to the schools with 5 or more students (121 schools)
+
+# Drop cluster sizes < 25
 data <- data %>%
-  filter(n >= 5) # To avoid convergence issues, we restricted our analysis to the schools with 5 or more students (121 schools)
+  filter(n >= 25) # To avoid convergence issues, we restricted our analysis to the schools with 25 or more students (62 schools)
 
 
 # cluster sizes
@@ -458,6 +461,7 @@ data %>%
   arrange(desc(n)) %>% 
   print(n = 132) # 15 schools (cluster sizes ranged from 41 to 81 students)
                  # 121 schools (cluster sizes ranged from 5 to 81 students)
+                 # 62 schools (cluster sizes ranged from 25 to 81 students)
 
 # Clean up environment 
 rm(imp, t, t_imp, 
@@ -474,7 +478,8 @@ med_var <- data.frame(lme4::VarCorr(med_unconditional))[1, 4] # variance due to 
 med_res <- data.frame(lme4::VarCorr(med_unconditional))[2, 4] # residual variance 
 med_icc <- med_var / (med_var + med_res)
 med_icc # 0.02 for med icc
-        # with 121 schools (5+ in size) med icc = 0.007111455
+        # with 121 schools (5+ in size) med icc = 0.006753599
+        # with 62 schools (25+ in size) med icc = 0.01020648
 
 # ICC for outcome 
 out_unconditional <- lme4::lmer(depress_w4 ~ (1 | CLUSTER2), data = data)
@@ -484,7 +489,8 @@ out_var <- data.frame(lme4::VarCorr(out_unconditional))[1, 4] # variance due to 
 out_res <- data.frame(lme4::VarCorr(out_unconditional))[2, 4] # residual variance 
 out_icc <- out_var / (out_var + out_res)
 out_icc # 0.016 for outcome icc
-        # with 121 schools (5+ in size) outcome icc = 0.01866436
+        # with 121 schools (5+ in size) outcome icc = 0.01863334
+        # with 62 schools (25+ in size) outcome icc = 0.01981785
 
 
 
@@ -498,7 +504,7 @@ psmod_sl <- glm(formula = "sportPartic_w1 ~ feelings_w1 + age_w1 + sex_w1 +
                 data = data)
 data$ps_sl <- predict(psmod_sl, type = "response") 
 data$ps_sl_logit <- predict(psmod_sl, type = "link")
-data <- cbind(data, iptw_sl = with(data, (sportPartic_w1 / ps_sl) + (1 - sportPartic_w1) / (1 - ps_sl)))
+# data <- cbind(data, iptw_sl = with(data, (sportPartic_w1 / ps_sl) + (1 - sportPartic_w1) / (1 - ps_sl)))
 
 
 ## FE PS model -------------------------------------------------------------
@@ -510,7 +516,7 @@ psmod_fe <- glm(formula = "sportPartic_w1 ~ feelings_w1 + age_w1 + sex_w1 +
                 data = data)
 data$ps_fe <- predict(psmod_fe, type = "response")
 data$ps_fe_logit <- predict(psmod_fe, type = "link")
-data <- cbind(data, iptw_fe = with(data, (sportPartic_w1 / ps_fe) + (1 - sportPartic_w1) / (1 - ps_fe)))
+# data <- cbind(data, iptw_fe = with(data, (sportPartic_w1 / ps_fe) + (1 - sportPartic_w1) / (1 - ps_fe)))
 
 
 ## RE PS model -------------------------------------------------------------
@@ -518,13 +524,13 @@ psmod_re <- lme4::glmer(formula = "sportPartic_w1 ~ feelings_w1 + age_w1 + sex_w
                         ethnicity_w1 + white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
                         parentalEdu_w1 + familyStruct_w1 + healthInsur_w1 + (1 | CLUSTER2)",
                         family = "binomial", 
-                        data = data, 
+                        data = data,
                         control = lme4::glmerControl(optimizer = "bobyqa")) # Changing optimizer
 # control = glmerControl(optCtrl = list(maxfun = 100000))) # Increase max iterations to 1000
 # control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000))) # Increase max iterations to 1000
 data$ps_re <- predict(psmod_re, type = "response")
 data$ps_re_logit <- predict(psmod_re, type = "link")
-data <- cbind(data, iptw_re = with(data, (sportPartic_w1 / ps_re) + (1 - sportPartic_w1) / (1 - ps_re)))
+# data <- cbind(data, iptw_re = with(data, (sportPartic_w1 / ps_re) + (1 - sportPartic_w1) / (1 - ps_re)))
 
 
 
@@ -621,9 +627,8 @@ cobalt::bal.tab(sportPartic_w1 ~ feelings_w1 + age_w1 + sex_w1 +
 
 
 # Drop Nonoverlap ---------------------------------------------------------
-
-## SL ----------------------------------------------------------------------
-### dynamic threshold -------------------------------------------------------
+### SL ----------------------------------------------------------------------
+##### dynamic threshold -------------------------------------------------------
 # Identify nonoverlapping cases with a caliper of 0.05
 caliper <- 0.05
 data_sl <- data
@@ -660,12 +665,12 @@ paste0(
   ")"
 )
 
-# # drop nonoverlap cases 
-# data_sl <- data_sl[data_sl$ind_nonoverlap == FALSE, ]
+# drop nonoverlap cases
+data_sl <- data_sl[data_sl$ind_nonoverlap == FALSE, ]
 
 
-## FE ----------------------------------------------------------------------
-### dynamic threshold -------------------------------------------------------
+### FE ----------------------------------------------------------------------
+##### dynamic threshold -------------------------------------------------------
 caliper <- 0.05
 data_fe <- data
 data_fe <- data_fe %>% 
@@ -701,12 +706,12 @@ paste0(
   ")"
 )
 
-# # drop nonoverlap cases 
-# data_fe <- data_fe[data_fe$ind_nonoverlap == FALSE, ]
+# drop nonoverlap cases 
+data_fe <- data_fe[data_fe$ind_nonoverlap == FALSE, ]
 
 
-## RE ----------------------------------------------------------------------
-### fixed threshold ---------------------------------------------------------
+### RE ----------------------------------------------------------------------
+##### fixed threshold ---------------------------------------------------------
 # Identify nonoverlapping cases with a caliper of 0.05
 caliper <- 0.05
 data_re <- data
@@ -733,7 +738,7 @@ paste0(sum(data_re$nonoverlap), " non-overlapping cases (left: ",
        sum(data_re$nonoverlap_left), "; right: ", sum(data_re$nonoverlap_right), ")")
 
 
-### dynamic threshold -------------------------------------------------------
+##### dynamic threshold -------------------------------------------------------
 caliper <- 0.05
 data_re <- data
 data_re <- data_re %>% 
@@ -769,35 +774,209 @@ paste0(
   ")"
 )
 
-# # drop nonoverlap cases 
-# data_re <- data_re[data_re$ind_nonoverlap == FALSE, ]
+# drop nonoverlap cases
+data_re <- data_re[data_re$ind_nonoverlap == FALSE, ]
 
 
-#### Check Overlap -----------------------------------------------------------
+# Check Overlap -----------------------------------------------------------
 
-# Histogram of PS logit 
-data_re %>%
-  ggplot(aes(x = ps_re_logit, group = as.factor(sportPartic_w1), fill = as.factor(sportPartic_w1))) +
-    geom_histogram(position = "identity", alpha = 0.5, binwidth = 0.1) +
+### SL ----------------------------------------------------------------------
+
+sl_overlap <- list()
+
+# Add stacked overlap visual to compare before & after dropping 
+(sl_overlap$histogram <- 
+    rbind(
+      data.frame(ps_sl_logit = data$ps_sl_logit, 
+                 sportPartic_w1 = as.factor(data$sportPartic_w1),
+                 source = "pre"),
+      data.frame(ps_sl_logit = data_sl$ps_sl_logit, 
+                 sportPartic_w1 = as.factor(data_sl$sportPartic_w1),
+                 source = "post")
+    ) %>% 
+    ggplot(aes(x = ps_sl_logit, 
+               group = sportPartic_w1, 
+               fill = sportPartic_w1)) +
+    geom_histogram(position = "identity",
+                   alpha = 0.7,
+                   binwidth = 0.1) +
+    facet_wrap(~ source, ncol = 1) +
     theme_minimal() +
-    labs(
-      title = "Mirrored Histogram of ps_fe_logit by sportPartic_w1",
-      x = "ps_fe_logit",
-      y = "Frequency",
-      fill = "sportPartic_w1"
-    )
-# Stats of PS logit 
-data_re %>% 
+    labs(# title = "Histogram of ps_sl_logit by sportPartic_w1",
+      fill = "trt (Sport Participation)") +
+    theme(legend.position = "bottom"))
+
+# Add summary stats for PS logit before & after dropping cases 
+sl_overlap$pre_summary <- data %>% 
+  group_by(sportPartic_w1) %>% 
+  summarize(min = min(ps_sl_logit), 
+            mean = mean(ps_sl_logit), 
+            max = max(ps_sl_logit))
+
+sl_overlap$post_summary <- data_sl %>% 
+  group_by(sportPartic_w1) %>% 
+  summarize(min = min(ps_sl_logit), 
+            mean = mean(ps_sl_logit), 
+            max = max(ps_sl_logit))
+
+
+# Display 
+sl_overlap$histogram
+sl_overlap$pre_summary
+sl_overlap$post_summary
+
+# > sl_overlap$pre_summary            # With 62 largest schools 
+#   sportPartic_w1   min  mean   max
+# 1              0 -1.24 0.355  1.83
+# 2              1 -2.64 0.560  1.56
+# > sl_overlap$post_summary
+#   sportPartic_w1    min  mean   max
+# 1              0 -1.24  0.351  1.46
+# 2              1 -0.764 0.562  1.56
+
+# > sl_overlap$pre_summary            # With 121 largest schools 
+#   sportPartic_w1   min  mean   max
+# 1              0 -1.14 0.361  1.54
+# 2              1 -2.67 0.546  1.46
+# > sl_overlap$post_summary
+#   sportPartic_w1    min  mean   max
+# 1              0 -1.14  0.359  1.46
+# 2              1 -0.700 0.547  1.46
+
+
+### FE ----------------------------------------------------------------------
+
+fe_overlap <- list()
+
+# Add stacked overlap visual to compare before & after dropping 
+(fe_overlap$histogram <- 
+    rbind(
+      data.frame(ps_fe_logit = data$ps_fe_logit, 
+                 sportPartic_w1 = as.factor(data$sportPartic_w1),
+                 source = "pre"),
+      data.frame(ps_fe_logit = data_fe$ps_fe_logit, 
+                 sportPartic_w1 = as.factor(data_fe$sportPartic_w1),
+                 source = "post")
+    ) %>% 
+    ggplot(aes(x = ps_fe_logit, 
+               group = sportPartic_w1, 
+               fill = sportPartic_w1)) +
+    geom_histogram(position = "identity",
+                   alpha = 0.7,
+                   binwidth = 0.1) +
+    facet_wrap(~ source, ncol = 1) +
+    theme_minimal() +
+    labs(# title = "Histogram of ps_fe_logit by sportPartic_w1",
+      fill = "trt (Sport Participation)") +
+    theme(legend.position = "bottom"))
+
+# Add summary stats for PS logit before & after dropping cases 
+fe_overlap$pre_summary <- data %>% 
+  group_by(sportPartic_w1) %>% 
+  summarize(min = min(ps_fe_logit), 
+            mean = mean(ps_fe_logit), 
+            max = max(ps_fe_logit))
+
+fe_overlap$post_summary <- data_fe %>% 
+  group_by(sportPartic_w1) %>% 
+  summarize(min = min(ps_fe_logit), 
+            mean = mean(ps_fe_logit), 
+            max = max(ps_fe_logit))
+
+
+# Display 
+fe_overlap$histogram
+fe_overlap$pre_summary
+fe_overlap$post_summary
+
+# > fe_overlap$pre_summary            # With 62 largest schools 
+#   sportPartic_w1   min  mean   max
+# 1              0 -1.90 0.118  3.70
+# 2              1 -2.77 0.869  4.30
+# > fe_overlap$post_summary
+#   sportPartic_w1   min  mean   max
+# 1              0 -1.90 0.118  3.70
+# 2              1 -1.41 0.832  3.75
+
+# > fe_overlap$pre_summary            # With 121 largest schools 
+# sportPartic_w1   min  mean   max
+# 1              0 -2.00 0.111  3.73
+# 2              1 -3.14 0.928 15.2 
+# > fe_overlap$post_summary
+# sportPartic_w1   min  mean   max
+# 1              0 -2.00 0.111  3.73
+# 2              1 -1.82 0.827  3.79
+
+
+### RE ----------------------------------------------------------------------
+
+re_overlap <- list()
+
+# Add stacked overlap visual to compare before & after dropping 
+(re_overlap$histogram <- 
+  rbind(
+    data.frame(ps_re_logit = data$ps_re_logit, 
+               sportPartic_w1 = as.factor(data$sportPartic_w1),
+               source = "pre"),
+    data.frame(ps_re_logit = data_re$ps_re_logit, 
+               sportPartic_w1 = as.factor(data_re$sportPartic_w1),
+               source = "post")
+  ) %>% 
+  ggplot(aes(x = ps_re_logit, 
+             group = sportPartic_w1, 
+             fill = sportPartic_w1)) +
+  geom_histogram(position = "identity",
+                 alpha = 0.7,
+                 binwidth = 0.1) +
+  facet_wrap(~ source, ncol = 1) +
+  theme_minimal() +
+  labs(# title = "Histogram of ps_re_logit by sportPartic_w1",
+    fill = "trt (Sport Participation)") +
+  theme(legend.position = "bottom"))
+
+# Add summary stats for PS logit before & after dropping cases 
+re_overlap$pre_summary <- data %>% 
   group_by(sportPartic_w1) %>% 
   summarize(min = min(ps_re_logit), 
             mean = mean(ps_re_logit), 
             max = max(ps_re_logit))
-#   sportPartic_w1   min  mean   max  # Pre-drop 
+
+re_overlap$post_summary <- data_re %>% 
+  group_by(sportPartic_w1) %>% 
+  summarize(min = min(ps_re_logit), 
+            mean = mean(ps_re_logit), 
+            max = max(ps_re_logit))
+
+
+# Display 
+re_overlap$histogram
+re_overlap$pre_summary
+re_overlap$post_summary
+
+# > re_overlap$pre_summary            # With 62 largest schools 
+#   sportPartic_w1   min  mean   max
+# 1              0 -1.46 0.178  2.83
+# 2              1 -2.72 0.746  3.02
+# > re_overlap$post_summary
+#   sportPartic_w1   min  mean   max
+# 1              0 -1.46 0.178  2.83
+# 2              1 -1.10 0.743  2.86
+
+# > re_overlap$pre_summary            # With 121 largest schools 
+#   sportPartic_w1   min  mean   max
 # 1              0 -1.48 0.193  2.72
 # 2              1 -2.91 0.715  2.96
-#   sportPartic_w1   min  mean   max  # Post-drop 
+# > re_overlap$post_summary
+#   sportPartic_w1   min  mean   max
 # 1              0 -1.48 0.193  2.72
 # 2              1 -1.09 0.710  2.74
+
+
+
+
+
+
+
 
 ##### OLD CODE  ---------------------------------------------------------------
 
@@ -834,6 +1013,16 @@ overlap(data_re$ps_fe_logit, data_re$sportPartic_w1, bin = 100)
 
 
 
+# IPTW  -------------------------------------------------------------------
+# SL 
+data_sl <- cbind(data_sl, iptw_sl = with(data_sl, (sportPartic_w1 / ps_sl) + (1 - sportPartic_w1) / (1 - ps_sl)))
+# FE
+data_fe <- cbind(data_fe, iptw_fe = with(data_fe, (sportPartic_w1 / ps_fe) + (1 - sportPartic_w1) / (1 - ps_fe)))
+# RE 
+data_re <- cbind(data_re, iptw_re = with(data_re, (sportPartic_w1 / ps_re) + (1 - sportPartic_w1) / (1 - ps_re)))
+
+
+
 # Estimate Effects --------------------------------------------------------
 
 
@@ -847,7 +1036,7 @@ med_slsl <-
     formula = "selfEst_w3 ~ sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
       white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
       parentalEdu_w1 + familyStruct_w1 + healthInsur_w3",
-    data = data,
+    data = data_sl,
     weights = iptw_sl
   )
 # Fixed-Effect PS & SL med/outcome
@@ -856,7 +1045,7 @@ med_fesl <-
     formula = "selfEst_w3 ~ sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
       white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
       parentalEdu_w1 + familyStruct_w1 + healthInsur_w3",
-    data = data,
+    data = data_fe,
     weights = iptw_fe
   )
 # Random-Effect PS & SL med/outcome
@@ -865,7 +1054,7 @@ med_resl <-
     formula = "selfEst_w3 ~ sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
       white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
       parentalEdu_w1 + familyStruct_w1 + healthInsur_w3",
-    data = data,
+    data = data_re,
     weights = iptw_re
   )
 
@@ -876,27 +1065,30 @@ med_resl <-
 med_slfe <- glm(formula = "selfEst_w3 ~ sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
       white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
       parentalEdu_w1 + familyStruct_w1 + healthInsur_w3 + as.factor(CLUSTER2)", 
-      data = data, 
+      data = data_sl, 
       weights = iptw_sl)
 # Fixed-Effect PS & FE med/outcome 
 med_fefe <- glm(formula = "selfEst_w3 ~ sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
       white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
       parentalEdu_w1 + familyStruct_w1 + healthInsur_w3 + as.factor(CLUSTER2)", 
-      data = data, 
+      data = data_fe, 
       weights = iptw_fe)
 
 # Random-Effect PS & FE med/outcome
 med_refe <- glm(formula = "selfEst_w3 ~ sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
       white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
       parentalEdu_w1 + familyStruct_w1 + healthInsur_w3 + as.factor(CLUSTER2)", 
-      data = data, 
+      data = data_re, 
       weights = iptw_re)
 
 
 ### Mediator models (RE) ----------------------------------------------------
 
 ### Add column of just 1s for level-2 weight
-data <- cbind(data, L2weight = rep(1, nrow(data)))
+# data <- cbind(data, L2weight = rep(1, nrow(data)))
+data_sl <- cbind(data_sl, L2weight = rep(1, nrow(data_sl)))
+data_fe <- cbind(data_fe, L2weight = rep(1, nrow(data_fe)))
+data_re <- cbind(data_re, L2weight = rep(1, nrow(data_re)))
 
 # Single-Level PS & RE med/outcome
 med_slre <-
@@ -904,7 +1096,7 @@ med_slre <-
     formula = selfEst_w3 ~ sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
       white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
       parentalEdu_w1 + familyStruct_w1 + healthInsur_w3 + (1 | CLUSTER2),
-    data = data,
+    data = data_sl,
     weights = c("iptw_sl", "L2weight")
   )
 # Fixed-Effect PS & RE med/outcome 
@@ -913,7 +1105,7 @@ med_fere <-
     formula = selfEst_w3 ~ sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
       white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
       parentalEdu_w1 + familyStruct_w1 + healthInsur_w3 + (1 | CLUSTER2),
-    data = data,
+    data = data_fe,
     weights = c("iptw_fe", "L2weight")
   )
 # Random-Effect PS & RE med/outcome
@@ -922,7 +1114,7 @@ med_rere <-
     formula = selfEst_w3 ~ sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
       white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
       parentalEdu_w1 + familyStruct_w1 + healthInsur_w3 + (1 | CLUSTER2),
-    data = data,
+    data = data_re,
     weights = c("iptw_re", "L2weight")
   )
 
@@ -938,7 +1130,7 @@ out_slsl <-
     formula = "depress_w4 ~ selfEst_w3 + sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
       white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
       parentalEdu_w1 + familyStruct_w1 + healthInsur_w4",
-    data = data,
+    data = data_sl,
     weights = iptw_sl
   )
 # Fixed-Effect
@@ -947,7 +1139,7 @@ out_fesl <-
     "depress_w4 ~ selfEst_w3 + sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
       white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
       parentalEdu_w1 + familyStruct_w1 + healthInsur_w4",
-    data = data,
+    data = data_fe,
     weights = iptw_fe
   )
 # Random-Effect
@@ -956,7 +1148,7 @@ out_resl <-
     "depress_w4 ~ selfEst_w3 + sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
       white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
       parentalEdu_w1 + familyStruct_w1 + healthInsur_w4",
-    data = data,
+    data = data_re,
     weights = iptw_re
   )
 
@@ -967,19 +1159,19 @@ out_resl <-
 out_slfe <- glm(formula = "depress_w4 ~ selfEst_w3 + sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
       white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
       parentalEdu_w1 + familyStruct_w1 + healthInsur_w4 + as.factor(CLUSTER2)", 
-      data = data, 
+      data = data_sl, 
       weights = iptw_sl)
 # Fixed-Effect PS & FE med/outcome 
 out_fefe <- glm(formula = "depress_w4 ~ selfEst_w3 + sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
       white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
       parentalEdu_w1 + familyStruct_w1 + healthInsur_w4 + as.factor(CLUSTER2)", 
-      data = data, 
+      data = data_fe, 
       weights = iptw_fe)
 # Random-Effect PS & FE med/outcome
 out_refe <-glm(formula = "depress_w4 ~ selfEst_w3 + sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
       white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
       parentalEdu_w1 + familyStruct_w1 + healthInsur_w4 + as.factor(CLUSTER2)",
-      data = data,
+      data = data_re,
       weights = iptw_re
 )
 
@@ -988,6 +1180,9 @@ out_refe <-glm(formula = "depress_w4 ~ selfEst_w3 + sportPartic_w1 + age_w1 + se
 
 # ### If not done so with mediator model, add column of just 1s for level-2 weight
 # data <- cbind(data, L2weight = rep(1, nrow(data)))
+# data_sl <- cbind(data_sl, L2weight = rep(1, nrow(data_sl)))
+# data_fe <- cbind(data_fe, L2weight = rep(1, nrow(data_fe)))
+# data_re <- cbind(data_re, L2weight = rep(1, nrow(data_re)))
 
 # Single-Level PS & RE med/outcome
 out_slre <-
@@ -995,7 +1190,7 @@ out_slre <-
     formula = depress_w4 ~ selfEst_w3 + sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
       white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
       parentalEdu_w1 + familyStruct_w1 + healthInsur_w4 + (1 | CLUSTER2),
-    data = data,
+    data = data_sl,
     weights = c("iptw_sl", "L2weight")
   )
 # Fixed-Effect PS & RE med/outcome 
@@ -1004,7 +1199,7 @@ out_fere <-
     formula = depress_w4 ~ selfEst_w3 + sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
       white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
       parentalEdu_w1 + familyStruct_w1 + healthInsur_w4 + (1 | CLUSTER2),
-    data = data,
+    data = data_fe,
     weights = c("iptw_fe", "L2weight")
   )
 # Random-Effect PS & RE med/outcome
@@ -1013,7 +1208,7 @@ out_rere <-
     formula = depress_w4 ~ selfEst_w3 + sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
       white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
       parentalEdu_w1 + familyStruct_w1 + healthInsur_w4 + (1 | CLUSTER2),
-    data = data,
+    data = data_re,
     weights = c("iptw_re", "L2weight")
   )
 
@@ -1056,7 +1251,29 @@ results_DF <- data.frame(
   )
 )
 
-# results_DF
+results_DF
+#   cond        NDE          NIE  # With 62 largest schools & dropped nonoverlapping cases (SL: 3, FE: 18, RE: 4) 
+# 1 slsl -0.3440008  0.001201179
+# 2 fesl -0.2160818 -0.009420466
+# 3 resl -0.2486070 -0.016260947
+# 4 slfe -0.2526180 -0.045080793
+# 5 fefe -0.2335502 -0.018090723
+# 6 refe -0.2283702 -0.031976047
+# 7 slre -0.2902622 -0.021014822
+# 8 fere -0.2302072 -0.016367209
+# 9 rere -0.2372861 -0.023401019
+
+#   cond        NDE         NIE   # With 121 largest schools & dropped nonoverlapping cases (SL: 3, FE: 27, RE: 7) 
+# 1 slsl -0.2438572 -0.01447974
+# 2 fesl -0.1110024 -0.02847153
+# 3 resl -0.1706718 -0.02770936
+# 4 slfe -0.1397979 -0.04151474
+# 5 fefe -0.1224656 -0.03418641
+# 6 refe -0.1258049 -0.03783174
+# 7 slre -0.1837684 -0.02902276
+# 8 fere -0.1216793 -0.03356498
+# 9 rere -0.1471450 -0.03248475
+
 #   cond       NDE         NIE
 # 1 slsl 0.4034979 -0.01127713  # With 15 largest schools 
 # 2 fesl 0.5285937  0.07458896
@@ -1068,7 +1285,7 @@ results_DF <- data.frame(
 # 8 fere 0.5097119  0.06037420
 # 9 rere 0.5099829  0.02680802
 
-#   cond        NDE         NIE
+#   cond        NDE         NIE # With 121 largest schools 
 # 1 slsl -0.2368474 -0.02117536
 # 2 fesl -0.1184377 -0.03255229
 # 3 resl -0.1793095 -0.02837372
@@ -1081,6 +1298,190 @@ results_DF <- data.frame(
 
 
 
+
+
+
+# Bootstrap CI ------------------------------------------------------------
+
+###### Investigating convergence issues when bootstrapping with RERE ----------------
+
+# only 50 iterations 
+
+# Initialize vectors to store the bootstrap indirect effects and convergence statuses
+indirect_effects_boot_rere <- numeric(50)
+mediator_converged <- logical(50)
+outcome_converged <- logical(50)
+
+# Create the progress bar
+pb <- txtProgressBar(min = 0, max = length(outcome_converged), style = 3, width = 50, char = "=")
+
+# Perform bootstrap resampling
+set.seed(456)
+for (i in 1:50) {
+  # Resample with replacement at the cluster level
+  cluster_boot <- sample(unique(data$CLUSTER2), replace = TRUE)
+  data_boot <- data[data$CLUSTER2 %in% cluster_boot, ]
+  
+  # Fit the RE models with RE ps for the bootstrap sample
+  ### Add column of just 1s for level-2 weight
+  data_boot <- cbind(data_boot, L2weight = rep(1, nrow(data_boot)))
+  
+  mediator_rere <- tryCatch({
+    WeMix::mix(formula = selfEst_w3 ~ sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
+                 white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
+                 parentalEdu_w1 + familyStruct_w1 + healthInsur_w3 + (1 | CLUSTER2), 
+               data = data_boot, 
+               weights = c("iptw_re", "L2weight"))
+  }, error = function(e) NULL)
+  
+  outcome_rere <- tryCatch({
+    WeMix::mix(formula = depress_w4 ~ selfEst_w3 + sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
+                 white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
+                 parentalEdu_w1 + familyStruct_w1 + healthInsur_w4 + (1 | CLUSTER2), 
+               data = data_boot, 
+               weights = c("iptw_re", "L2weight"))
+  }, error = function(e) NULL)
+  
+  # Check convergence and calculate indirect effect if both models converged
+  mediator_converged[i] <- !is.null(mediator_rere)
+  outcome_converged[i] <- !is.null(outcome_rere)
+  
+  if (mediator_converged[i] && outcome_converged[i]) {
+    indirect_effects_boot_rere[i] <- summary(mediator_rere)$coef["sportPartic_w1", "Estimate"] * 
+      summary(outcome_rere)$coef["selfEst_w3", "Estimate"]
+  } else {
+    indirect_effects_boot_rere[i] <- NA
+  }
+  
+  # Update the progress bar
+  setTxtProgressBar(pb, i)
+}
+
+# Close the progress bar & print completion message
+close(pb)
+cat("\nBootstrap resampling completed!\n")
+
+# Calculate the percentile bootstrap CI
+boot_ci_rere <- quantile(indirect_effects_boot_rere, probs = c(0.025, 0.975), na.rm = TRUE)
+
+# Print results
+print(boot_ci_rere)
+paste0("Number of converged mediator models: ", sum(mediator_converged), " (", (sum(mediator_converged)/length(mediator_converged))*100, "%)")
+paste0("Number of converged outcome models: ", sum(outcome_converged), " (", (sum(outcome_converged)/length(outcome_converged))*100, "%)")
+paste0("Number of iterations with both models converged: ", sum(mediator_converged & outcome_converged), " (", (sum(mediator_converged & outcome_converged)/length(mediator_converged & outcome_converged))*100, "%)")
+# 2.5%      97.5% 
+# -0.1764424  0.1432817 
+# [1] "Number of converged mediator models: 28 (56%)"
+# [1] "Number of converged outcome models: 28 (56%)"
+# [1] "Number of iterations with both models converged: 17 (34%)"   # With 15 largest schools  
+
+# 2.5%       97.5% 
+# -0.08573095  0.04281563 
+# [1] "Number of converged mediator models: 40 (80%)"
+# [1] "Number of converged outcome models: 50 (100%)"
+# [1] "Number of iterations with both models converged: 40 (80%)"   # With 121 largest schools 
+
+# Print all indirect effects
+cat("All indirect effects:\n")
+print(indirect_effects_boot_rere)
+
+
+
+###### After dropping nonoverlap - Investigating convergence issues when bootstrapping with RERE ----------------
+
+# only 50 iterations 
+
+# Initialize vectors to store the bootstrap indirect effects and convergence statuses
+indirect_effects_boot_rere <- numeric(50)
+mediator_converged <- logical(50)
+outcome_converged <- logical(50)
+
+# Create the progress bar
+pb <- txtProgressBar(min = 0, max = length(outcome_converged), style = 3, width = 50, char = "=")
+
+# Perform bootstrap resampling
+set.seed(456)
+for (i in 1:50) {
+  # Resample with replacement at the cluster level
+  cluster_boot <- sample(unique(data_re$CLUSTER2), replace = TRUE)
+  data_boot <- data_re[data_re$CLUSTER2 %in% cluster_boot, ]
+  
+  # Fit the RE models with RE ps for the bootstrap sample
+  ### Add column of just 1s for level-2 weight
+  data_boot <- cbind(data_boot, L2weight = rep(1, nrow(data_boot)))
+  
+  mediator_rere <- tryCatch({
+    WeMix::mix(formula = selfEst_w3 ~ sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
+                 white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
+                 parentalEdu_w1 + familyStruct_w1 + healthInsur_w3 + (1 | CLUSTER2), 
+               data = data_boot, 
+               weights = c("iptw_re", "L2weight"))
+  }, error = function(e) NULL)
+  
+  outcome_rere <- tryCatch({
+    WeMix::mix(formula = depress_w4 ~ selfEst_w3 + sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
+                 white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
+                 parentalEdu_w1 + familyStruct_w1 + healthInsur_w4 + (1 | CLUSTER2), 
+               data = data_boot, 
+               weights = c("iptw_re", "L2weight"))
+  }, error = function(e) NULL)
+  
+  # Check convergence and calculate indirect effect if both models converged
+  mediator_converged[i] <- !is.null(mediator_rere)
+  outcome_converged[i] <- !is.null(outcome_rere)
+  
+  if (mediator_converged[i] && outcome_converged[i]) {
+    indirect_effects_boot_rere[i] <- summary(mediator_rere)$coef["sportPartic_w1", "Estimate"] * 
+      summary(outcome_rere)$coef["selfEst_w3", "Estimate"]
+  } else {
+    indirect_effects_boot_rere[i] <- NA
+  }
+  
+  # Update the progress bar
+  setTxtProgressBar(pb, i)
+}
+
+# Close the progress bar & print completion message
+close(pb)
+cat("\nBootstrap resampling completed!\n")
+
+# Calculate the percentile bootstrap CI
+boot_ci_rere <- quantile(indirect_effects_boot_rere, probs = c(0.025, 0.975), na.rm = TRUE)
+
+# Print results
+print(boot_ci_rere)
+paste0("Number of converged mediator models: ", sum(mediator_converged), " (", (sum(mediator_converged)/length(mediator_converged))*100, "%)")
+paste0("Number of converged outcome models: ", sum(outcome_converged), " (", (sum(outcome_converged)/length(outcome_converged))*100, "%)")
+paste0("Number of iterations with both models converged: ", sum(mediator_converged & outcome_converged), " (", (sum(mediator_converged & outcome_converged)/length(mediator_converged & outcome_converged))*100, "%)")
+
+# 2.5%       97.5% 
+# -0.10019603  0.06098333 
+# [1] "Number of converged mediator models: 43 (86%)"
+# [1] "Number of converged outcome models: 50 (100%)"
+# [1] "Number of iterations with both models converged: 43 (86%)"   # With 62 largest schools & dropped nonoverlapping cases (SL: 3, FE: 18, RE: 4) 
+
+# 2.5%       97.5% 
+# -0.07437584  0.02966024 
+# [1] "Number of converged mediator models: 36 (72%)"
+# [1] "Number of converged outcome models: 50 (100%)"
+# [1] "Number of iterations with both models converged: 36 (72%)"   # With 121 largest schools & dropped nonoverlapping cases (SL: 3, FE: 27, RE: 7) 
+
+
+# 2.5%      97.5% 
+# -0.1764424  0.1432817 
+# [1] "Number of converged mediator models: 28 (56%)"
+# [1] "Number of converged outcome models: 28 (56%)"
+# [1] "Number of iterations with both models converged: 17 (34%)"   # With 15 largest schools  
+
+# 2.5%       97.5% 
+# -0.08573095  0.04281563 
+# [1] "Number of converged mediator models: 40 (80%)"
+# [1] "Number of converged outcome models: 50 (100%)"
+# [1] "Number of iterations with both models converged: 40 (80%)"   # With 121 largest schools 
+
+# Print all indirect effects
+cat("All indirect effects:\n")
+print(indirect_effects_boot_rere)
 
 
 
