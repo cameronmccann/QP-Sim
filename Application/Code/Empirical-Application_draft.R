@@ -12,12 +12,12 @@
 # Script Description:
 #
 #
-# Last Updated: 07/19/2024 
+# Last Updated: 07/20/2024 
 #
 #
 # Notes:
 #   To-Do:
-#     + Standardize variables, impute missing, data, & check model collinearity & proportion of students in each demographic group 
+#     + Standardize variables, impute missing, data, & check model collinearity & proportion of students in each demographic group (likely add race categories: other, asian, native american)
 #     + Drop nonoverlaping cases 
 #     + increase number of clusters to all of those greater or equal to 5 (Liu email)
 #       - write RE mediator & outcome code 
@@ -660,6 +660,30 @@ data$ps_re_logit <- predict(psmod_re, type = "link")
 # data <- cbind(data, iptw_re = with(data, (sportPartic_w1 / ps_re) + (1 - sportPartic_w1) / (1 - ps_re)))
 
 
+
+# Collinearity ------------------------------------------------------------
+
+car::vif(psmod_sl)
+car::vif(psmod_fe)
+car::vif(psmod_re)
+
+nrow(data)
+(sum(data$white_w1) / nrow(data)) * 100
+(sum(data$black_w1) / nrow(data)) * 100
+(sum(data$asian_w1) / nrow(data)) * 100
+(sum(data$nativeAmerican_w1) / nrow(data)) * 100
+(sum(data$raceOther_w1) / nrow(data)) * 100
+
+cor(data[, c("sex_w1", "ethnicity_w1", "white_w1", "black_w1", "asian_w1", "nativeAmerican_w1", 
+             "raceOther_w1", "healthInsur_w1", "familyStruct_w1", "sport_w1", "sportPartic_w1",
+             "selfEst_w3", "depress_w4", 
+             "age_w1_sc", "parentalEdu_w1_sc", "feelings_w1_sc", "selfEst_w3_sc")])
+
+corrplot::corrplot(cor(data[, c("sex_w1", "ethnicity_w1", "white_w1", "black_w1", "asian_w1", "nativeAmerican_w1", 
+                                "raceOther_w1", "healthInsur_w1", "familyStruct_w1", "sportPartic_w1",
+                                "depress_w4", 
+                                "age_w1_sc", "parentalEdu_w1_sc", "feelings_w1_sc", "selfEst_w3_sc")]),
+                   method = c("ellipse"))
 
 # Viz for balancing PS variables ------------------------------------------
 
