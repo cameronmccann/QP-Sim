@@ -663,11 +663,12 @@ data$ps_re_logit <- predict(psmod_re, type = "link")
 
 # Potential collinearity issues ------------------------------------------------------------
 
-car::vif(psmod_sl)
-car::vif(psmod_fe)
-car::vif(psmod_re)
+# Check VIF
+performance::check_collinearity(psmod_sl)
+performance::check_collinearity(psmod_fe)
+performance::check_collinearity(psmod_re)
 
-# 
+# Racial categories frequency & corr 
 paste0("Number of white: ", prettyNum(sum(data$white_w1), big.mark = ","), " (", round((sum(data$white_w1) / nrow(data)) * 100, 2), "%)")
 paste0("Number of black: ", prettyNum(sum(data$black_w1), big.mark = ","), " (", round((sum(data$black_w1) / nrow(data)) * 100, 2), "%)")
 paste0("Number of asian: ", prettyNum(sum(data$asian_w1), big.mark = ","), " (", round((sum(data$asian_w1) / nrow(data)) * 100, 2), "%)")
@@ -678,7 +679,6 @@ paste0("Number of other: ", prettyNum(sum(data$raceOther_w1), big.mark = ","), "
  # "Number of asian: 147 (4.67%)"
  # "Number of nativeAm: 183 (5.81%)"
  # "Number of other: 215 (6.82%)"
-
 round(cor(data[, c("sex_w1", "ethnicity_w1", "white_w1", "black_w1", 
              "asian_w1", "nativeAmerican_w1", "raceOther_w1", 
              "sportPartic_w1")]), 
@@ -701,76 +701,13 @@ PerformanceAnalytics::chart.Correlation(data[, c("ethnicity_w1", "white_w1", "bl
                                                  "asian_w1", "nativeAmerican_w1", 
                                                  "raceOther_w1", "sportPartic_w1")])
 
-# Group asian, native american, & other 
-data$Other <- rowSums(data[, c("asian_w1", "nativeAmerican_w1", "raceOther_w1")])
-
-paste0("Number of white: ", prettyNum(sum(data$white_w1), big.mark = ","), " (", round((sum(data$white_w1) / nrow(data)) * 100, 2), "%)")
-paste0("Number of black: ", prettyNum(sum(data$black_w1), big.mark = ","), " (", round((sum(data$black_w1) / nrow(data)) * 100, 2), "%)")
-paste0("Number of other: ", prettyNum(sum(data$Other), big.mark = ","), " (", round((sum(data$Other) / nrow(data)) * 100, 2), "%)")
-# [1] "Number of white: 1,965 (62.36%)"
-# [1] "Number of black: 804 (25.52%)"
-# [1] "Number of other: 545 (17.3%)"
-
-round(cor(data[, c("sex_w1",
-                   "ethnicity_w1",
-                   "white_w1",
-                   "black_w1",
-                   "Other",
-                   "sportPartic_w1")]),
-      digits = 3)
-#                 sex_w1 ethnicity_w1 white_w1 black_w1  Other sportPartic_w1
-# sex_w1          1.000       -0.022   -0.025    0.049  0.001         -0.097
-# ethnicity_w1   -0.022        1.000   -0.322   -0.088  0.264         -0.011
-# white_w1       -0.025       -0.322    1.000   -0.686 -0.252          0.013
-# black_w1        0.049       -0.088   -0.686    1.000 -0.084         -0.003
-# Other           0.001        0.264   -0.252   -0.084  1.000         -0.021
-# sportPartic_w1 -0.097       -0.011    0.013   -0.003 -0.021          1.000
-
-corrplot::corrplot(cor(data[, c("sex_w1", "ethnicity_w1", "white_w1", "black_w1", 
-                                "Other", "sportPartic_w1")]),
-                   method = c("ellipse"))
-
-PerformanceAnalytics::chart.Correlation(data[, c("sex_w1", "ethnicity_w1", "white_w1", "black_w1", 
-                                                     "Other", "sportPartic_w1")])
-
-# Run RE from ground up
-psmod_re <- lme4::glmer(formula = "sportPartic_w1 ~ feelings_w1_sc + sex_w1 + age_w1_sc + 
-                        parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 + 
-                        ethnicity_w1 + white_w1 + nativeAmerican_w1 + 
-                        (1 | CLUSTER2)",
-                        family = "binomial", 
-                        data = data) # Model fails to converge when black_w1 &/or raceOther_w1 is added 
-                                      # Note: white_w1 corr with black_w1 (r = -0.69) & raceOther_w1 (r = -0.18); and ethnicity_w1 corr with raceOther_w1 (r = 0.38)
-
-# car::vif(psmod_re)
-performance::check_collinearity(psmod_re)
-
-psmod_re <- lme4::glmer(formula = "sportPartic_w1 ~ feelings_w1_sc + sex_w1 + age_w1_sc + 
-                        parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 + 
-                        ethnicity_w1 + white_w1 + asian_w1 + nativeAmerican_w1 + 
-                        (1 | CLUSTER2)",
-                        family = "binomial", 
-                        data = data)
-
-
-psmod_re <- lme4::glmer(formula = "sportPartic_w1 ~ feelings_w1_sc + age_w1_sc + sex_w1 + 
-                        ethnicity_w1 + white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
-                        parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 + (1 | CLUSTER2)",
-                        family = "binomial", 
-                        data = data) 
-
-
-
-
-
+# Generate frequency matrix for racial categories 
 dat <- as.data.frame(data[, c("white_w1", "black_w1", "asian_w1", "nativeAmerican_w1", "raceOther_w1")])
 vars <- names(dat)
 total_samples <- nrow(dat)
-
 # Create an empty matrix to store results, with an extra row and column for totals
 result_matrix <- matrix(NA, nrow = length(vars) + 1, ncol = length(vars) + 1, 
                         dimnames = list(c(vars, "Total"), c(vars, "Total")))
-
 # Fill the matrix
 for (i in seq_along(vars)) {
   for (j in seq_along(vars)) {
@@ -785,29 +722,24 @@ for (i in seq_along(vars)) {
     result_matrix[i, j] <- paste0(count, " (", percentage, "%)")
   }
 }
-
 # Calculate row totals
 for (i in seq_along(vars)) {
   count <- sum(dat[[vars[i]]] == 1)
   percentage <- round(count / total_samples * 100, 2)
   result_matrix[i, length(vars) + 1] <- paste0(count, " (", percentage, "%)")
 }
-
 # Calculate column totals
 for (j in seq_along(vars)) {
   count <- sum(dat[[vars[j]]] == 1)
   percentage <- round(count / total_samples * 100, 2)
   result_matrix[length(vars) + 1, j] <- paste0(count, " (", percentage, "%)")
 }
-
 # Set the overall total
 overall_count <- sum(dat == 1)
 overall_percentage <- round(overall_count / (total_samples * length(vars)) * 100, 2)
 result_matrix[length(vars) + 1, length(vars) + 1] <- paste0(overall_count, " (", overall_percentage, "%)")
-
 # Convert to data frame
 result_df <- as.data.frame(result_matrix)
-
 # Print the result
 print(result_df)
 #                       white_w1     black_w1    asian_w1 nativeAmerican_w1 raceOther_w1         Total
@@ -818,26 +750,224 @@ print(result_df)
 # raceOther_w1         66 (2.09%)   20 (0.63%)  15 (0.48%)        27 (0.86%)  215 (6.82%)   215 (6.82%)
 # Total             1965 (62.36%) 804 (25.52%) 147 (4.67%)       183 (5.81%)  215 (6.82%) 3314 (21.03%)
 
-round(cor(data[, c(
-  "sex_w1",
-  "ethnicity_w1",
-  "white_w1",
-  "black_w1",
-  "asian_w1",
-  "nativeAmerican_w1",
-  "raceOther_w1",
-  "sportPartic_w1"
-)]),
-digits = 3)
-#                   sex_w1 ethnicity_w1 white_w1 black_w1 asian_w1 nativeAmerican_w1 raceOther_w1 sportPartic_w1
-# sex_w1             1.000       -0.022   -0.025    0.049   -0.016             0.005        0.009         -0.097
-# ethnicity_w1      -0.022        1.000   -0.322   -0.088    0.014             0.048        0.382         -0.011
-# white_w1          -0.025       -0.322    1.000   -0.686   -0.220            -0.062       -0.177          0.013
-# black_w1           0.049       -0.088   -0.686    1.000   -0.040            -0.005       -0.101         -0.003
-# asian_w1          -0.016        0.014   -0.220   -0.040    1.000            -0.003        0.030         -0.021
-# nativeAmerican_w1  0.005        0.048   -0.062   -0.005   -0.003             1.000        0.078         -0.022
-# raceOther_w1       0.009        0.382   -0.177   -0.101    0.030             0.078        1.000          0.004
-# sportPartic_w1    -0.097       -0.011    0.013   -0.003   -0.021            -0.022        0.004          1.000
+
+## RE PS model stepwise from intercept only model --------------------------
+
+# Run RE PS model & add predictors 
+psmod_re <- lme4::glmer(formula = "sportPartic_w1 ~ feelings_w1_sc + sex_w1 + age_w1_sc + 
+                        parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 + 
+                        ethnicity_w1 + white_w1 + asian_w1 + nativeAmerican_w1 + 
+                        (1 | CLUSTER2)",
+                        family = "binomial", 
+                        data = data) # Model fails to converge when black_w1 &/or raceOther_w1 is added 
+# Note: white_w1 corr with black_w1 (r = -0.69) & raceOther_w1 (r = -0.18); and ethnicity_w1 corr with raceOther_w1 (r = 0.38)
+
+
+
+## Check black_w1 & raceOther_w1 relation with mediator & outcome ----------
+
+round(cor(data[, c("sex_w1", "ethnicity_w1", "white_w1", "black_w1", 
+                   "asian_w1", "nativeAmerican_w1", "raceOther_w1", 
+                   "sportPartic_w1", "selfEst_w3_sc", "depress_w4")]), 
+      digits = 3)
+#                   sex_w1 ethnicity_w1 white_w1 black_w1 asian_w1 nativeAmerican_w1 raceOther_w1 sportPartic_w1 selfEst_w3_sc depress_w4
+# sex_w1             1.000       -0.022   -0.025    0.049   -0.016             0.005        0.009         -0.097        -0.079      0.125
+# ethnicity_w1      -0.022        1.000   -0.322   -0.088    0.014             0.048        0.382         -0.011        -0.027      0.046
+# white_w1          -0.025       -0.322    1.000   -0.686   -0.220            -0.062       -0.177          0.013        -0.031     -0.091
+# black_w1           0.049       -0.088   -0.686    1.000   -0.040            -0.005       -0.101         -0.003         0.058      0.063
+# asian_w1          -0.016        0.014   -0.220   -0.040    1.000            -0.003        0.030         -0.021        -0.029      0.042
+# nativeAmerican_w1  0.005        0.048   -0.062   -0.005   -0.003             1.000        0.078         -0.022        -0.014      0.048
+# raceOther_w1       0.009        0.382   -0.177   -0.101    0.030             0.078        1.000          0.004        -0.029     -0.008
+# sportPartic_w1    -0.097       -0.011    0.013   -0.003   -0.021            -0.022        0.004          1.000         0.053     -0.094
+# selfEst_w3_sc     -0.079       -0.027   -0.031    0.058   -0.029            -0.014       -0.029          0.053         1.000     -0.311
+# depress_w4         0.125        0.046   -0.091    0.063    0.042             0.048       -0.008         -0.094        -0.311      1.000
+
+corrplot::corrplot(cor(data[, c("sex_w1", "ethnicity_w1", "white_w1", "black_w1", "asian_w1", "nativeAmerican_w1", 
+                                "raceOther_w1", "sportPartic_w1",  "selfEst_w3_sc", "depress_w4")]),
+                   method = c("ellipse"))
+
+PerformanceAnalytics::chart.Correlation(data[, c("ethnicity_w1", "white_w1", "black_w1", 
+                                                 "asian_w1", "nativeAmerican_w1", 
+                                                 "raceOther_w1", "sportPartic_w1",  "selfEst_w3_sc", "depress_w4")])
+
+# Using FE models to check black_w1 & raceOther_w1 possible relations to mediator & outcome 
+
+## PS 
+psmod_fe <- glm(formula = "sportPartic_w1 ~ feelings_w1_sc + age_w1_sc + sex_w1 + 
+                ethnicity_w1 + white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
+                parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 +
+                as.factor(CLUSTER2)",
+                family = "binomial", 
+                data = data)
+data$ps_fe <- predict(psmod_fe, type = "response")
+data$ps_fe_logit <- predict(psmod_fe, type = "link")
+data <- cbind(data, iptw_fe = with(data, (sportPartic_w1 / ps_fe) + (1 - sportPartic_w1) / (1 - ps_fe)))
+
+## Mediator 
+med_fe <- glm(formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w3 + ethnicity_w1 + white_w1 + asian_w1 + nativeAmerican_w1 + black_w1 + raceOther_w1 + as.factor(CLUSTER2)", 
+              data = data, 
+              weights = iptw_fe)
+## Outcome 
+out_fe <- glm(formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w4 + ethnicity_w1 + white_w1 + asian_w1 + nativeAmerican_w1 + black_w1 + raceOther_w1 + as.factor(CLUSTER2)",
+              data = data,
+              weights = iptw_fe)
+
+summary(med_fe)
+#                         Estimate Std. Error t value Pr(>|t|)    
+# (Intercept)            18.65502    0.70251  26.555  < 2e-16 ***
+#   sportPartic_w1          0.20465    0.10301   1.987   0.0471 *  
+#   age_w1_sc              -0.01065    0.06394  -0.167   0.8677    
+# sex_w1                 -0.49201    0.09340  -5.268 1.48e-07 ***
+#   parentalEdu_w1_sc       0.05964    0.05123   1.164   0.2445    
+# familyStruct_w1         0.39100    0.09676   4.041 5.46e-05 ***
+#   healthInsur_w3          0.78904    0.13287   5.938 3.21e-09 ***
+#   ethnicity_w1           -0.11074    0.18729  -0.591   0.5544    
+# white_w1               -0.14313    0.18259  -0.784   0.4332    
+# asian_w1               -0.49341    0.26422  -1.867   0.0619 .  
+# nativeAmerican_w1      -0.12144    0.20794  -0.584   0.5592    
+# black_w1               -0.03602    0.19924  -0.181   0.8566    
+# raceOther_w1           -0.18510    0.21092  -0.878   0.3802    
+# AIC: 15005
+
+#                         Estimate Std. Error t value Pr(>|t|)    
+# (Intercept)            17.80757    0.72026  24.724  < 2e-16 ***
+#   sportPartic_w1          0.07551    0.09175   0.823  0.41055    
+# age_w1_sc               0.04970    0.06267   0.793  0.42780    
+# sex_w1                 -0.42352    0.07816  -5.419 6.48e-08 ***
+#   parentalEdu_w1_sc       0.06534    0.05075   1.287  0.19804    
+# familyStruct_w1         0.44539    0.09850   4.522 6.37e-06 ***
+#   healthInsur_w3          0.83042    0.12978   6.399 1.81e-10 ***
+#   ethnicity_w1           -0.25120    0.18717  -1.342  0.17968    
+# white_w1               -0.10971    0.18064  -0.607  0.54366    
+# asian_w1               -0.52110    0.26997  -1.930  0.05368 .  
+# nativeAmerican_w1      -0.03361    0.20111  -0.167  0.86727    
+# black_w1                0.11970    0.19980   0.599  0.54914    
+# raceOther_w1           -0.10991    0.20542  -0.535  0.59263    
+# AIC: 15262
+summary(out_fe)
+#                         Estimate Std. Error t value Pr(>|t|)    
+# (Intercept)             7.75468    1.15400   6.720 2.17e-11 ***
+#   selfEst_w3_sc          -1.35032    0.07826 -17.254  < 2e-16 ***
+#   sportPartic_w1         -0.32940    0.16865  -1.953  0.05089 .  
+# age_w1_sc               0.02045    0.10452   0.196  0.84488    
+# sex_w1                  0.93863    0.15404   6.094 1.24e-09 ***
+#   parentalEdu_w1_sc      -0.24334    0.08371  -2.907  0.00368 ** 
+#   familyStruct_w1        -0.67175    0.15798  -4.252 2.18e-05 ***
+#   healthInsur_w4         -0.98189    0.22402  -4.383 1.21e-05 ***
+#   ethnicity_w1            0.12796    0.30674   0.417  0.67658    
+# white_w1               -0.53639    0.29832  -1.798  0.07227 .  
+# asian_w1                0.21890    0.43249   0.506  0.61281    
+# nativeAmerican_w1       0.70689    0.33919   2.084  0.03724 *  
+#   black_w1                0.12222    0.32544   0.376  0.70729    
+# raceOther_w1           -0.67769    0.34608  -1.958  0.05030 .  
+# AIC: 18159
+
+#                         Estimate Std. Error t value Pr(>|t|)    
+# (Intercept)             5.77607    1.17845   4.901 1.00e-06 ***
+#   selfEst_w3_sc          -1.38810    0.07825 -17.739  < 2e-16 ***
+#   sportPartic_w1         -0.14384    0.15054  -0.956 0.339377    
+# age_w1_sc               0.07599    0.10249   0.741 0.458472    
+# sex_w1                  1.20881    0.12919   9.357  < 2e-16 ***
+#   parentalEdu_w1_sc      -0.27807    0.08298  -3.351 0.000815 ***
+#   familyStruct_w1        -0.69908    0.16059  -4.353 1.39e-05 ***
+#   healthInsur_w4         -1.02305    0.21809  -4.691 2.84e-06 ***
+#   ethnicity_w1            0.14202    0.30749   0.462 0.644203    
+# white_w1               -0.51976    0.29555  -1.759 0.078748 .  
+# asian_w1                0.34828    0.44229   0.787 0.431082    
+# nativeAmerican_w1       0.86326    0.32722   2.638 0.008379 ** 
+#   black_w1                0.29481    0.32659   0.903 0.366758    
+# raceOther_w1           -0.97026    0.33726  -2.877 0.004045 ** 
+#   AIC: 18419
+
+
+# Perform bootstrap resampling 
+med_black_boot <- numeric(1000)
+med_other_boot <- numeric(1000)
+out_black_boot <- numeric(1000)
+out_other_boot <- numeric(1000)
+
+set.seed(456)
+for (i in 1:1000) {
+  # Resample with replacement at the cluster level
+  cluster_boot <- sample(unique(data$CLUSTER2), replace = TRUE)
+  data_boot <- data[data$CLUSTER2 %in% cluster_boot, ]
+  # Fit the FE models for the bootstrap sample
+  mediator_fe <- glm(formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w3 + ethnicity_w1 + white_w1 + asian_w1 + nativeAmerican_w1 + black_w1 + raceOther_w1 + as.factor(CLUSTER2)", 
+      data = data_boot, #)
+      weights = iptw_fe)
+  outcome_fe <-glm(formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w4 + ethnicity_w1 + white_w1 + asian_w1 + nativeAmerican_w1 + black_w1 + raceOther_w1 + as.factor(CLUSTER2)",
+      data = data_boot, #)
+      weights = iptw_fe)
+  # Calculate the effects for the bootstrap sample
+  med_black_boot[i] <- summary(mediator_fe)$coef["black_w1", "Estimate"] 
+  med_other_boot[i] <- summary(mediator_fe)$coef["raceOther_w1", "Estimate"] 
+  out_black_boot[i] <- summary(outcome_fe)$coef["black_w1", "Estimate"] 
+  out_other_boot[i] <- summary(outcome_fe)$coef["raceOther_w1", "Estimate"] 
+
+  # Progress message 
+  if (i %% 100 == 0) cat("Completed iteration", i, "\n")
+}
+
+# Calculate the percentile bootstrap CI
+(boot_med_black <- quantile(med_black_boot, probs = c(0.025, 0.975)))
+(boot_med_other <- quantile(med_other_boot, probs = c(0.025, 0.975)))
+(boot_out_black <- quantile(out_black_boot, probs = c(0.025, 0.975)))
+(boot_out_other <- quantile(out_other_boot, probs = c(0.025, 0.975)))
+
+summary(med_fe)$coef["black_w1", "Estimate"]; (boot_med_black <- quantile(med_black_boot, probs = c(0.025, 0.975)))
+summary(out_fe)$coef["black_w1", "Estimate"]; (boot_out_black <- quantile(out_black_boot, probs = c(0.025, 0.975)))
+
+summary(med_fe)$coef["raceOther_w1", "Estimate"]; (boot_med_other <- quantile(med_other_boot, probs = c(0.025, 0.975)))
+summary(out_fe)$coef["raceOther_w1", "Estimate"]; (boot_out_other <- quantile(out_other_boot, probs = c(0.025, 0.975))) 
+# Only the other racial category appears to have a significant relation with the outcome, -0.678, 95% CI[-1.209, -0.171] (when IPTW is used: -0.970, 95% CI[-1.549, -0.422] )
+
+
+## Group native american & other and drop black dummy variables ------------
+
+# Group asian, native american, & other 
+data$Other <- rowSums(data[, c("nativeAmerican_w1", "raceOther_w1")])
+
+paste0("Number of white: ", prettyNum(sum(data$white_w1), big.mark = ","), " (", round((sum(data$white_w1) / nrow(data)) * 100, 2), "%)")
+paste0("Number of black: ", prettyNum(sum(data$black_w1), big.mark = ","), " (", round((sum(data$black_w1) / nrow(data)) * 100, 2), "%)")
+paste0("Number of asian: ", prettyNum(sum(data$asian_w1), big.mark = ","), " (", round((sum(data$asian_w1) / nrow(data)) * 100, 2), "%)")
+paste0("Number of other: ", prettyNum(sum(data$Other), big.mark = ","), " (", round((sum(data$Other) / nrow(data)) * 100, 2), "%)")
+# [1] "Number of white: 1,965 (62.36%)"
+# [1] "Number of black: 804 (25.52%)"
+# [1] "Number of asian: 147 (4.67%)"
+# [1] "Number of other: 398 (12.63%)"
+round(cor(data[, c("sex_w1",
+                   "ethnicity_w1",
+                   "white_w1",
+                   "black_w1",
+                   "asian_w1", 
+                   "Other",
+                   "sportPartic_w1")]),
+      digits = 3)
+#                 sex_w1 ethnicity_w1 white_w1 black_w1 asian_w1  Other sportPartic_w1
+# sex_w1          1.000       -0.022   -0.025    0.049   -0.016  0.010         -0.097
+# ethnicity_w1   -0.022        1.000   -0.322   -0.088    0.014  0.301         -0.011
+# white_w1       -0.025       -0.322    1.000   -0.686   -0.220 -0.165          0.013
+# black_w1        0.049       -0.088   -0.686    1.000   -0.040 -0.075         -0.003
+# asian_w1       -0.016        0.014   -0.220   -0.040    1.000  0.019         -0.021
+# Other           0.010        0.301   -0.165   -0.075    0.019  1.000         -0.012
+# sportPartic_w1 -0.097       -0.011    0.013   -0.003   -0.021 -0.012          1.000
+
+corrplot::corrplot(cor(data[, c("sex_w1", "ethnicity_w1", "white_w1", "black_w1", 
+                                "asian_w1", "Other", "sportPartic_w1")]),
+                   method = c("ellipse"))
+
+PerformanceAnalytics::chart.Correlation(data[, c("sex_w1", "ethnicity_w1", "white_w1", "black_w1", 
+                                                     "Other", "sportPartic_w1")])
+
+# Run RE PS model & add predictors (with new Other variable)
+psmod_re <- lme4::glmer(formula = "sportPartic_w1 ~ feelings_w1_sc + sex_w1 + age_w1_sc + 
+                        parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 + 
+                        ethnicity_w1 + white_w1 + asian_w1 + Other +  
+                        (1 | CLUSTER2)",
+                        family = "binomial", 
+                        data = data) # Model converges when Other (other racial groups + native american) is added, but fails to converge when black_w1 is added 
+# Note: white_w1 corr with Other (r = -0.17); and ethnicity_w1 corr with Other (r = 0.30)
+
 
 
 
