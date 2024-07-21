@@ -12,7 +12,7 @@
 # Script Description:
 #
 #
-# Last Updated: 07/20/2024 
+# Last Updated: 07/21/2024 
 #
 #
 # Notes:
@@ -661,29 +661,192 @@ data$ps_re_logit <- predict(psmod_re, type = "link")
 
 
 
-# Collinearity ------------------------------------------------------------
+# Potential collinearity issues ------------------------------------------------------------
 
 car::vif(psmod_sl)
 car::vif(psmod_fe)
 car::vif(psmod_re)
 
-nrow(data)
-(sum(data$white_w1) / nrow(data)) * 100
-(sum(data$black_w1) / nrow(data)) * 100
-(sum(data$asian_w1) / nrow(data)) * 100
-(sum(data$nativeAmerican_w1) / nrow(data)) * 100
-(sum(data$raceOther_w1) / nrow(data)) * 100
+# 
+paste0("Number of white: ", prettyNum(sum(data$white_w1), big.mark = ","), " (", round((sum(data$white_w1) / nrow(data)) * 100, 2), "%)")
+paste0("Number of black: ", prettyNum(sum(data$black_w1), big.mark = ","), " (", round((sum(data$black_w1) / nrow(data)) * 100, 2), "%)")
+paste0("Number of asian: ", prettyNum(sum(data$asian_w1), big.mark = ","), " (", round((sum(data$asian_w1) / nrow(data)) * 100, 2), "%)")
+paste0("Number of nativeAm: ", prettyNum(sum(data$nativeAmerican_w1), big.mark = ","), " (", round((sum(data$nativeAmerican_w1) / nrow(data)) * 100, 2), "%)")
+paste0("Number of other: ", prettyNum(sum(data$raceOther_w1), big.mark = ","), " (", round((sum(data$raceOther_w1) / nrow(data)) * 100, 2), "%)")
+ # "Number of white: 1,965 (62.36%)"
+ # "Number of black: 804 (25.52%)"
+ # "Number of asian: 147 (4.67%)"
+ # "Number of nativeAm: 183 (5.81%)"
+ # "Number of other: 215 (6.82%)"
 
-cor(data[, c("sex_w1", "ethnicity_w1", "white_w1", "black_w1", "asian_w1", "nativeAmerican_w1", 
-             "raceOther_w1", "healthInsur_w1", "familyStruct_w1", "sport_w1", "sportPartic_w1",
-             "selfEst_w3", "depress_w4", 
-             "age_w1_sc", "parentalEdu_w1_sc", "feelings_w1_sc", "selfEst_w3_sc")])
+round(cor(data[, c("sex_w1", "ethnicity_w1", "white_w1", "black_w1", 
+             "asian_w1", "nativeAmerican_w1", "raceOther_w1", 
+             "sportPartic_w1")]), 
+      digits = 3)
+#                   sex_w1 ethnicity_w1 white_w1 black_w1 asian_w1 nativeAmerican_w1 raceOther_w1 sportPartic_w1
+# sex_w1             1.000       -0.022   -0.025    0.049   -0.016             0.005        0.009         -0.097
+# ethnicity_w1      -0.022        1.000   -0.322   -0.088    0.014             0.048        0.382         -0.011
+# white_w1          -0.025       -0.322    1.000   -0.686   -0.220            -0.062       -0.177          0.013
+# black_w1           0.049       -0.088   -0.686    1.000   -0.040            -0.005       -0.101         -0.003
+# asian_w1          -0.016        0.014   -0.220   -0.040    1.000            -0.003        0.030         -0.021
+# nativeAmerican_w1  0.005        0.048   -0.062   -0.005   -0.003             1.000        0.078         -0.022
+# raceOther_w1       0.009        0.382   -0.177   -0.101    0.030             0.078        1.000          0.004
+# sportPartic_w1    -0.097       -0.011    0.013   -0.003   -0.021            -0.022        0.004          1.000
 
 corrplot::corrplot(cor(data[, c("sex_w1", "ethnicity_w1", "white_w1", "black_w1", "asian_w1", "nativeAmerican_w1", 
-                                "raceOther_w1", "healthInsur_w1", "familyStruct_w1", "sportPartic_w1",
-                                "depress_w4", 
-                                "age_w1_sc", "parentalEdu_w1_sc", "feelings_w1_sc", "selfEst_w3_sc")]),
+                                "raceOther_w1", "sportPartic_w1")]),
                    method = c("ellipse"))
+
+PerformanceAnalytics::chart.Correlation(data[, c("ethnicity_w1", "white_w1", "black_w1", 
+                                                 "asian_w1", "nativeAmerican_w1", 
+                                                 "raceOther_w1", "sportPartic_w1")])
+
+# Group asian, native american, & other 
+data$Other <- rowSums(data[, c("asian_w1", "nativeAmerican_w1", "raceOther_w1")])
+
+paste0("Number of white: ", prettyNum(sum(data$white_w1), big.mark = ","), " (", round((sum(data$white_w1) / nrow(data)) * 100, 2), "%)")
+paste0("Number of black: ", prettyNum(sum(data$black_w1), big.mark = ","), " (", round((sum(data$black_w1) / nrow(data)) * 100, 2), "%)")
+paste0("Number of other: ", prettyNum(sum(data$Other), big.mark = ","), " (", round((sum(data$Other) / nrow(data)) * 100, 2), "%)")
+# [1] "Number of white: 1,965 (62.36%)"
+# [1] "Number of black: 804 (25.52%)"
+# [1] "Number of other: 545 (17.3%)"
+
+round(cor(data[, c("sex_w1",
+                   "ethnicity_w1",
+                   "white_w1",
+                   "black_w1",
+                   "Other",
+                   "sportPartic_w1")]),
+      digits = 3)
+#                 sex_w1 ethnicity_w1 white_w1 black_w1  Other sportPartic_w1
+# sex_w1          1.000       -0.022   -0.025    0.049  0.001         -0.097
+# ethnicity_w1   -0.022        1.000   -0.322   -0.088  0.264         -0.011
+# white_w1       -0.025       -0.322    1.000   -0.686 -0.252          0.013
+# black_w1        0.049       -0.088   -0.686    1.000 -0.084         -0.003
+# Other           0.001        0.264   -0.252   -0.084  1.000         -0.021
+# sportPartic_w1 -0.097       -0.011    0.013   -0.003 -0.021          1.000
+
+corrplot::corrplot(cor(data[, c("sex_w1", "ethnicity_w1", "white_w1", "black_w1", 
+                                "Other", "sportPartic_w1")]),
+                   method = c("ellipse"))
+
+PerformanceAnalytics::chart.Correlation(data[, c("sex_w1", "ethnicity_w1", "white_w1", "black_w1", 
+                                                     "Other", "sportPartic_w1")])
+
+# Run RE from ground up
+psmod_re <- lme4::glmer(formula = "sportPartic_w1 ~ feelings_w1_sc + sex_w1 + age_w1_sc + 
+                        parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 + 
+                        ethnicity_w1 + white_w1 + nativeAmerican_w1 + 
+                        (1 | CLUSTER2)",
+                        family = "binomial", 
+                        data = data) # Model fails to converge when black_w1 &/or raceOther_w1 is added 
+                                      # Note: white_w1 corr with black_w1 (r = -0.69) & raceOther_w1 (r = -0.18); and ethnicity_w1 corr with raceOther_w1 (r = 0.38)
+
+# car::vif(psmod_re)
+performance::check_collinearity(psmod_re)
+
+psmod_re <- lme4::glmer(formula = "sportPartic_w1 ~ feelings_w1_sc + sex_w1 + age_w1_sc + 
+                        parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 + 
+                        ethnicity_w1 + white_w1 + asian_w1 + nativeAmerican_w1 + 
+                        (1 | CLUSTER2)",
+                        family = "binomial", 
+                        data = data)
+
+
+psmod_re <- lme4::glmer(formula = "sportPartic_w1 ~ feelings_w1_sc + age_w1_sc + sex_w1 + 
+                        ethnicity_w1 + white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
+                        parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 + (1 | CLUSTER2)",
+                        family = "binomial", 
+                        data = data) 
+
+
+
+
+
+dat <- as.data.frame(data[, c("white_w1", "black_w1", "asian_w1", "nativeAmerican_w1", "raceOther_w1")])
+vars <- names(dat)
+total_samples <- nrow(dat)
+
+# Create an empty matrix to store results, with an extra row and column for totals
+result_matrix <- matrix(NA, nrow = length(vars) + 1, ncol = length(vars) + 1, 
+                        dimnames = list(c(vars, "Total"), c(vars, "Total")))
+
+# Fill the matrix
+for (i in seq_along(vars)) {
+  for (j in seq_along(vars)) {
+    if (i == j) {
+      # Diagonal: count of 1s in each variable
+      count <- sum(dat[[vars[i]]] == 1)
+    } else {
+      # Off-diagonal: intersection count
+      count <- sum(dat[[vars[i]]] == 1 & dat[[vars[j]]] == 1)
+    }
+    percentage <- round(count / total_samples * 100, 2)
+    result_matrix[i, j] <- paste0(count, " (", percentage, "%)")
+  }
+}
+
+# Calculate row totals
+for (i in seq_along(vars)) {
+  count <- sum(dat[[vars[i]]] == 1)
+  percentage <- round(count / total_samples * 100, 2)
+  result_matrix[i, length(vars) + 1] <- paste0(count, " (", percentage, "%)")
+}
+
+# Calculate column totals
+for (j in seq_along(vars)) {
+  count <- sum(dat[[vars[j]]] == 1)
+  percentage <- round(count / total_samples * 100, 2)
+  result_matrix[length(vars) + 1, j] <- paste0(count, " (", percentage, "%)")
+}
+
+# Set the overall total
+overall_count <- sum(dat == 1)
+overall_percentage <- round(overall_count / (total_samples * length(vars)) * 100, 2)
+result_matrix[length(vars) + 1, length(vars) + 1] <- paste0(overall_count, " (", overall_percentage, "%)")
+
+# Convert to data frame
+result_df <- as.data.frame(result_matrix)
+
+# Print the result
+print(result_df)
+#                       white_w1     black_w1    asian_w1 nativeAmerican_w1 raceOther_w1         Total
+# white_w1          1965 (62.36%)   45 (1.43%)  21 (0.67%)        92 (2.92%)   66 (2.09%) 1965 (62.36%)
+# black_w1             45 (1.43%) 804 (25.52%)  26 (0.83%)        45 (1.43%)   20 (0.63%)  804 (25.52%)
+# asian_w1             21 (0.67%)   26 (0.83%) 147 (4.67%)         8 (0.25%)   15 (0.48%)   147 (4.67%)
+# nativeAmerican_w1    92 (2.92%)   45 (1.43%)   8 (0.25%)       183 (5.81%)   27 (0.86%)   183 (5.81%)
+# raceOther_w1         66 (2.09%)   20 (0.63%)  15 (0.48%)        27 (0.86%)  215 (6.82%)   215 (6.82%)
+# Total             1965 (62.36%) 804 (25.52%) 147 (4.67%)       183 (5.81%)  215 (6.82%) 3314 (21.03%)
+
+round(cor(data[, c(
+  "sex_w1",
+  "ethnicity_w1",
+  "white_w1",
+  "black_w1",
+  "asian_w1",
+  "nativeAmerican_w1",
+  "raceOther_w1",
+  "sportPartic_w1"
+)]),
+digits = 3)
+#                   sex_w1 ethnicity_w1 white_w1 black_w1 asian_w1 nativeAmerican_w1 raceOther_w1 sportPartic_w1
+# sex_w1             1.000       -0.022   -0.025    0.049   -0.016             0.005        0.009         -0.097
+# ethnicity_w1      -0.022        1.000   -0.322   -0.088    0.014             0.048        0.382         -0.011
+# white_w1          -0.025       -0.322    1.000   -0.686   -0.220            -0.062       -0.177          0.013
+# black_w1           0.049       -0.088   -0.686    1.000   -0.040            -0.005       -0.101         -0.003
+# asian_w1          -0.016        0.014   -0.220   -0.040    1.000            -0.003        0.030         -0.021
+# nativeAmerican_w1  0.005        0.048   -0.062   -0.005   -0.003             1.000        0.078         -0.022
+# raceOther_w1       0.009        0.382   -0.177   -0.101    0.030             0.078        1.000          0.004
+# sportPartic_w1    -0.097       -0.011    0.013   -0.003   -0.021            -0.022        0.004          1.000
+
+
+
+
+
+
+
+
+
 
 # Viz for balancing PS variables ------------------------------------------
 
