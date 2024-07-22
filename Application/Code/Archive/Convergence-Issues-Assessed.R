@@ -360,16 +360,36 @@ out_rere <-
 
 
 ##### Display Estimates -------------------------------------------------------
+
 # Add NDE & NIE estimates 
 results_DF <- data.frame(
-  cond = c("slre", "fere", "rere"),
+  cond = c("slsl", "fesl", "resl",
+           "slfe", "fefe", "refe", 
+           "slre", "fere", "rere"),
+  # est = rep("NDE", 3),
   NDE = c(
+    summary(out_slsl)$coef["sportPartic_w1", "Estimate"],
+    summary(out_fesl)$coef["sportPartic_w1", "Estimate"],
+    summary(out_resl)$coef["sportPartic_w1", "Estimate"],
+    
+    summary(out_slfe)$coef["sportPartic_w1", "Estimate"],
+    summary(out_fefe)$coef["sportPartic_w1", "Estimate"],
+    summary(out_refe)$coef["sportPartic_w1", "Estimate"],
+    
     summary(out_slre)$coef["sportPartic_w1", "Estimate"], 
     summary(out_fere)$coef["sportPartic_w1", "Estimate"], 
     summary(out_rere)$coef["sportPartic_w1", "Estimate"]
   ),
   
   NIE = c(
+    summary(med_slsl)$coef["sportPartic_w1", "Estimate"] * summary(out_slsl)$coef["selfEst_w3_sc", "Estimate"],
+    summary(med_fesl)$coef["sportPartic_w1", "Estimate"] * summary(out_fesl)$coef["selfEst_w3_sc", "Estimate"],
+    summary(med_resl)$coef["sportPartic_w1", "Estimate"] * summary(out_resl)$coef["selfEst_w3_sc", "Estimate"],
+    
+    summary(med_slfe)$coef["sportPartic_w1", "Estimate"] * summary(out_slfe)$coef["selfEst_w3_sc", "Estimate"],
+    summary(med_fefe)$coef["sportPartic_w1", "Estimate"] * summary(out_fefe)$coef["selfEst_w3_sc", "Estimate"],
+    summary(med_refe)$coef["sportPartic_w1", "Estimate"] * summary(out_refe)$coef["selfEst_w3_sc", "Estimate"], 
+    
     summary(med_slre)$coef["sportPartic_w1", "Estimate"] * summary(out_slre)$coef["selfEst_w3_sc", "Estimate"], 
     summary(med_fere)$coef["sportPartic_w1", "Estimate"] * summary(out_fere)$coef["selfEst_w3_sc", "Estimate"], 
     summary(med_rere)$coef["sportPartic_w1", "Estimate"] * summary(out_rere)$coef["selfEst_w3_sc", "Estimate"]
@@ -377,6 +397,89 @@ results_DF <- data.frame(
 )
 # Display 
 results_DF
+
+
+
+#### Bootstrap CI ------------------------------------------------------------
+
+# RERE
+# Initialize vectors to store the bootstrap indirect effects and convergence statuses
+indirect_effects_boot_rere <- numeric(50)
+mediator_converged <- logical(50)
+outcome_converged <- logical(50)
+
+# Create the progress bar
+pb <- txtProgressBar(min = 0, max = length(outcome_converged), style = 3, width = 50, char = "=")
+
+# Perform bootstrap resampling
+set.seed(456)
+for (i in 1:50) {
+  # Resample with replacement at the cluster level
+  cluster_boot <- sample(unique(data$CLUSTER2), replace = TRUE)
+  data_boot <- data[data$CLUSTER2 %in% cluster_boot, ]
+  
+  # Fit the RE models with RE ps for the bootstrap sample
+  ### Add column of just 1s for level-2 weight
+  data_boot <- cbind(data_boot, L2weight = rep(1, nrow(data_boot)))
+  
+  mediator_rere <- tryCatch({
+    WeMix::mix(formula = selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
+                 white_w1 + black_w1 + 
+                 parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap + (1 | CLUSTER2),  
+               data = data_boot, 
+               weights = c("iptw_re", "L2weight"))
+  }, error = function(e) NULL)
+  
+  outcome_rere <- tryCatch({
+    WeMix::mix(formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
+                 white_w1 + black_w1 + 
+                 parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap + (1 | CLUSTER2),
+               data = data_boot, 
+               weights = c("iptw_re", "L2weight"))
+  }, error = function(e) NULL)
+  
+  # Check convergence and calculate indirect effect if both models converged
+  mediator_converged[i] <- !is.null(mediator_rere)
+  outcome_converged[i] <- !is.null(outcome_rere)
+  
+  if (mediator_converged[i] && outcome_converged[i]) {
+    indirect_effects_boot_rere[i] <- summary(mediator_rere)$coef["sportPartic_w1", "Estimate"] * 
+      summary(outcome_rere)$coef["selfEst_w3_sc", "Estimate"]
+  } else {
+    indirect_effects_boot_rere[i] <- NA
+  }
+  
+  # Update the progress bar
+  setTxtProgressBar(pb, i)
+}
+
+# Close the progress bar & print completion message
+close(pb)
+cat("\nBootstrap resampling completed!\n")
+
+# Calculate the percentile bootstrap CI
+boot_ci_rere <- quantile(indirect_effects_boot_rere, probs = c(0.025, 0.975), na.rm = TRUE)
+
+# Print results
+print(boot_ci_rere)
+paste0("Number of converged mediator models: ", sum(mediator_converged), " (", (sum(mediator_converged)/length(mediator_converged))*100, "%)")
+paste0("Number of converged outcome models: ", sum(outcome_converged), " (", (sum(outcome_converged)/length(outcome_converged))*100, "%)")
+paste0("Number of iterations with both models converged: ", sum(mediator_converged & outcome_converged), " (", (sum(mediator_converged & outcome_converged)/length(mediator_converged & outcome_converged))*100, "%)")
+# 2.5%       97.5% 
+# -0.29939675 -0.02777095 
+# [1] "Number of converged mediator models: 39 (78%)"
+# [1] "Number of converged outcome models: 50 (100%)"
+# [1] "Number of iterations with both models converged: 39 (78%)"
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -764,7 +867,76 @@ results_DF
 
 
 
+#### Bootstrap CI ------------------------------------------------------------
 
+# RERE
+# Initialize vectors to store the bootstrap indirect effects and convergence statuses
+indirect_effects_boot_rere <- numeric(50)
+mediator_converged <- logical(50)
+outcome_converged <- logical(50)
+
+# Create the progress bar
+pb <- txtProgressBar(min = 0, max = length(outcome_converged), style = 3, width = 50, char = "=")
+
+# Perform bootstrap resampling
+set.seed(456)
+for (i in 1:50) {
+  # Resample with replacement at the cluster level
+  cluster_boot <- sample(unique(data$CLUSTER2), replace = TRUE)
+  data_boot <- data[data$CLUSTER2 %in% cluster_boot, ]
+  
+  # Fit the RE models with RE ps for the bootstrap sample
+  ### Add column of just 1s for level-2 weight
+  data_boot <- cbind(data_boot, L2weight = rep(1, nrow(data_boot)))
+  
+  mediator_rere <- tryCatch({
+    WeMix::mix(formula = selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
+                 white_w1 + black_w1 + 
+                 parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w3 + (1 | CLUSTER2),  
+               data = data_boot, 
+               weights = c("iptw_re", "L2weight"))
+  }, error = function(e) NULL)
+  
+  outcome_rere <- tryCatch({
+    WeMix::mix(formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
+                 white_w1 + black_w1 + 
+                 parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w4 + (1 | CLUSTER2),
+               data = data_boot, 
+               weights = c("iptw_re", "L2weight"))
+  }, error = function(e) NULL)
+  
+  # Check convergence and calculate indirect effect if both models converged
+  mediator_converged[i] <- !is.null(mediator_rere)
+  outcome_converged[i] <- !is.null(outcome_rere)
+  
+  if (mediator_converged[i] && outcome_converged[i]) {
+    indirect_effects_boot_rere[i] <- summary(mediator_rere)$coef["sportPartic_w1", "Estimate"] * 
+      summary(outcome_rere)$coef["selfEst_w3_sc", "Estimate"]
+  } else {
+    indirect_effects_boot_rere[i] <- NA
+  }
+  
+  # Update the progress bar
+  setTxtProgressBar(pb, i)
+}
+
+# Close the progress bar & print completion message
+close(pb)
+cat("\nBootstrap resampling completed!\n")
+
+# Calculate the percentile bootstrap CI
+boot_ci_rere <- quantile(indirect_effects_boot_rere, probs = c(0.025, 0.975), na.rm = TRUE)
+
+# Print results
+print(boot_ci_rere)
+paste0("Number of converged mediator models: ", sum(mediator_converged), " (", (sum(mediator_converged)/length(mediator_converged))*100, "%)")
+paste0("Number of converged outcome models: ", sum(outcome_converged), " (", (sum(outcome_converged)/length(outcome_converged))*100, "%)")
+paste0("Number of iterations with both models converged: ", sum(mediator_converged & outcome_converged), " (", (sum(mediator_converged & outcome_converged)/length(mediator_converged & outcome_converged))*100, "%)")
+# 2.5%       97.5% 
+# -0.29939675 -0.02777095 
+# [1] "Number of converged mediator models: 39 (78%)"
+# [1] "Number of converged outcome models: 50 (100%)"
+# [1] "Number of iterations with both models converged: 39 (78%)"
 
 
 

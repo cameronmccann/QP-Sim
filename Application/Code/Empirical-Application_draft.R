@@ -144,9 +144,9 @@ data$familyStruct <- data$S11 + data$S17
 table(data$S11); sum(is.na(data$S11))
 table(data$S17); sum(is.na(data$S17))
 table(data$S11, data$S17)
-data$familyStruct <- ifelse(data$familyStruct == 9, NA, data$familyStruct) # change "multiple response" to missing 
+data$familyStruct <- ifelse(data$familyStruct == 10, NA, data$familyStruct) # change "multiple response" to missing 
 
-# table(data$familyStruct)
+table(data$familyStruct)
 
 # gap in health insurance (wave 1) 
 ## In the past 12 months, has there been a time when {NAME} had no health insurance? (PC22)
