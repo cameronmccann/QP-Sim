@@ -12,13 +12,18 @@
 # Script Description:
 #
 #
-# Last Updated: 07/21/2024 
+# Last Updated: 07/22/2024 
 #
 #
 # Notes:
 #   To-Do:
 #     + Standardize variables, impute missing, data, & check model collinearity & proportion of students in each demographic group (likely add race categories: other, asian, native american)
 #     + Drop nonoverlaping cases 
+#     + Med & Outcome model formulas 
+# 
+#     + MAYBE go back & create viz to check overlap
+#     + Figure out how to get covariate balance for all models on 1 visual (like Chang et al. article) 
+# 
 #     + increase number of clusters to all of those greater or equal to 5 (Liu email)
 #       - write RE mediator & outcome code 
 #       - create bootstrap function
@@ -368,6 +373,8 @@ colnames(data)[!grepl(pattern = paste(c("_w\\d{1}$", "AID", "CLUSTER2"), collaps
 data$healthInsur_w1 <- ifelse(data$healthInsur_w1 > 0, 1, 0)
 data$healthInsur_w3 <- ifelse(data$healthInsur_w3 > 0, 1, 0)
 data$healthInsur_w4 <- ifelse(data$healthInsur_w4 > 0, 1, 0)
+data$healthInsur_gap <- ifelse(data$healthInsur_w1 == 0 | data$healthInsur_w3 == 0 | data$healthInsur_w4 == 0,
+                               1, 0)
 
 # Add cluster (school) size variable 
 data <- data %>% 
@@ -472,8 +479,10 @@ data <- data %>%
 
 # Select variables in PS model 
 t <- data %>% 
-  select(!c(AID, CLUSTER2, sport_w1, 
-            healthInsur_w3, healthInsur_w4)) 
+  select(!c(AID, CLUSTER2, sport_w1, n, healthInsur_w3, healthInsur_w4, healthInsur_w1))
+  # select(!c(AID, CLUSTER2, sport_w1, n, healthInsur_gap))
+            # healthInsur_w3, healthInsur_w4, 
+            # healthInsur_w1))
 
 # Missing pattern 
 md.pattern(t, rotate.names = TRUE)
@@ -604,7 +613,7 @@ med_var <- data.frame(lme4::VarCorr(med_unconditional))[1, 4] # variance due to 
 med_res <- data.frame(lme4::VarCorr(med_unconditional))[2, 4] # residual variance 
 med_icc <- med_var / (med_var + med_res)
 med_icc # 0.02 for med icc
-        # with 121 schools (5+ in size) med icc = 0.006753599
+        # with 121 schools (5+ in size) med icc = 0.007176327
         # with 62 schools (25+ in size) med icc = 0.01020648
         # with 17 schools (40+ in size) med icc = 0.02445009
 
@@ -616,7 +625,7 @@ out_var <- data.frame(lme4::VarCorr(out_unconditional))[1, 4] # variance due to 
 out_res <- data.frame(lme4::VarCorr(out_unconditional))[2, 4] # residual variance 
 out_icc <- out_var / (out_var + out_res)
 out_icc # 0.016 for outcome icc
-        # with 121 schools (5+ in size) outcome icc = 0.01863334
+        # with 121 schools (5+ in size) outcome icc = 0.0185748
         # with 62 schools (25+ in size) outcome icc = 0.01981785
         # with 17 schools (40+ in size) outcome icc = 0.01729325
 
@@ -755,7 +764,7 @@ print(result_df)
 
 # Run RE PS model & add predictors 
 psmod_re <- lme4::glmer(formula = "sportPartic_w1 ~ feelings_w1_sc + sex_w1 + age_w1_sc + 
-                        parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 + 
+                        parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 +
                         ethnicity_w1 + white_w1 + asian_w1 + nativeAmerican_w1 + 
                         (1 | CLUSTER2)",
                         family = "binomial", 
@@ -973,6 +982,45 @@ psmod_re <- lme4::glmer(formula = "sportPartic_w1 ~ feelings_w1_sc + sex_w1 + ag
 
 
 
+# PS & IPTW (Dropped black_w1 & otherRace_w1) ------------------------------------
+
+## SL PS model -------------------------------------------------------------
+psmod_sl <- glm(formula = "sportPartic_w1 ~ feelings_w1_sc + age_w1_sc + sex_w1 + 
+                ethnicity_w1 + white_w1 + asian_w1 + nativeAmerican_w1 + 
+                parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1",
+                family = "binomial", 
+                data = data)
+data$ps_sl <- predict(psmod_sl, type = "response") 
+data$ps_sl_logit <- predict(psmod_sl, type = "link")
+data <- cbind(data, iptw_sl = with(data, (sportPartic_w1 / ps_sl) + (1 - sportPartic_w1) / (1 - ps_sl)))
+
+
+## FE PS model -------------------------------------------------------------
+psmod_fe <- glm(formula = "sportPartic_w1 ~ feelings_w1_sc + age_w1_sc + sex_w1 + 
+                ethnicity_w1 + white_w1 + asian_w1 + nativeAmerican_w1 + 
+                parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 +
+                as.factor(CLUSTER2)",
+                family = "binomial", 
+                data = data)
+data$ps_fe <- predict(psmod_fe, type = "response")
+data$ps_fe_logit <- predict(psmod_fe, type = "link")
+data <- cbind(data, iptw_fe = with(data, (sportPartic_w1 / ps_fe) + (1 - sportPartic_w1) / (1 - ps_fe)))
+
+
+## RE PS model -------------------------------------------------------------
+psmod_re <- lme4::glmer(formula = "sportPartic_w1 ~ feelings_w1_sc + age_w1_sc + sex_w1 + 
+                        ethnicity_w1 + white_w1 + asian_w1 + nativeAmerican_w1 + 
+                        parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 + (1 | CLUSTER2)",
+                        family = "binomial", 
+                        data = data) 
+# control = lme4::glmerControl(optimizer = "bobyqa")) # Changing optimizer
+# control = glmerControl(optCtrl = list(maxfun = 100000))) # Increase max iterations to 1000
+# control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000))) # Increase max iterations to 1000
+data$ps_re <- predict(psmod_re, type = "response")
+data$ps_re_logit <- predict(psmod_re, type = "link")
+data <- cbind(data, iptw_re = with(data, (sportPartic_w1 / ps_re) + (1 - sportPartic_w1) / (1 - ps_re)))
+
+
 
 
 
@@ -984,9 +1032,9 @@ psmod_re <- lme4::glmer(formula = "sportPartic_w1 ~ feelings_w1_sc + sex_w1 + ag
 # SL
 cobalt::bal.plot(
   WeightIt::weightit(
-    formula = sportPartic_w1 ~ feelings_w1 + age_w1 + sex_w1 +
-      ethnicity_w1 + white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
-      parentalEdu_w1 + familyStruct_w1 + healthInsur_w1,
+    formula = sportPartic_w1 ~ feelings_w1_sc + age_w1_sc + sex_w1 + 
+      ethnicity_w1 + white_w1 + asian_w1 + nativeAmerican_w1 + 
+      parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1, 
     data = data,
     estimand = "ATE",
     method = "ps"
@@ -997,10 +1045,9 @@ cobalt::bal.plot(
 # FE PS 
 cobalt::bal.plot(
   WeightIt::weightit(
-    formula = sportPartic_w1 ~ feelings_w1 + age_w1 + sex_w1 +
-      ethnicity_w1 + white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
-      parentalEdu_w1 + familyStruct_w1 + healthInsur_w1 +
-      as.factor(CLUSTER2),
+    formula = sportPartic_w1 ~ feelings_w1_sc + age_w1_sc + sex_w1 + 
+      ethnicity_w1 + white_w1 + asian_w1 + nativeAmerican_w1 + 
+      parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 + as.factor(CLUSTER2),
     data = data,
     estimand = "ATE",
     method = "ps"
@@ -1011,9 +1058,9 @@ cobalt::bal.plot(
 # RE PS 
 # cobalt::bal.plot(
 #   WeightIt::weightit(
-#     formula = sportPartic_w1 ~ feelings_w1 + age_w1 + sex_w1 +
-#       ethnicity_w1 + white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
-#       parentalEdu_w1 + familyStruct_w1 + healthInsur_w1 + (1 | CLUSTER2),
+#     formula = sportPartic_w1 ~ feelings_w1_sc + age_w1_sc + sex_w1 + 
+#       ethnicity_w1 + white_w1 + asian_w1 + nativeAmerican_w1 + 
+#       parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 + (1 | CLUSTER2),
 #     data = data,
 #     estimand = "ATE",
 #     method = "ps"
@@ -1071,7 +1118,77 @@ cobalt::bal.tab(sportPartic_w1 ~ feelings_w1 + age_w1 + sex_w1 +
 
 
 # Drop Nonoverlap ---------------------------------------------------------
+
+# SL 
+paste0("Number of PSs < 0.0111: ", sum(I(data$ps_sl < 0.0111)), 
+       "; Number of PSs > 0.999: ", sum(I(data$ps_sl > 0.999)))
+paste0(
+  "Number of cases < 1st percentile of IPTW (", quantile(data$iptw_sl, probs = c(0.01)), 
+  "): ", sum(I(data$iptw_sl < quantile(data$iptw_sl, probs = c(0.01)))), 
+  "; Number of cases > 99th percentile of IPTW (", quantile(data$iptw_sl, probs = c(0.99)), 
+  "): ", sum(I(data$iptw_sl > quantile(data$iptw_sl, probs = c(0.99))))
+)
+# Change < 1st percentile to 1st the percentile value & > 99th to the 99th percentile value 
+percentiles <- quantile(data$iptw_sl, probs = c(0.01, 0.99))
+data <- data %>% 
+  mutate(iptw_sl = ifelse(iptw_sl < percentiles[1], percentiles[1], 
+                          ifelse(iptw_sl > percentiles[2], percentiles[2], 
+                                 iptw_sl)))
+
+# FE 
+paste0("Number of PSs < 0.0111: ", sum(I(data$ps_fe < 0.0111)), 
+       "; Number of PSs > 0.999: ", sum(I(data$ps_fe > 0.999)))
+paste0(
+  "Number of cases < 1st percentile of IPTW (", quantile(data$iptw_fe, probs = c(0.01)), 
+  "): ", sum(I(data$iptw_fe < quantile(data$iptw_fe, probs = c(0.01)))), 
+  "; Number of cases > 99th percentile of IPTW (", quantile(data$iptw_fe, probs = c(0.99)), 
+  "): ", sum(I(data$iptw_fe > quantile(data$iptw_fe, probs = c(0.99))))
+)
+# Change < 1st percentile to 1st the percentile value & > 99th to the 99th percentile value 
+percentiles <- quantile(data$iptw_fe, probs = c(0.01, 0.99))
+data <- data %>% 
+  mutate(iptw_fe = ifelse(iptw_fe < percentiles[1], percentiles[1], 
+                          ifelse(iptw_fe > percentiles[2], percentiles[2], 
+                                 iptw_fe)))
+
+# RE
+paste0("Number of PSs < 0.0111: ", sum(I(data$ps_re < 0.0111)), 
+       "; Number of PSs > 0.999: ", sum(I(data$ps_re > 0.999)))
+paste0(
+  "Number of cases < 1st percentile of IPTW (", quantile(data$iptw_re, probs = c(0.01)), 
+  "): ", sum(I(data$iptw_re < quantile(data$iptw_re, probs = c(0.01)))), 
+  "; Number of cases > 99th percentile of IPTW (", quantile(data$iptw_re, probs = c(0.99)), 
+  "): ", sum(I(data$iptw_re > quantile(data$iptw_re, probs = c(0.99))))
+)
+# Change < 1st percentile to 1st the percentile value & > 99th to the 99th percentile value 
+percentiles <- quantile(data$iptw_re, probs = c(0.01, 0.99))
+data <- data %>% 
+  mutate(iptw_re = ifelse(iptw_re < percentiles[1], percentiles[1], 
+                          ifelse(iptw_re > percentiles[2], percentiles[2], 
+                                 iptw_re)))
+
+
+
+
+
+
 ### SL ----------------------------------------------------------------------
+
+##### fixed 
+
+data$ps_sl
+data %>% 
+  summarize()
+sum(I(data$ps_sl < 0.0111))
+sum(I(data$ps_sl > 0.999))
+
+quantile(data$iptw_sl, probs = c(0.01, 0.1, 0.90, 0.99))
+sum(I(data$iptw_sl < 1.259809))
+sum(I(data$iptw_sl > 4.439679))
+
+hist(data$ps_sl)
+hist(data$iptw_sl)
+
 ##### dynamic threshold -------------------------------------------------------
 # Identify nonoverlapping cases with a caliper of 0.05
 caliper <- 0.05
@@ -1476,53 +1593,11 @@ re_overlap$post_summary
 
 
 
-##### OLD CODE  ---------------------------------------------------------------
 
-overlap <- function(x, trtgrp, lab = NULL, bin = 20)
-{
-  # plot a histogram of a covariate by group
-  # x   ... numeric vector (covariate)
-  # trtgrp   ... binary treatment variable
-  # lab ... label for title and x-axis
-  # bin ... number of bins for histogram
-  
-  r1 <- range(x)
-  if (!is.numeric(trtgrp)) trtgrp <- as.numeric(trtgrp) - 1
-  c.dat <- hist(x[trtgrp == 0], seq(r1[1], r1[2], length = bin), plot = F)  # histogram data for control group
-  t.dat <- hist(x[trtgrp == 1], seq(r1[1], r1[2], length = bin), plot = F)  # histogram data for treatm. group
-  t.dat$counts <- -t.dat$counts
-  t.dat$density <- -t.dat$density
-  plot(c.dat, axes = F, ylim = c(min(t.dat$density), max(c.dat$density)), freq = F,
-       main = lab, xlab = lab)
-  # if plot frequency
-  # plot(c.dat, axes = F, ylim = c(min(t.dat$counts), max(c.dat$counts)), freq = T,
-  #      main = lab, xlab = lab)
-  plot(t.dat, add = T, density = 30, freq = F)
-  axis(1)
-  ax.loc <- axis(2, labels = F)
-  axis(2, at = ax.loc, labels = abs(ax.loc))
-  y <- par('usr')[3:4]
-  text(rep(max(x), 2), c(y[2] - diff(y)*.05, y[1] + diff(y)*.05), 
-       c('Control', 'Treatment'), adj = 1, xpd = T)
-}
-
-overlap(data_re$ps_fe_logit, data_re$sportPartic_w1, bin = 100)
-
-
-
-
-# IPTW  -------------------------------------------------------------------
-# SL 
-data_sl <- cbind(data_sl, iptw_sl = with(data_sl, (sportPartic_w1 / ps_sl) + (1 - sportPartic_w1) / (1 - ps_sl)))
-# FE
-data_fe <- cbind(data_fe, iptw_fe = with(data_fe, (sportPartic_w1 / ps_fe) + (1 - sportPartic_w1) / (1 - ps_fe)))
-# RE 
-data_re <- cbind(data_re, iptw_re = with(data_re, (sportPartic_w1 / ps_re) + (1 - sportPartic_w1) / (1 - ps_re)))
 
 
 
 # Estimate Effects --------------------------------------------------------
-
 
 ## Mediator models ---------------------------------------------------------
 
@@ -1531,28 +1606,28 @@ data_re <- cbind(data_re, iptw_re = with(data_re, (sportPartic_w1 / ps_re) + (1 
 # Single-Level PS & SL med/outcome
 med_slsl <-
   glm(
-    formula = "selfEst_w3 ~ sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
+    formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + ethnicity_w1 +
       white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
-      parentalEdu_w1 + familyStruct_w1 + healthInsur_w3",
-    data = data_sl,
+      parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w3",
+    data = data,
     weights = iptw_sl
   )
 # Fixed-Effect PS & SL med/outcome
 med_fesl <-
   glm(
-    formula = "selfEst_w3 ~ sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
+    formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + ethnicity_w1 +
       white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
-      parentalEdu_w1 + familyStruct_w1 + healthInsur_w3",
-    data = data_fe,
+      parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w3",
+    data = data,
     weights = iptw_fe
   )
 # Random-Effect PS & SL med/outcome
 med_resl <-
   glm(
-    formula = "selfEst_w3 ~ sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
+    formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + ethnicity_w1 +
       white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
-      parentalEdu_w1 + familyStruct_w1 + healthInsur_w3",
-    data = data_re,
+      parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w3",
+    data = data,
     weights = iptw_re
   )
 
@@ -1560,59 +1635,56 @@ med_resl <-
 ### Mediator models (FE) --------------------------------------------------
 
 # Single-Level PS & FE med/outcome
-med_slfe <- glm(formula = "selfEst_w3 ~ sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
+med_slfe <- glm(formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + ethnicity_w1 +
       white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
-      parentalEdu_w1 + familyStruct_w1 + healthInsur_w3 + as.factor(CLUSTER2)", 
-      data = data_sl, 
+      parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w3 + as.factor(CLUSTER2)", 
+      data = data, 
       weights = iptw_sl)
 # Fixed-Effect PS & FE med/outcome 
-med_fefe <- glm(formula = "selfEst_w3 ~ sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
+med_fefe <- glm(formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + ethnicity_w1 +
       white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
-      parentalEdu_w1 + familyStruct_w1 + healthInsur_w3 + as.factor(CLUSTER2)", 
-      data = data_fe, 
+      parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w3 + as.factor(CLUSTER2)", 
+      data = data, 
       weights = iptw_fe)
 
 # Random-Effect PS & FE med/outcome
-med_refe <- glm(formula = "selfEst_w3 ~ sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
+med_refe <- glm(formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + ethnicity_w1 +
       white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
-      parentalEdu_w1 + familyStruct_w1 + healthInsur_w3 + as.factor(CLUSTER2)", 
-      data = data_re, 
+      parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w3 + as.factor(CLUSTER2)", 
+      data = data, 
       weights = iptw_re)
 
 
 ### Mediator models (RE) ----------------------------------------------------
 
 ### Add column of just 1s for level-2 weight
-# data <- cbind(data, L2weight = rep(1, nrow(data)))
-data_sl <- cbind(data_sl, L2weight = rep(1, nrow(data_sl)))
-data_fe <- cbind(data_fe, L2weight = rep(1, nrow(data_fe)))
-data_re <- cbind(data_re, L2weight = rep(1, nrow(data_re)))
+data <- cbind(data, L2weight = rep(1, nrow(data)))
 
 # Single-Level PS & RE med/outcome
 med_slre <-
   WeMix::mix(
-    formula = selfEst_w3 ~ sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
+    formula = selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + ethnicity_w1 +
       white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
-      parentalEdu_w1 + familyStruct_w1 + healthInsur_w3 + (1 | CLUSTER2),
-    data = data_sl,
+      parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w3 + (1 | CLUSTER2),
+    data = data,
     weights = c("iptw_sl", "L2weight")
   )
 # Fixed-Effect PS & RE med/outcome 
 med_fere <- 
   WeMix::mix(
-    formula = selfEst_w3 ~ sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
+    formula = selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + ethnicity_w1 +
       white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
-      parentalEdu_w1 + familyStruct_w1 + healthInsur_w3 + (1 | CLUSTER2),
-    data = data_fe,
+      parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w3 + (1 | CLUSTER2),
+    data = data,
     weights = c("iptw_fe", "L2weight")
   )
 # Random-Effect PS & RE med/outcome
 med_rere <- 
   WeMix::mix(
-    formula = selfEst_w3 ~ sportPartic_w1 + age_w1 + sex_w1 + ethnicity_w1 +
+    formula = selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + ethnicity_w1 +
       white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 +
-      parentalEdu_w1 + familyStruct_w1 + healthInsur_w3 + (1 | CLUSTER2),
-    data = data_re,
+      parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w3 + (1 | CLUSTER2),
+    data = data,
     weights = c("iptw_re", "L2weight")
   )
 
