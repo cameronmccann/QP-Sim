@@ -12,18 +12,18 @@
 # Script Description:
 #           This is a draft document to help create the bootstrap function for the empirical example. 
 #
-# Last Updated: 07/23/2024 
+# Last Updated: 07/24/2024 
 #
 #
 # Notes:
 #   To-Do:
-#     # Try to parallelize the RE function 
 # 
 #   Next: 
 #     
 #   Done: 
 #     # make 2 bootstrap functions: 1) SL & FE med/out models & 2) RE med/out models
 #     # make each function return direct & indirect CIs
+#     # Try to parallelize the RE function 
 # 
 # 
 ################################################################################
@@ -314,6 +314,245 @@ result$outcome_converged_count
 
 
 ## Parallelize the RE bootstrap function  ----------------------------------
+
+#### Initial function  -------------------------------------------------------
+
+# 
+# bootstrap_ci_re_paral <- function(seed = 456, iterations = 50, iptw, data) {
+#   # Initialize vectors to store the bootstrap indirect and direct effects and convergence statuses
+#   indirect_effects <- numeric(iterations)
+#   direct_effects <- numeric(iterations)
+#   mediator_converged <- logical(iterations)
+#   outcome_converged <- logical(iterations)
+#   
+#   # Convert iptw to string
+#   iptw_str <- deparse(substitute(iptw))
+#   
+#   # Set the seed for reproducibility
+#   set.seed(seed)
+#   
+#   # Create the progress bar
+#   pb <- txtProgressBar(min = 0, max = iterations, style = 3, width = 50, char = "=")
+#   
+#   # Perform bootstrap resampling
+#   for (i in 1:iterations) {
+#     # Resample with replacement at the cluster level
+#     cluster_boot <- sample(unique(data$CLUSTER2), replace = TRUE)
+#     data_boot <- data[data$CLUSTER2 %in% cluster_boot, ]
+#     
+#     # Add column of just 1s for level-2 weight
+#     data_boot <- cbind(data_boot, L2weight = rep(1, nrow(data_boot)))
+#     
+#     # Fit the RE models with RE ps for the bootstrap sample
+#     mediator_rere <- tryCatch({
+#       WeMix::mix(
+#         formula = selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 + 
+#           parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap + (1 | CLUSTER2),  
+#         data = data_boot, 
+#         weights = c(iptw_str, "L2weight")
+#       )
+#     }, error = function(e) NULL)
+#     
+#     outcome_rere <- tryCatch({
+#       WeMix::mix(
+#         formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 + 
+#           parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap + (1 | CLUSTER2),
+#         data = data_boot, 
+#         weights = c(iptw_str, "L2weight")
+#       )
+#     }, error = function(e) NULL)
+#     
+#     # Check convergence and calculate effects if both models converged
+#     mediator_converged[i] <- !is.null(mediator_rere)
+#     outcome_converged[i] <- !is.null(outcome_rere)
+#     
+#     if (mediator_converged[i] && outcome_converged[i]) {
+#       indirect_effects[i] <- summary(mediator_rere)$coef["sportPartic_w1", "Estimate"] * 
+#         summary(outcome_rere)$coef["selfEst_w3_sc", "Estimate"]
+#       direct_effects[i] <- summary(outcome_rere)$coef["sportPartic_w1", "Estimate"]
+#     } else {
+#       indirect_effects[i] <- NA
+#       direct_effects[i] <- NA
+#     }
+#     
+#     # Update the progress bar
+#     setTxtProgressBar(pb, i)
+#   }
+#   
+#   # Close the progress bar & print completion message
+#   close(pb)
+#   cat("\nBootstrap resampling completed!\n")
+#   
+#   # Calculate the percentile bootstrap CI
+#   indirect_ci_rere <- quantile(indirect_effects, probs = c(0.025, 0.975), na.rm = TRUE)
+#   direct_ci_rere <- quantile(direct_effects, probs = c(0.025, 0.975), na.rm = TRUE)
+#   
+#   # Return the results as a list
+#   list(
+#     indirect_ci = indirect_ci_rere,
+#     direct_ci = direct_ci_rere,
+#     indirect_effects = indirect_effects,
+#     direct_effects = direct_effects,
+#     mediator_converged_count = sum(mediator_converged),
+#     outcome_converged_count = sum(outcome_converged),
+#     both_converged_count = sum(mediator_converged & outcome_converged)
+#   )
+# }
+
+
+
+#### Perplexity 1 (FINAL FUNCTION) ------------------------------------------------------------
+
+bootstrap_ci_re_paral <- function(iterations = 50, iptw, data, cores = 2, core_seeds = NULL) {
+  # Load necessary libraries
+  library(parallel)
+  library(WeMix)
+  
+  # Convert iptw to string
+  iptw_str <- deparse(substitute(iptw))
+  
+  # Generate seeds for each core if not provided
+  if (is.null(core_seeds)) {
+    core_seeds <- sample.int(1e6, cores)
+  } else if (length(core_seeds) != cores) {
+    stop("The number of core_seeds must match the number of cores")
+  }
+  
+  # Define the function to be run in parallel
+  bootstrap_iteration <- function(i, core_seed, iptw_str, data) {
+    set.seed(core_seed + i)  # Unique seed for each iteration within a core
+    
+    # Resample with replacement at the cluster level
+    cluster_boot <- sample(unique(data$CLUSTER2), replace = TRUE)
+    data_boot <- data[data$CLUSTER2 %in% cluster_boot, ]
+    
+    # Add column of just 1s for level-2 weight
+    data_boot <- cbind(data_boot, L2weight = rep(1, nrow(data_boot)))
+    
+    # Fit the RE models with RE ps for the bootstrap sample
+    mediator_rere <- tryCatch({
+      WeMix::mix(
+        formula = selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 + 
+          parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap + (1 | CLUSTER2),  
+        data = data_boot, 
+        weights = c(iptw_str, "L2weight")
+      )
+    }, error = function(e) NULL)
+    
+    outcome_rere <- tryCatch({
+      WeMix::mix(
+        formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 + 
+          parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap + (1 | CLUSTER2),
+        data = data_boot, 
+        weights = c(iptw_str, "L2weight")
+      )
+    }, error = function(e) NULL)
+    
+    # Check convergence and calculate effects if both models converged
+    mediator_converged <- !is.null(mediator_rere)
+    outcome_converged <- !is.null(outcome_rere)
+    
+    if (mediator_converged && outcome_converged) {
+      indirect_effect <- summary(mediator_rere)$coef["sportPartic_w1", "Estimate"] * 
+        summary(outcome_rere)$coef["selfEst_w3_sc", "Estimate"]
+      direct_effect <- summary(outcome_rere)$coef["sportPartic_w1", "Estimate"]
+    } else {
+      indirect_effect <- NA
+      direct_effect <- NA
+    }
+    
+    list(indirect_effect = indirect_effect, direct_effect = direct_effect, 
+         mediator_converged = mediator_converged, outcome_converged = outcome_converged)
+  }
+  
+  # Run the bootstrap iterations in parallel
+  results <- mclapply(1:iterations, function(i) {
+    core_index <- (i - 1) %% cores + 1
+    bootstrap_iteration(i, core_seeds[core_index], iptw_str, data)
+  }, mc.cores = cores)
+  
+  # Extract results from the list
+  indirect_effects <- sapply(results, function(x) x$indirect_effect)
+  direct_effects <- sapply(results, function(x) x$direct_effect)
+  mediator_converged <- sapply(results, function(x) x$mediator_converged)
+  outcome_converged <- sapply(results, function(x) x$outcome_converged)
+  
+  # Calculate the percentile bootstrap CI
+  indirect_ci_rere <- quantile(indirect_effects, probs = c(0.025, 0.975), na.rm = TRUE)
+  direct_ci_rere <- quantile(direct_effects, probs = c(0.025, 0.975), na.rm = TRUE)
+  
+  # Return the results as a list
+  list(
+    indirect_ci = indirect_ci_rere,
+    direct_ci = direct_ci_rere,
+    indirect_effects = indirect_effects,
+    direct_effects = direct_effects,
+    mediator_converged_count = sum(mediator_converged),
+    outcome_converged_count = sum(outcome_converged),
+    both_converged_count = sum(mediator_converged & outcome_converged)
+  )
+}
+
+
+# Test
+system.time()
+result_par <- bootstrap_ci_re_paral(iterations = 10,
+                                    iptw = iptw_re, 
+                                    data = data, 
+                                    cores = 6, 
+                                    core_seeds = c(4561, 4562, 4563, 4564, 4565, 4566))
+result_par$indirect_ci
+result_par$both_converged_count
+# > result_par$indirect_ci
+# 2.5%      97.5% 
+#   -0.3253006 -0.1421907 
+# > result_par$both_converged_count
+# [1] 6
+
+# Compare parallel to not
+## parallel 
+execution_time <- system.time({
+  result_par <- bootstrap_ci_re_paral(iterations = 10,
+                                      iptw = iptw_re, 
+                                      data = data, 
+                                      cores = 6, 
+                                      core_seeds = c(4561, 4562, 4563, 4564, 4565, 4566))
+})
+
+# Print the execution time
+print(execution_time)
+# user  system elapsed 
+# 35.563   1.042  10.609 
+
+# If you want to see the elapsed time specifically
+cat("Elapsed time:", execution_time["elapsed"], "seconds\n")
+# Elapsed time: 10.609 seconds
+
+
+## non-parallel 
+execution_time <- system.time({
+  result_nopar <- bootstrap_ci_re(seed = 456, 
+                                  iterations = 10, 
+                                  iptw = iptw_re, 
+                                  data = data)
+})
+
+# Print the execution time
+print(execution_time)
+# user  system elapsed 
+# 43.741   0.138  43.894 
+
+# If you want to see the elapsed time specifically
+cat("Elapsed time:", execution_time["elapsed"], "seconds\n")
+# Elapsed time: 43.894 seconds
+
+
+
+
+
+
+
+
 
 
 
@@ -1247,21 +1486,135 @@ print(result)
 
 
 
+library(parallel); library(doParallel)
+future::availableCores()
+(numCores <- min(detectCores() - 1, 2))
+
+cl <- parallel::makeCluster(numCores)
+cl <- parallel::makeForkCluster(numCores)
+cl <- parallel::makeCluster(numCores, type = "PSOCK")
+cl <- makePSOCKcluster(2)
+
+R.version$version.string # "R version 4.3.1 (2023-06-16)"
+packageVersion("doParallel") #‘1.0.17’
+packageVersion("parallel") #‘4.3.1’
+
+# explicit
+cl <- makeCluster(c("localhost", "localhost"))
+# cl <- makeCluster(c("Cameron.local", "Cameron.local"))
+
+R.version$version.string # "R version 4.3.1 (2023-06-16)"
+packageVersion("doParallel") #‘1.0.17’
+packageVersion("parallel") #‘4.3.1’
+
+
+library(future); library(future.apply)
+plan(multisession, workers - numCores)
+
+plan(multicore, workers = numCores)
+
+
+
+
+library(future)
+library(future.apply)
+
+# Reduce number of workers
+numCores <- min(availableCores() - 1, 2)
+plan(multisession, workers = numCores)
+
+# Increase timeout
+options(future.wait.timeout = 600)
+
+# Function to run in parallel
+parallel_function <- function(seed) {
+  set.seed(seed)
+  rnorm(1)
+}
+
+# Seeds for each process
+seeds <- sample(1:10000, numCores)
+
+# Run the function in parallel
+results <- future_lapply(seeds, parallel_function)
+
+print(results)
 
 
 
 
 
 
+# 1
+library(parallel)
+
+numCores <- min(detectCores() - 1, 2)
+
+result <- mclapply(1:10, function(x) {
+  Sys.sleep(1)  # Simulate some work
+  return(x^2)
+}, mc.cores = numCores)
+
+print(result)
+# Worked!
 
 
+# 2 
+# install.packages("future")
+library(future)
+
+plan(multisession, workers = 2)
+
+result <- future_lapply(1:10, function(x) {
+  Sys.sleep(1)  # Simulate some work
+  return(x^2)
+})
+
+print(result)
+# plan() would not finish running after a couple minutes 
 
 
+# 3 
+# install.packages(c("foreach", "doMC"))
+library(foreach)
+library(doMC)
+
+numCores <- min(detectCores() - 1, 2)
+registerDoMC(cores = numCores)
+
+result <- foreach(i = 1:10) %dopar% {
+  Sys.sleep(1)  # Simulate some work
+  i^2
+}
+
+print(result)
+# Worked!
 
 
+# 4 
+tryCatch({
+  cl <- parallel::makeCluster(2)
+  print("Cluster created successfully")
+  stopCluster(cl)
+}, error = function(e) {
+  print(paste("Error:", e$message))
+})
+# did not complete after a couple minutes 
 
 
+# 5 
+con <- socketConnection("localhost", port = 11111, server = TRUE)
+close(con)
+# did not complete after a couple minutes 
 
+
+# 6
+cl <- parallel::makeCluster(2, type = "PSOCK", outfile = "")
+# did not complete after a couple minutes 
+# Warning message:
+#   In socketConnection(master, port = port, blocking = TRUE, open = "a+b",  :
+#                         localhost:11448 cannot be opened
+#                       Execution halted
 
 
 # Create SL & FE bootstrap CI function ------------------------------------
@@ -1461,147 +1814,7 @@ result <- bootstrap_ci(seed = 456, iterations = 10, iptw = iptw_sl, data = data)
 # print(result$direct_ci)
 
 
-######################
-
-
-bootstrap_ci <- function(seed = 456, iterations = 50, iptw, data, model = "SL") {
-  # Initialize vectors to store the bootstrap indirect and direct effects and convergence statuses
-  indirect_effects <- numeric(iterations)
-  direct_effects <- numeric(iterations)
-  mediator_converged <- logical(iterations)
-  outcome_converged <- logical(iterations)
-  
-  # Convert iptw to string
-  iptw_str <- deparse(substitute(iptw))
-  
-  # Set the seed for reproducibility
-  set.seed(seed)
-  
-  # Create the progress bar
-  pb <- txtProgressBar(min = 0, max = iterations, style = 3, width = 50, char = "=")
-  
-  # Perform bootstrap resampling
-  for (i in 1:iterations) {
-    # cat("\nIteration:", i, "\n")
-    
-    # Resample with replacement at the cluster level
-    cluster_boot <- sample(unique(data$CLUSTER2), replace = TRUE)
-    data_boot <- data[data$CLUSTER2 %in% cluster_boot, ]
-    # cat("Resampled clusters:", unique(cluster_boot), "\n")
-    # cat("Resampled data size:", nrow(data_boot), "\n")
-    
-    if (model == "SL") {
-      # Fit the SL models for the bootstrap sample
-      mediator <- tryCatch({
-        glm(
-          formula = selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 + 
-            parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap,
-          data = data_boot,
-          weights = data_boot[[iptw_str]]
-        )
-      }, error = function(e) {
-        # cat("Mediator model failed: ", e$message, "\n")
-        NULL
-      })
-      
-      outcome <- tryCatch({
-        glm(
-          formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 + 
-            parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap,
-          data = data_boot,
-          weights = data_boot[[iptw_str]]
-        )
-      }, error = function(e) {
-        # cat("Outcome model failed: ", e$message, "\n")
-        NULL
-      })
-    } else if (model == "FE") {
-      # Fit the FE models for the bootstrap sample
-      mediator <- tryCatch({
-        glm(
-          formula = selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 + 
-            parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap + as.factor(CLUSTER2), 
-          data = data_boot, 
-          weights = data_boot[[iptw_str]]
-        )
-      }, error = function(e) {
-        # cat("Mediator FE model failed: ", e$message, "\n")
-        NULL
-      })
-      
-      outcome <- tryCatch({
-        glm(
-          formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 + 
-            parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap + as.factor(CLUSTER2),
-          data = data_boot,
-          weights = data_boot[[iptw_str]]
-        )
-      }, error = function(e) {
-        # cat("Outcome FE model failed: ", e$message, "\n")
-        NULL
-      })
-    } else {
-      stop("Invalid model type. Choose 'SL' or 'FE'.")
-    }
-    
-    # Check convergence and calculate effects if both models converged
-    mediator_converged[i] <- !is.null(mediator)
-    outcome_converged[i] <- !is.null(outcome)
-    # cat("Mediator model converged:", mediator_converged[i], "\n")
-    # cat("Outcome model converged:", outcome_converged[i], "\n")
-    
-    if (mediator_converged[i] && outcome_converged[i]) {
-      indirect_effects[i] <- summary(mediator)$coef["sportPartic_w1", "Estimate"] * 
-        summary(outcome)$coef["selfEst_w3_sc", "Estimate"]
-      direct_effects[i] <- summary(outcome)$coef["sportPartic_w1", "Estimate"]
-      # cat("Indirect effect estimate:", indirect_effects[i], "\n")
-      # cat("Direct effect estimate:", direct_effects[i], "\n")
-    } else {
-      indirect_effects[i] <- NA
-      direct_effects[i] <- NA
-      # cat("One or both models did not converge. Setting effects to NA.\n")
-    }
-    
-    # Update the progress bar
-    setTxtProgressBar(pb, i)
-  }
-  
-  # Close the progress bar & print completion message
-  close(pb)
-  cat("\nBootstrap resampling completed!\n")
-  
-  # Calculate the percentile bootstrap CI
-  indirect_ci_rere <- quantile(indirect_effects, probs = c(0.025, 0.975), na.rm = TRUE)
-  direct_ci_rere <- quantile(direct_effects, probs = c(0.025, 0.975), na.rm = TRUE)
-  
-  # Return the results as a list
-  list(
-    indirect_ci = indirect_ci_rere,
-    direct_ci = direct_ci_rere,
-    indirect_effects = indirect_effects,
-    direct_effects = direct_effects,
-    mediator_converged_count = sum(mediator_converged),
-    outcome_converged_count = sum(outcome_converged),
-    both_converged_count = sum(mediator_converged & outcome_converged)
-  )
-}
-
-# Example usage
-result <- bootstrap_ci(seed = 456, iterations = 10, iptw = "iptw_re", data = data, model = "SL")
-print(result$indirect_ci)
-print(result$direct_ci)
-
-
-result <- bootstrap_ci(seed = 456, iterations = 10, iptw = "iptw_re", data = data, model = "FE")
-print(result$indirect_ci)
-print(result$direct_ci)
-result$mediator_converged_count
-
-
-
-
-
-# Add FE as an option to function  ----------------------------------------
+## Add FE as an option to function  ----------------------------------------
 
 bootstrap_ci <- function(seed = 456, iterations = 50, iptw, data, model = "SL") {
   # Initialize vectors to store the bootstrap indirect and direct effects and convergence statuses
@@ -1753,15 +1966,352 @@ result$outcome_converged_count
 
 
 
+## FINAL (non-parallel) FUNCTION -------------------------------------------
+
+bootstrap_ci <- function(seed = 456, iterations = 50, iptw, data, model = "SL") {
+  # Initialize vectors to store the bootstrap indirect and direct effects and convergence statuses
+  indirect_effects <- numeric(iterations)
+  direct_effects <- numeric(iterations)
+  mediator_converged <- logical(iterations)
+  outcome_converged <- logical(iterations)
+  
+  # Convert iptw to string
+  iptw_str <- deparse(substitute(iptw))
+  
+  # Set the seed for reproducibility
+  set.seed(seed)
+  
+  # Create the progress bar
+  pb <- txtProgressBar(min = 0, max = iterations, style = 3, width = 50, char = "=")
+  
+  # Perform bootstrap resampling
+  for (i in 1:iterations) {
+    # cat("\nIteration:", i, "\n")
+    
+    # Resample with replacement at the cluster level
+    cluster_boot <- sample(unique(data$CLUSTER2), replace = TRUE)
+    data_boot <- data[data$CLUSTER2 %in% cluster_boot, ]
+    # cat("Resampled clusters:", unique(cluster_boot), "\n")
+    # cat("Resampled data size:", nrow(data_boot), "\n")
+    
+    if (model == "SL") {
+      # Fit the SL models for the bootstrap sample
+      mediator <- tryCatch({
+        glm(
+          formula = selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 + 
+            parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap,
+          data = data_boot,
+          weights = data_boot[[iptw_str]]
+        )
+      }, error = function(e) {
+        # cat("Mediator model failed: ", e$message, "\n")
+        NULL
+      })
+      
+      outcome <- tryCatch({
+        glm(
+          formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 + 
+            parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap,
+          data = data_boot,
+          weights = data_boot[[iptw_str]]
+        )
+      }, error = function(e) {
+        # cat("Outcome model failed: ", e$message, "\n")
+        NULL
+      })
+    } else if (model == "FE") {
+      # Fit the FE models for the bootstrap sample
+      mediator <- tryCatch({
+        glm(
+          formula = selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 + 
+            parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap + as.factor(CLUSTER2), 
+          data = data_boot, 
+          weights = data_boot[[iptw_str]]
+        )
+      }, error = function(e) {
+        # cat("Mediator FE model failed: ", e$message, "\n")
+        NULL
+      })
+      
+      outcome <- tryCatch({
+        glm(
+          formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 + 
+            parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap + as.factor(CLUSTER2),
+          data = data_boot,
+          weights = data_boot[[iptw_str]]
+        )
+      }, error = function(e) {
+        # cat("Outcome FE model failed: ", e$message, "\n")
+        NULL
+      })
+    } else {
+      stop("Invalid model type. Choose 'SL' or 'FE'.")
+    }
+    
+    # Check convergence and calculate effects if both models converged
+    mediator_converged[i] <- !is.null(mediator)
+    outcome_converged[i] <- !is.null(outcome)
+    # cat("Mediator model converged:", mediator_converged[i], "\n")
+    # cat("Outcome model converged:", outcome_converged[i], "\n")
+    
+    if (mediator_converged[i] && outcome_converged[i]) {
+      indirect_effects[i] <- summary(mediator)$coef["sportPartic_w1", "Estimate"] * 
+        summary(outcome)$coef["selfEst_w3_sc", "Estimate"]
+      direct_effects[i] <- summary(outcome)$coef["sportPartic_w1", "Estimate"]
+      # cat("Indirect effect estimate:", indirect_effects[i], "\n")
+      # cat("Direct effect estimate:", direct_effects[i], "\n")
+    } else {
+      indirect_effects[i] <- NA
+      direct_effects[i] <- NA
+      # cat("One or both models did not converge. Setting effects to NA.\n")
+    }
+    
+    # Update the progress bar
+    setTxtProgressBar(pb, i)
+  }
+  
+  # Close the progress bar & print completion message
+  close(pb)
+  cat("\nBootstrap resampling completed!\n")
+  
+  # Calculate the percentile bootstrap CI
+  indirect_ci_rere <- quantile(indirect_effects, probs = c(0.025, 0.975), na.rm = TRUE)
+  direct_ci_rere <- quantile(direct_effects, probs = c(0.025, 0.975), na.rm = TRUE)
+  
+  # Return the results as a list
+  list(
+    indirect_ci = indirect_ci_rere,
+    direct_ci = direct_ci_rere,
+    indirect_effects = indirect_effects,
+    direct_effects = direct_effects,
+    mediator_converged_count = sum(mediator_converged),
+    outcome_converged_count = sum(outcome_converged),
+    both_converged_count = sum(mediator_converged & outcome_converged)
+  )
+}
+
+# Example usage
+result <- bootstrap_ci(seed = 456, iterations = 10, iptw = "iptw_re", data = data, model = "SL")
+print(result$indirect_ci)
+print(result$direct_ci)
+# 2.5%      97.5% 
+# -0.4478676 -0.1218050 
+# 2.5%      97.5% 
+# -0.7498424 -0.4453751 
+
+result <- bootstrap_ci(seed = 456, iterations = 10, iptw = "iptw_re", data = data, model = "FE")
+print(result$indirect_ci)
+print(result$direct_ci)
+result$mediator_converged_count
+# 2.5%      97.5% 
+# -0.4741025 -0.1797198 
+# 2.5%      97.5% 
+# -0.6290483 -0.2758734 
+# [1] 10
+
+
+
+# PARALLEL  ---------------------------------------------------------------
+
+
+
+bootstrap_ci_paral <- function(iterations = 50, iptw, data, model = "SL", cores = 2, core_seeds = NULL) {
+  # Load necessary libraries
+  library(parallel)
+  library(WeMix)
+  
+  # Convert iptw to string
+  iptw_str <- deparse(substitute(iptw))
+  
+  # Generate seeds for each core if not provided
+  if (is.null(core_seeds)) {
+    core_seeds <- sample.int(1e6, cores)
+  } else if (length(core_seeds) != cores) {
+    stop("The number of core_seeds must match the number of cores")
+  }
+  
+  # Define the function to be run in parallel
+  bootstrap_iteration <- function(i, core_seed, iptw_str, data, model) {
+    set.seed(core_seed + i)  # Unique seed for each iteration within a core
+    
+    # Resample with replacement at the cluster level
+    cluster_boot <- sample(unique(data$CLUSTER2), replace = TRUE)
+    data_boot <- data[data$CLUSTER2 %in% cluster_boot, ]
+    
+    # Fit the models based on the specified type
+    if (model == "SL") {
+      mediator <- tryCatch({
+        glm(
+          formula = selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 + 
+            parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap,
+          data = data_boot,
+          weights = data_boot[[iptw_str]]
+        )
+      }, error = function(e) NULL)
+      
+      outcome <- tryCatch({
+        glm(
+          formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 + 
+            parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap,
+          data = data_boot,
+          weights = data_boot[[iptw_str]]
+        )
+      }, error = function(e) NULL)
+    } else if (model == "FE") {
+      mediator <- tryCatch({
+        glm(
+          formula = selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 + 
+            parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap + as.factor(CLUSTER2), 
+          data = data_boot, 
+          weights = data_boot[[iptw_str]]
+        )
+      }, error = function(e) NULL)
+      
+      outcome <- tryCatch({
+        glm(
+          formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 + 
+            parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap + as.factor(CLUSTER2),
+          data = data_boot,
+          weights = data_boot[[iptw_str]]
+        )
+      }, error = function(e) NULL)
+    } else {
+      stop("Invalid model type. Choose 'SL' or 'FE'.")
+    }
+    
+    # Check convergence and calculate effects if both models converged
+    mediator_converged <- !is.null(mediator)
+    outcome_converged <- !is.null(outcome)
+    
+    if (mediator_converged && outcome_converged) {
+      indirect_effect <- summary(mediator)$coef["sportPartic_w1", "Estimate"] * 
+        summary(outcome)$coef["selfEst_w3_sc", "Estimate"]
+      direct_effect <- summary(outcome)$coef["sportPartic_w1", "Estimate"]
+    } else {
+      indirect_effect <- NA
+      direct_effect <- NA
+    }
+    
+    list(indirect_effect = indirect_effect, direct_effect = direct_effect, 
+         mediator_converged = mediator_converged, outcome_converged = outcome_converged)
+  }
+  
+  # Run the bootstrap iterations in parallel
+  results <- mclapply(1:iterations, function(i) {
+    core_index <- (i - 1) %% cores + 1
+    bootstrap_iteration(i, core_seeds[core_index], iptw_str, data, model)
+  }, mc.cores = cores)
+  
+  # Extract results from the list
+  indirect_effects <- sapply(results, function(x) x$indirect_effect)
+  direct_effects <- sapply(results, function(x) x$direct_effect)
+  mediator_converged <- sapply(results, function(x) x$mediator_converged)
+  outcome_converged <- sapply(results, function(x) x$outcome_converged)
+  
+  # Calculate the percentile bootstrap CI
+  indirect_ci_rere <- quantile(indirect_effects, probs = c(0.025, 0.975), na.rm = TRUE)
+  direct_ci_rere <- quantile(direct_effects, probs = c(0.025, 0.975), na.rm = TRUE)
+  
+  # Return the results as a list
+  list(
+    indirect_ci = indirect_ci_rere,
+    direct_ci = direct_ci_rere,
+    indirect_effects = indirect_effects,
+    direct_effects = direct_effects,
+    mediator_converged_count = sum(mediator_converged),
+    outcome_converged_count = sum(outcome_converged),
+    both_converged_count = sum(mediator_converged & outcome_converged)
+  )
+}
+
+
+
+
+
+result_par <- bootstrap_ci_paral(iterations = 100,
+                                 iptw = iptw_re, 
+                                 data = data, 
+                                 model = "SL", 
+                                 cores = 4, 
+                                 core_seeds = c(4561, 4562, 4563, 4564))
 
 
 
 
 
 
+# Test
+system.time()
+result_par <- bootstrap_ci_re_paral(iterations = 10,
+                                    iptw = iptw_re, 
+                                    data = data, 
+                                    cores = 6, 
+                                    core_seeds = c(4561, 4562, 4563, 4564, 4565, 4566))
+result_par$indirect_ci
+result_par$both_converged_count
+# > result_par$indirect_ci
+# 2.5%      97.5% 
+#   -0.3253006 -0.1421907 
+# > result_par$both_converged_count
+# [1] 6
+
+# Compare parallel to not
+## parallel 
+execution_time <- system.time({
+  result_par_fe <- bootstrap_ci_paral(iterations = 10, 
+                                      iptw = iptw_re, 
+                                      data = data, 
+                                      model = "FE", 
+                                      cores = 6,
+                                      core_seeds = c(4561, 4562, 4563, 4564, 4565, 4566))
+})
+
+# Print the execution time
+print(execution_time)
+# user  system elapsed 
+# 0.517   0.146   0.211 
+
+# If you want to see the elapsed time specifically
+cat("Elapsed time:", execution_time["elapsed"], "seconds\n")
+# Elapsed time: 0.211 seconds
+
+result_par_fe$indirect_ci
+result_par_fe$indirect_effects
+result_par_fe$both_converged_count
+# 2.5%      97.5% 
+# -0.3603692 -0.1539777 
+# [1] -0.3825357 -0.2411688 -0.2161508 -0.2840177 -0.1539777 -0.2026045 -0.2840177 -0.1539777 -0.2026045 -0.2028336
+# [1] 10
+
+## non-parallel 
+execution_time <- system.time({
+  result_nopar_fe <- bootstrap_ci(seed = 456, 
+                              iterations = 10, 
+                              iptw = iptw_re, 
+                              model = "FE", 
+                              data = data)
+})
+
+# Print the execution time
+print(execution_time)
+# user  system elapsed 
+# 0.587   0.026   0.611 
+
+# If you want to see the elapsed time specifically
+cat("Elapsed time:", execution_time["elapsed"], "seconds\n")
+# Elapsed time: 0.611 seconds
+
+result_nopar_fe$indirect_ci
+result_nopar_fe$indirect_effects
+result_nopar_fe$both_converged_count
+# 2.5%      97.5% 
+# -0.3208386 -0.0341457 
+# [1] -0.11683251 -0.31729970 -0.08895492 -0.04078267 -0.10086418 -0.32186596 -0.29593555 -0.26189614 -0.11574428 -0.03221884
+# [1] 10
 
 
 
-
+result_par_fe$indirect_ci
+result_nopar_fe$indirect_ci
 
 

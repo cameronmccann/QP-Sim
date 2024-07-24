@@ -12,7 +12,7 @@
 # Script Description:
 #
 #
-# Last Updated: 07/22/2024 
+# Last Updated: 07/24/2024 
 #
 #
 # Notes:
@@ -64,7 +64,8 @@ pacman::p_load(
   boot, 
   utils, 
   lme4, 
-  WeMix
+  WeMix, 
+  parallel
   # ggdag, 
   # dagitty, 
   # huxtable
