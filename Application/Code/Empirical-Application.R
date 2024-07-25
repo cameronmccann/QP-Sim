@@ -12,31 +12,11 @@
 # Script Description:
 #
 #
-# Last Updated: 07/24/2024 
+# Last Updated: 07/25/2024 
 #
 #
 # Notes:
 #   To-Do:
-#     + Refer to "NEXT" area in code
-#   Then: 
-#     + Check & clean up comments for the data cleaning sections (Wave I, III, IV)
-#     + Also double check, delete & clean the following sections: Drop small clusters, Missing Data
-#     + Add visuals of covariate balance & overlap 
-# 
-# 
-
-# 
-#     + MAYBE go back & create viz to check overlap
-#     + Figure out how to get covariate balance for all models on 1 visual (like Chang et al. article) 
-# 
-#     + increase number of clusters to all of those greater or equal to 5 (Liu email)
-#       - write RE mediator & outcome code 
-#       - create bootstrap function
-#       - address model convergence issues: with PS (& maybe mediator & outcome) 
-#     + I had model convergence issues with 15 clusters (cs: 41-81 students; N = 742). So I will attempt to increase the number of clusters 
-# 
-#     + Obtain variables names from codebook
-#       - School ID
 # 
 #   Next: 
 #     + 
@@ -702,10 +682,211 @@ data <- data %>%
 
 
 
-# [INSERT VISUALS] --------------------------------------------------------
+# Covariate Balance Visuals -----------------------------------------------
 
-# ADD VISUALS TO SHOW HISTOGRAM OR DENSITY OVERLAP 
-# ADD VISUAL SHOWING DOT PLOT ACROSS MODELS ON EACH COVARIATE OF SAMPLE BALANCE (SMD LIKE LOVEPLOT)
+# Function to calculate Standardized Mean Difference (SMD)
+calculate_smd <- function(data, treatment, covariate) {
+  # Calculate the mean for the treatment group
+  mean_treatment <- mean(data[[covariate]][data[[treatment]] == 1], na.rm = TRUE)
+  
+  # Calculate the mean for the control group
+  mean_control <- mean(data[[covariate]][data[[treatment]] == 0], na.rm = TRUE)
+  
+  # Calculate the standard deviation for the treatment group
+  sd_treatment <- sd(data[[covariate]][data[[treatment]] == 1], na.rm = TRUE)
+  
+  # Calculate the standard deviation for the control group
+  sd_control <- sd(data[[covariate]][data[[treatment]] == 0], na.rm = TRUE)
+  
+  # Compute the SMD using the means and pooled standard deviations
+  smd <- (mean_treatment - mean_control) / sqrt((sd_treatment^2 + sd_control^2) / 2)
+  
+  return(smd)  # Return the calculated SMD
+}
+
+# List of covariates to analyze for balance
+covariates <- c("feelings_w1_sc", "sex_w1", "age_w1_sc", "white_w1", 
+                "black_w1", "parentalEdu_w1_sc", "familyStruct_w1", 
+                "healthInsur_gap")
+
+# Calculate SMD for each covariate before applying weights
+smd_before <- sapply(covariates, function(cov) calculate_smd(data, "sportPartic_w1", cov))
+
+# Convert the SMD results into a data frame for easier manipulation
+smd_before_df <- data.frame(covariate = covariates, SMD = smd_before)
+smd_before_df$type <- "Unweighted"  # Label the type as 'Unweighted'
+
+# Function to calculate weighted SMD, allowing for weights as an argument
+calculate_weighted_smd <- function(data, treatment, covariate, weights_col) {
+  # Subset the data into treatment and control groups
+  treatment_group <- data[data[[treatment]] == 1, ]
+  control_group <- data[data[[treatment]] == 0, ]
+  
+  # Check if either group is empty; return NA if so
+  if (nrow(treatment_group) == 0 || nrow(control_group) == 0) {
+    return(NA)  # Return NA if either group is empty
+  }
+  
+  # Remove rows with missing values in the covariate or weights
+  treatment_group <- treatment_group[!is.na(treatment_group[[covariate]]) & !is.na(treatment_group[[weights_col]]), ]
+  control_group <- control_group[!is.na(control_group[[covariate]]) & !is.na(control_group[[weights_col]]), ]
+  
+  # Check lengths after removing NAs; return NA if either group is empty
+  if (nrow(treatment_group) == 0 || nrow(control_group) == 0) {
+    return(NA)  # Return NA if either group is empty after filtering
+  }
+  
+  # Calculate weighted means for both groups
+  mean_treatment <- weighted.mean(treatment_group[[covariate]], treatment_group[[weights_col]], na.rm = TRUE)
+  mean_control <- weighted.mean(control_group[[covariate]], control_group[[weights_col]], na.rm = TRUE)
+  
+  # Calculate weighted standard deviations for both groups
+  sd_treatment <- sqrt(weighted.var(treatment_group[[covariate]], treatment_group[[weights_col]], na.rm = TRUE))
+  sd_control <- sqrt(weighted.var(control_group[[covariate]], control_group[[weights_col]], na.rm = TRUE))
+  
+  # Compute the SMD using the weighted means and pooled standard deviations
+  smd <- (mean_treatment - mean_control) / sqrt((sd_treatment^2 + sd_control^2) / 2)
+  
+  return(smd)  # Return the calculated weighted SMD
+}
+
+# Calculate SMD for each covariate after applying different weighting methods
+smd_sl_after <- sapply(covariates, function(cov) calculate_weighted_smd(data, "sportPartic_w1", cov, "iptw_sl"))
+smd_fe_after <- sapply(covariates, function(cov) calculate_weighted_smd(data, "sportPartic_w1", cov, "iptw_fe"))
+smd_re_after <- sapply(covariates, function(cov) calculate_weighted_smd(data, "sportPartic_w1", cov, "iptw_re"))
+
+# Convert the results into data frames for easier handling
+smd_sl_after_df <- data.frame(covariate = covariates, SMD = smd_sl_after, type = "Single-Level")
+smd_fe_after_df <- data.frame(covariate = covariates, SMD = smd_fe_after, type = "Fixed-Effect")
+smd_re_after_df <- data.frame(covariate = covariates, SMD = smd_re_after, type = "Random-Effects")
+
+# Combine all SMD data frames into one for comprehensive analysis
+smd_combined <- rbind(smd_before_df, smd_sl_after_df, smd_fe_after_df, smd_re_after_df)
+
+# Calculate the Absolute Standardized Mean Difference (ASMD)
+smd_combined$ASMD <- abs(smd_combined$SMD)
+
+# Define a custom order for the y-axis in the plot
+custom_order <- c("black_w1", "white_w1", "healthInsur_gap", 
+                  "familyStruct_w1", "age_w1_sc", "sex_w1", 
+                  "feelings_w1_sc", "parentalEdu_w1_sc")
+
+# Define new labels for the y-axis to enhance readability
+new_labels <- c("Race: Black", "Race: White", "Health Insurance \n Coverage Gap", 
+                "Family Structure", "Age", "Sex", 
+                "Feelings Scale Score", "Parental Education")
+
+# Create a Love Plot to visualize the Absolute SMD, using custom ordering
+ggplot(smd_combined, aes(x = ASMD, y = factor(covariate, levels = custom_order), color = type, shape = type)) +
+  geom_vline(xintercept = 0.1, linetype = "dashed", color = "black") +  # Reference line for SMD threshold
+  geom_vline(xintercept = 0, color = "black") +  # Line at zero for clarity
+  geom_point(size = 3, stroke = 1.5) +  # Points with increased size and stroke for emphasis
+  labs(title = "Love Plot",
+       subtitle = "Covariate Balance of Individual-Level Covariates",
+       x = "Absolute Standardized Mean Difference (ASMD)",
+       y = "") +
+  theme_minimal() +  # Apply a minimal theme for clean aesthetics
+  theme(axis.text.y = element_text(angle = 0, hjust = 1, size = 10),  # Adjust y-axis text for clarity
+        axis.title = element_text(size = 14),  # Increase axis title size for visibility
+        plot.title = element_text(size = 16, face = "bold"),  # Bold title for emphasis
+        plot.subtitle = element_text(size = 14),  # Subtitle size for readability
+        legend.position = "top") +  # Position legend at the top
+  scale_color_manual(values = c("Unweighted" = "#1f77b4",  # Blue for unweighted
+                                "Single-Level" = "#2ca02c",  # Green for single-level weighting
+                                "Fixed-Effect" = "#ff7f0e",  # Orange for fixed-effect weighting
+                                "Random-Effects" = "#9467bd"),  # Purple for random-effects weighting
+                     name = NULL) +
+  scale_shape_manual(values = c("Unweighted" = 16,  # Circle shape for unweighted
+                                "Single-Level" = 17,  # Triangle shape for single-level
+                                "Fixed-Effect" = 15,  # Square shape for fixed-effect
+                                "Random-Effects" = 18),  # Diamond shape for random-effects
+                     name = NULL) +
+  scale_y_discrete(labels = new_labels)  # Use new labels for the y-axis
+
+
+
+
+
+# 
+# # ADD VISUALS TO SHOW HISTOGRAM OR DENSITY OVERLAP 
+# # ADD VISUAL SHOWING DOT PLOT ACROSS MODELS ON EACH COVARIATE OF SAMPLE BALANCE (SMD LIKE LOVEPLOT)
+# 
+# colnames(data)
+# ## THIS IS BEFORE TRUNCATION 
+# # SL 
+# data %>% 
+#   mutate(sportPartic_w1 = as.factor(sportPartic_w1)) %>% 
+#   ggplot(aes(x = ps_sl, 
+#              group = sportPartic_w1, 
+#              fill = sportPartic_w1)) +
+#   geom_histogram(position = "identity",
+#                  alpha = 0.5,
+#                  binwidth = 0.01) +
+#   geom_density(aes(y = ..count.. * 0.01, 
+#                    color = sportPartic_w1),  
+#                size = 0.5,        
+#                alpha = 0, 
+#                trim = TRUE, 
+#                show.legend = FALSE) +      # Set alpha to 1 (no transparency)
+#   scale_fill_manual(values = c("blue", "darkorange")) +
+#   scale_color_manual(values = c("blue", "darkorange")) +
+#   theme_minimal() +
+#   labs(# title = "Histogram of ps_sl_logit by sportPartic_w1",
+#     y = "count",
+#     fill = "trt (Sport Participation)") +
+#   theme(legend.position = "bottom")
+# 
+# # FE 
+# data %>% 
+#   mutate(sportPartic_w1 = as.factor(sportPartic_w1)) %>% 
+#   ggplot(aes(x = ps_fe, 
+#              group = sportPartic_w1, 
+#              fill = sportPartic_w1)) +
+#   geom_histogram(position = "identity",
+#                  alpha = 0.5,
+#                  binwidth = 0.01) +
+#   geom_density(aes(y = ..count.. * 0.01, 
+#                    color = sportPartic_w1),  
+#                size = 0.5,        
+#                alpha = 0, 
+#                trim = TRUE, 
+#                show.legend = FALSE) +      # Set alpha to 1 (no transparency)
+#   scale_fill_manual(values = c("blue", "darkorange")) +
+#   scale_color_manual(values = c("blue", "darkorange")) +
+#   theme_minimal() +
+#   labs(# title = "Histogram of ps_sl_logit by sportPartic_w1",
+#     y = "count",
+#     fill = "trt (Sport Participation)") +
+#   theme(legend.position = "bottom")
+# 
+# # RE 
+# data %>% 
+#   mutate(sportPartic_w1 = as.factor(sportPartic_w1)) %>% 
+#   ggplot(aes(x = ps_re, 
+#              group = sportPartic_w1, 
+#              fill = sportPartic_w1)) +
+#   geom_histogram(position = "identity",
+#                  alpha = 0.5,
+#                  binwidth = 0.01) +
+#   geom_density(aes(y = ..count.. * 0.01, 
+#                    color = sportPartic_w1),  
+#                size = 0.5,        
+#                alpha = 0, 
+#                trim = TRUE, 
+#                show.legend = FALSE) +      # Set alpha to 1 (no transparency)
+#   scale_fill_manual(values = c("blue", "darkorange")) +
+#   scale_color_manual(values = c("blue", "darkorange")) +
+#   theme_minimal() +
+#   labs(# title = "Histogram of ps_sl_logit by sportPartic_w1",
+#     y = "count",
+#     fill = "trt (Sport Participation)") +
+#   theme(legend.position = "bottom")
+#   
+
+
+
+
+
 
 
 
@@ -898,6 +1079,7 @@ out_rere <-
   )
 
 
+
 # Display Estimates -------------------------------------------------------
 
 # Define conditions
@@ -927,7 +1109,6 @@ results_DF <- data.frame(
 # Display results
 rownames(results_DF) <- NULL
 results_DF
-
 # cond        NDE        NIE
 # 1 slsl -0.3279340 -0.1349289
 # 2 fesl -0.2337515 -0.2072494
@@ -942,18 +1123,17 @@ results_DF
 
 
 
+# Conduct Bootstrap Confidence Intervals (CI) ---------------------------------
 
-
-# Conduct Bootstrap CI ------------------------------------------------------------
-
-#### Single-Level (SL) Med/Out Models  ---------------------------------------------
+#### Single-Level (SL) Med/Out Models  ---------------------------------------
 # SL PS Model 
 slsl_ci <- bootstrap_ci_paral(iterations = 1000,
-                   iptw = iptw_sl,
-                   data = data,
-                   model = "SL",
-                   cores = 6,
-                   core_seeds = c(4561:4566))
+                              iptw = iptw_sl,
+                              data = data,
+                              model = "SL",
+                              cores = 6,
+                              core_seeds = c(4561:4566))
+
 # FE PS Model 
 fesl_ci <- bootstrap_ci_paral(iterations = 1000,
                               iptw = iptw_fe,
@@ -961,6 +1141,7 @@ fesl_ci <- bootstrap_ci_paral(iterations = 1000,
                               model = "SL",
                               cores = 6,
                               core_seeds = c(4561:4566))
+
 # RE PS Model 
 resl_ci <- bootstrap_ci_paral(iterations = 1000,
                               iptw = iptw_re,
@@ -977,6 +1158,7 @@ slfe_ci <- bootstrap_ci_paral(iterations = 1000,
                               model = "FE",
                               cores = 6,
                               core_seeds = c(4561:4566))
+
 # FE PS Model 
 fefe_ci <- bootstrap_ci_paral(iterations = 1000,
                               iptw = iptw_fe,
@@ -984,6 +1166,7 @@ fefe_ci <- bootstrap_ci_paral(iterations = 1000,
                               model = "FE",
                               cores = 6,
                               core_seeds = c(4561:4566))
+
 # RE PS Model 
 refe_ci <- bootstrap_ci_paral(iterations = 1000,
                               iptw = iptw_re,
@@ -992,36 +1175,37 @@ refe_ci <- bootstrap_ci_paral(iterations = 1000,
                               cores = 6,
                               core_seeds = c(4561:4566))
 
-
 #### Random-Effect (RE) Med/Out Models ---------------------------------------
 # SL PS Model 
-execution_time_slre <- system.time({ # track computation time 
-slre_ci <- bootstrap_ci_re_paral(iterations = 1500, 
-                                 iptw = iptw_sl, 
-                                 data = data, 
-                                 cores = 6, 
-                                 core_seeds = c(4561:4566))
+execution_time_slre <- system.time({ # Track computation time 
+  slre_ci <- bootstrap_ci_re_paral(iterations = 1500, 
+                                   iptw = iptw_sl, 
+                                   data = data, 
+                                   cores = 6, 
+                                   core_seeds = c(4561:4566))
 })
 # Print the execution time
 print(execution_time_slre)
-
-# If you want to see the elapsed time specifically
-cat("Elapsed time:", execution_time_slre["elapsed"], "seconds\n")
 # user   system  elapsed 
 # 6039.100   49.430 1383.943 
+
+# Print the elapsed time specifically
+cat("Elapsed time:", execution_time_slre["elapsed"], "seconds\n")
 # Elapsed time: 1383.943 seconds
 
-# 
-paste0("Number of converged mediator models: ", slre_ci$mediator_converged_count, " (", (slre_ci$mediator_converged_count/length(slre_ci$direct_effects))*100, "%)")
-paste0("Number of converged outcome models: ", slre_ci$outcome_converged_count, " (", (slre_ci$outcome_converged_count/length(slre_ci$direct_effects))*100, "%)")
-paste0("Number of iterations with both models converged: ", slre_ci$both_converged_count, " (", (slre_ci$both_converged_count/length(slre_ci$direct_effects))*100, "%)")
+# Print convergence statistics
+paste0("Number of converged mediator models: ", slre_ci$mediator_converged_count, 
+       " (", (slre_ci$mediator_converged_count / length(slre_ci$direct_effects)) * 100, "%)")
+paste0("Number of converged outcome models: ", slre_ci$outcome_converged_count, 
+       " (", (slre_ci$outcome_converged_count / length(slre_ci$direct_effects)) * 100, "%)")
+paste0("Number of iterations with both models converged: ", slre_ci$both_converged_count, 
+       " (", (slre_ci$both_converged_count / length(slre_ci$direct_effects)) * 100, "%)")
 # [1] "Number of converged mediator models: 1152 (76.8%)"
 # [1] "Number of converged outcome models: 1498 (99.8666666666667%)"
 # [1] "Number of iterations with both models converged: 1152 (76.8%)"
 
-
 # FE PS Model
-execution_time_fere <- system.time({ # track computation time 
+execution_time_fere <- system.time({ # Track computation time 
   fere_ci <- bootstrap_ci_re_paral(iterations = 1500, 
                                    iptw = iptw_fe, 
                                    data = data, 
@@ -1030,30 +1214,26 @@ execution_time_fere <- system.time({ # track computation time
 })
 # Print the execution time
 print(execution_time_fere)
-#  user   system  elapsed 
+# user   system  elapsed 
 # 6116.785   45.386 1271.666 
 
-# If you want to see the elapsed time specifically
+# Print the elapsed time specifically
 cat("Elapsed time:", execution_time_fere["elapsed"], "seconds\n")
 # Elapsed time: 1271.666 seconds
 
-
-# 
-paste0("Number of converged mediator models: ", fere_ci$mediator_converged_count, " (", (fere_ci$mediator_converged_count/length(fere_ci$direct_effects))*100, "%)")
-paste0("Number of converged outcome models: ", fere_ci$outcome_converged_count, " (", (fere_ci$outcome_converged_count/length(fere_ci$direct_effects))*100, "%)")
-paste0("Number of iterations with both models converged: ", fere_ci$both_converged_count, " (", (fere_ci$both_converged_count/length(fere_ci$direct_effects))*100, "%)")
+# Print convergence statistics
+paste0("Number of converged mediator models: ", fere_ci$mediator_converged_count, 
+       " (", (fere_ci$mediator_converged_count / length(fere_ci$direct_effects)) * 100, "%)")
+paste0("Number of converged outcome models: ", fere_ci$outcome_converged_count, 
+       " (", (fere_ci$outcome_converged_count / length(fere_ci$direct_effects)) * 100, "%)")
+paste0("Number of iterations with both models converged: ", fere_ci$both_converged_count, 
+       " (", (fere_ci$both_converged_count / length(fere_ci$direct_effects)) * 100, "%)")
 # [1] "Number of converged mediator models: 1152 (76.8%)"
 # [1] "Number of converged outcome models: 1498 (99.8666666666667%)"
 # [1] "Number of iterations with both models converged: 1152 (76.8%)"
 
-
-
-
-
-
-
 # RE PS Model
-execution_time_rere <- system.time({ # track computation time 
+execution_time_rere <- system.time({ # Track computation time 
   rere_ci <- bootstrap_ci_re_paral(iterations = 1500, 
                                    iptw = iptw_re, 
                                    data = data, 
@@ -1062,58 +1242,80 @@ execution_time_rere <- system.time({ # track computation time
 })
 # Print the execution time
 print(execution_time_rere)
-#   user   system  elapsed 
+# user   system  elapsed 
 # 6019.628   23.378 1239.493 
 
-# If you want to see the elapsed time specifically
+# Print the elapsed time specifically
 cat("Elapsed time:", execution_time_rere["elapsed"], "seconds\n")
 # Elapsed time: 1239.493 seconds
 
-# 
-paste0("Number of converged mediator models: ", rere_ci$mediator_converged_count, " (", (rere_ci$mediator_converged_count/length(rere_ci$direct_effects))*100, "%)")
-paste0("Number of converged outcome models: ", rere_ci$outcome_converged_count, " (", (rere_ci$outcome_converged_count/length(rere_ci$direct_effects))*100, "%)")
-paste0("Number of iterations with both models converged: ", rere_ci$both_converged_count, " (", (rere_ci$both_converged_count/length(rere_ci$direct_effects))*100, "%)")
+# Print convergence statistics
+paste0("Number of converged mediator models: ", rere_ci$mediator_converged_count, 
+       " (", (rere_ci$mediator_converged_count / length(rere_ci$direct_effects)) * 100, "%)")
+paste0("Number of converged outcome models: ", rere_ci$outcome_converged_count, 
+       " (", (rere_ci$outcome_converged_count / length(rere_ci$direct_effects)) * 100, "%)")
+paste0("Number of iterations with both models converged: ", rere_ci$both_converged_count, 
+       " (", (rere_ci$both_converged_count / length(rere_ci$direct_effects)) * 100, "%)")
 # [1] "Number of converged mediator models: 1152 (76.8%)"
 # [1] "Number of converged outcome models: 1498 (99.8666666666667%)"
 # [1] "Number of iterations with both models converged: 1152 (76.8%)"
 
 
 
+# Store & Join Results ----------------------------------------------------
+
+#### RE Mediator/Outcome Models CI -----------------------------------------
+
+###### Obtain 1,000 completed iterations -----------------------------------
+
+# Function to get non-NA pairs (i.e., first 1,000 completed iterations)
+get_non_na_pairs <- function(direct, indirect, n = 1000) {
+  combined <- data.frame(direct = direct, indirect = indirect)  # Combine vectors into a dataframe
+  combined <- na.omit(combined)  # Remove rows with any NA values
+  return(head(combined, n))  # Return the first n rows (or all if less than n)
+}
+
+# Apply the function to our data
+slre_ci_DF <- get_non_na_pairs(slre_ci$direct_effects, slre_ci$indirect_effects)
+fere_ci_DF <- get_non_na_pairs(fere_ci$direct_effects, fere_ci$indirect_effects)
+rere_ci_DF <- get_non_na_pairs(rere_ci$direct_effects, rere_ci$indirect_effects)
 
 
-##################
-# NEXT
-#   + Check time took to compute & how many iterations converged for slre_ci, then up the iterations (maybe something like 1,500)
-#   
-#   + proceed to repeat with FE & RE PS models 
-#   + Check that you have 1,000 good/converged iterations
-#   + grab first 1,000 good/converged (in)direct effect estimates & compute percentile bootstrap CI (with quantile())
-#       + Store this in a dataframe with columns & column names like results_DF_noRE (cond, NIE_LL, NIE_UL, NDE_LL, NDE_UL)
-#       + Then merge this with their respective point estimates 
+###### Store RE Med/Outcome Model CIs --------------------------------------
 
-# 
-# 
+# Create the results dataframe
+results_DF_RE <- data.frame(
+  cond = c("slre", "fere", "rere"),
+  NIE_LL = numeric(3),
+  NIE_UL = numeric(3),
+  NDE_LL = numeric(3),
+  NDE_UL = numeric(3),
+  stringsAsFactors = FALSE
+)
 
+# List of dataframes to process
+df_list <- list(slre_ci_DF, fere_ci_DF, rere_ci_DF)
 
-
-
-
-# FE PS Model 
-
-
-# RE PS Model 
-
+# Calculate CIs and fill the dataframe
+for (i in 1:3) {
+  results_DF_RE[i, c("NIE_LL", "NIE_UL")] <- quantile(df_list[[i]]$indirect, probs = c(0.025, 0.975))
+  results_DF_RE[i, c("NDE_LL", "NDE_UL")] <- quantile(df_list[[i]]$direct, probs = c(0.025, 0.975))
+}
 
 
+###### Join CI & point estimates for RE med/outcome ------------------------
+
+# Merge results with existing data
+results_DF_RE <- merge(results_DF[results_DF$cond %in% c("slre", "fere", "rere"), ], 
+                       results_DF_RE)
+
+# Clean up environment (drop functions & objects from this section that are no longer needed)
+rm(get_non_na_pairs, slre_ci_DF, fere_ci_DF, rere_ci_DF)
 
 
+#### SL & FE Mediator/Outcome Models CI ------------------------------------
 
-
-# Join results ------------------------------------------------------------
-
-
-
-## Join CI and point estimates for SL & FE med/outcome  --------------------
+###### Join CI & point estimates for SL & FE med/outcome -------------------
 
 # List of your lists
 list_names <- c("slsl_ci", "fesl_ci", "resl_ci", "slfe_ci", "fefe_ci", "refe_ci")
@@ -1141,11 +1343,10 @@ direct_df <- do.call(rbind, lapply(seq_along(lists), function(i) {
   )
 }))
 
-# combine both into a single data frame
+# Combine both into a single data frame
 combined_df <- merge(indirect_df, direct_df, by = "list_name")
-# print(combined_df)
 
-# 
+# Drop "_ci" from 1st column 
 combined_df$list_name <- sub("_ci$", "", combined_df$list_name)
 
 # Rename columns starting with "indirect_ci" to "NIE"
@@ -1154,19 +1355,121 @@ colnames(combined_df) <- gsub("^indirect_ci", "NIE", colnames(combined_df))
 # Rename columns starting with "direct_ci" to "NDE"
 colnames(combined_df) <- gsub("^direct_ci", "NDE", colnames(combined_df))
 
+# Merge with existing results
 results_DF_noRE <- merge(results_DF[1:6, ], combined_df, by.x = "cond", by.y = "list_name")
 
+# Clean up environment (drop objects from this section that are no longer needed)
+rm(lists, list_names, direct_df, indirect_df)
+
+
+#### Create dataframe of final estimates -----------------------------------
+
+# Combine RE and non-RE results
+results_DF <- rbind(results_DF_noRE, results_DF_RE)
+
+# View the results
+print(results_DF)
+#   cond        NDE        NIE     NIE_LL       NIE_UL     NDE_LL      NDE_UL
+# 1 fefe -0.2212818 -0.2102262 -0.4080094 -0.004401872 -0.4624698  0.03589144
+# 2 fesl -0.2337515 -0.2072494 -0.3932524 -0.012611251 -0.4800913  0.01226658
+# 3 refe -0.2245736 -0.1958965 -0.3876489  0.009442654 -0.4698303  0.01990022
+# 4 resl -0.2772344 -0.1727740 -0.3489316  0.018722813 -0.5234119 -0.03857419
+# 5 slfe -0.2024146 -0.1935592 -0.3780337  0.017820865 -0.4569169  0.03960417
+# 6 slsl -0.3279340 -0.1349289 -0.3157658  0.050019477 -0.5774336 -0.07859867
+# 7 fere -0.2279858 -0.2074429 -0.4315686 -0.014924474 -0.4870868  0.02146335
+# 8 rere -0.2482880 -0.1817158 -0.3919542  0.001995522 -0.4914180 -0.01117623
+# 9 slre -0.2510726 -0.1651808 -0.3655679  0.019904633 -0.4900618 -0.01770076
+
+
+# Add PS model & Mediator/Outcome model labels 
+results_DF <- results_DF %>%
+  mutate(
+    PS = case_when(
+      startsWith(cond, "fe") ~ "Fixed-Effect",
+      startsWith(cond, "sl") ~ "Single-Level",
+      startsWith(cond, "re") ~ "Random-Effect",
+      TRUE ~ NA_character_  # Default case
+    ),
+    Model = case_when(
+      endsWith(cond, "fe") ~ "Fixed-Effect",
+      endsWith(cond, "sl") ~ "Single-Level",
+      endsWith(cond, "re") ~ "Random-Effect",
+      TRUE ~ NA_character_  # Default case
+    )
+  )
+
+# Print the modified dataframe
+print(results_DF)
+#   cond        NDE        NIE     NIE_LL       NIE_UL     NDE_LL      NDE_UL            PS         Model
+# 1 fefe -0.2212818 -0.2102262 -0.4080094 -0.004401872 -0.4624698  0.03589144  Fixed-Effect  Fixed-Effect
+# 2 fesl -0.2337515 -0.2072494 -0.3932524 -0.012611251 -0.4800913  0.01226658  Fixed-Effect  Single-Level
+# 3 refe -0.2245736 -0.1958965 -0.3876489  0.009442654 -0.4698303  0.01990022 Random-Effect  Fixed-Effect
+# 4 resl -0.2772344 -0.1727740 -0.3489316  0.018722813 -0.5234119 -0.03857419 Random-Effect  Single-Level
+# 5 slfe -0.2024146 -0.1935592 -0.3780337  0.017820865 -0.4569169  0.03960417  Single-Level  Fixed-Effect
+# 6 slsl -0.3279340 -0.1349289 -0.3157658  0.050019477 -0.5774336 -0.07859867  Single-Level  Single-Level
+# 7 fere -0.2279858 -0.2074429 -0.4315686 -0.014924474 -0.4870868  0.02146335  Fixed-Effect Random-Effect
+# 8 rere -0.2482880 -0.1817158 -0.3919542  0.001995522 -0.4914180 -0.01117623 Random-Effect Random-Effect
+# 9 slre -0.2510726 -0.1651808 -0.3655679  0.019904633 -0.4900618 -0.01770076  Single-Level Random-Effect
 
 
 
-## Join CI and point estimates for RE med/outcome --------------------------
+# Result visuals ----------------------------------------------------------
 
 
+# # NDE 
+# ggplot(results_DF, aes(y = cond, x = NDE)) +
+#   geom_point(size = 3) +
+#   geom_errorbarh(aes(xmin = NDE_LL, xmax = NDE_UL), height = 0.2) +
+#   labs(title = "Natural Direct Effect (NDE) with 95% Confidence Intervals",
+#        x = "Natural Direct Effect (NDE)",
+#        y = "Condition") +
+#   theme_minimal() +
+#   theme(axis.text.y = element_text(angle = 0, hjust = 1))
+
+# NDE 
+results_DF %>% 
+  mutate(
+    # Model = paste(Model, "Mediator/Outcome Model"),  # Append to Model variable
+    Zero_Encompasses = ifelse(NDE_LL > 0 | NDE_UL < 0, "Below 0", "Includes 0")
+  ) %>% 
+  ggplot(aes(y = PS, x = NDE)) +
+  geom_point(aes(color = Zero_Encompasses), size = 3) +
+  geom_errorbarh(aes(xmin = NDE_LL, xmax = NDE_UL, color = Zero_Encompasses), height = 0.2) +
+  labs(title = "Natural Direct Effect (NDE) with 95% Confidence Intervals",
+       x = "Natural Direct Effect (NDE)",
+       y = "Propensity Score (PS)") +
+  facet_wrap(~ Model, ncol = 1) +  # Facet by updated Model variable
+  scale_color_manual(values = c("Below 0" = "red", "Includes 0" = "black")) +  # Set colors
+  theme_minimal() +
+  theme(axis.text.y = element_text(angle = 0, hjust = 1),
+        legend.position = "none")  # Remove legend
 
 
+# # NIE 
+# ggplot(results_DF, aes(y = cond, x = NIE)) +
+#   geom_point(size = 3) +
+#   geom_errorbarh(aes(xmin = NIE_LL, xmax = NIE_UL), height = 0.2) +
+#   labs(title = "Natural Indirect Effect (NIE) with 95% Confidence Intervals",
+#        x = "Natural Indirect Effect (NIE)",
+#        y = "Condition") +
+#   theme_minimal() +
+#   theme(axis.text.y = element_text(angle = 0, hjust = 1))
 
 
-
-
-
-
+# NIE 
+results_DF %>% 
+  mutate(
+    # Model = paste(Model, "Mediator/Outcome Model"),  # Append to Model variable
+    Zero_Encompasses = ifelse(NIE_LL > 0 | NIE_UL < 0, "Below 0", "Includes 0")
+  ) %>% 
+  ggplot(aes(y = PS, x = NIE)) +
+  geom_point(aes(color = Zero_Encompasses), size = 3) +
+  geom_errorbarh(aes(xmin = NIE_LL, xmax = NIE_UL, color = Zero_Encompasses), height = 0.2) +
+  labs(title = "Natural Indirect Effect (NIE) with 95% Confidence Intervals",
+       x = "Natural Indirect Effect (NIE)",
+       y = "Propensity Score (PS)") +
+  facet_wrap(~ Model, ncol = 1) +  # Facet by updated Model variable
+  scale_color_manual(values = c("Below 0" = "red", "Includes 0" = "black")) +  # Set colors
+  theme_minimal() +
+  theme(axis.text.y = element_text(angle = 0, hjust = 1),
+        legend.position = "none")  # Remove legend
