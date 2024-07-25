@@ -946,7 +946,7 @@ results_DF
 
 # Conduct Bootstrap CI ------------------------------------------------------------
 
-# SL Mediator/Outcome
+#### Single-Level (SL) Med/Out Models  ---------------------------------------------
 # SL PS Model 
 slsl_ci <- bootstrap_ci_paral(iterations = 1000,
                    iptw = iptw_sl,
@@ -969,7 +969,7 @@ resl_ci <- bootstrap_ci_paral(iterations = 1000,
                               cores = 6,
                               core_seeds = c(4561:4566))
 
-# FE Mediator/Outcome 
+#### Fixed-Effect (FE) Med/Out Models ----------------------------------------
 # SL PS Model 
 slfe_ci <- bootstrap_ci_paral(iterations = 1000,
                               iptw = iptw_sl,
@@ -992,10 +992,10 @@ refe_ci <- bootstrap_ci_paral(iterations = 1000,
                               cores = 6,
                               core_seeds = c(4561:4566))
 
-# RE Mediator/Outcome 
-# SL PS Model 
 
-execution_time <- system.time({ # track computation time 
+#### Random-Effect (RE) Med/Out Models ---------------------------------------
+# SL PS Model 
+execution_time_slre <- system.time({ # track computation time 
 slre_ci <- bootstrap_ci_re_paral(iterations = 1500, 
                                  iptw = iptw_sl, 
                                  data = data, 
@@ -1003,21 +1003,79 @@ slre_ci <- bootstrap_ci_re_paral(iterations = 1500,
                                  core_seeds = c(4561:4566))
 })
 # Print the execution time
-print(execution_time)
+print(execution_time_slre)
 
 # If you want to see the elapsed time specifically
-cat("Elapsed time:", execution_time["elapsed"], "seconds\n")
+cat("Elapsed time:", execution_time_slre["elapsed"], "seconds\n")
 # user   system  elapsed 
-# 4062.031   70.951  872.969 
-# Elapsed time: 872.969 seconds
+# 6039.100   49.430 1383.943 
+# Elapsed time: 1383.943 seconds
 
 # 
 paste0("Number of converged mediator models: ", slre_ci$mediator_converged_count, " (", (slre_ci$mediator_converged_count/length(slre_ci$direct_effects))*100, "%)")
 paste0("Number of converged outcome models: ", slre_ci$outcome_converged_count, " (", (slre_ci$outcome_converged_count/length(slre_ci$direct_effects))*100, "%)")
 paste0("Number of iterations with both models converged: ", slre_ci$both_converged_count, " (", (slre_ci$both_converged_count/length(slre_ci$direct_effects))*100, "%)")
-# [1] "Number of converged mediator models: 765 (76.5%)"
-# [1] "Number of converged outcome models: 998 (99.8%)"
-# [1] "Number of iterations with both models converged: 765 (76.5%)"
+# [1] "Number of converged mediator models: 1152 (76.8%)"
+# [1] "Number of converged outcome models: 1498 (99.8666666666667%)"
+# [1] "Number of iterations with both models converged: 1152 (76.8%)"
+
+
+# FE PS Model
+execution_time_fere <- system.time({ # track computation time 
+  fere_ci <- bootstrap_ci_re_paral(iterations = 1500, 
+                                   iptw = iptw_fe, 
+                                   data = data, 
+                                   cores = 6, 
+                                   core_seeds = c(4561:4566))
+})
+# Print the execution time
+print(execution_time_fere)
+#  user   system  elapsed 
+# 6116.785   45.386 1271.666 
+
+# If you want to see the elapsed time specifically
+cat("Elapsed time:", execution_time_fere["elapsed"], "seconds\n")
+# Elapsed time: 1271.666 seconds
+
+
+# 
+paste0("Number of converged mediator models: ", fere_ci$mediator_converged_count, " (", (fere_ci$mediator_converged_count/length(fere_ci$direct_effects))*100, "%)")
+paste0("Number of converged outcome models: ", fere_ci$outcome_converged_count, " (", (fere_ci$outcome_converged_count/length(fere_ci$direct_effects))*100, "%)")
+paste0("Number of iterations with both models converged: ", fere_ci$both_converged_count, " (", (fere_ci$both_converged_count/length(fere_ci$direct_effects))*100, "%)")
+# [1] "Number of converged mediator models: 1152 (76.8%)"
+# [1] "Number of converged outcome models: 1498 (99.8666666666667%)"
+# [1] "Number of iterations with both models converged: 1152 (76.8%)"
+
+
+
+
+
+
+
+# RE PS Model
+execution_time_rere <- system.time({ # track computation time 
+  rere_ci <- bootstrap_ci_re_paral(iterations = 1500, 
+                                   iptw = iptw_re, 
+                                   data = data, 
+                                   cores = 6, 
+                                   core_seeds = c(4561:4566))
+})
+# Print the execution time
+print(execution_time_rere)
+#   user   system  elapsed 
+# 6019.628   23.378 1239.493 
+
+# If you want to see the elapsed time specifically
+cat("Elapsed time:", execution_time_rere["elapsed"], "seconds\n")
+# Elapsed time: 1239.493 seconds
+
+# 
+paste0("Number of converged mediator models: ", rere_ci$mediator_converged_count, " (", (rere_ci$mediator_converged_count/length(rere_ci$direct_effects))*100, "%)")
+paste0("Number of converged outcome models: ", rere_ci$outcome_converged_count, " (", (rere_ci$outcome_converged_count/length(rere_ci$direct_effects))*100, "%)")
+paste0("Number of iterations with both models converged: ", rere_ci$both_converged_count, " (", (rere_ci$both_converged_count/length(rere_ci$direct_effects))*100, "%)")
+# [1] "Number of converged mediator models: 1152 (76.8%)"
+# [1] "Number of converged outcome models: 1498 (99.8666666666667%)"
+# [1] "Number of iterations with both models converged: 1152 (76.8%)"
 
 
 
@@ -1037,7 +1095,11 @@ paste0("Number of iterations with both models converged: ", slre_ci$both_converg
 # 
 
 
+
+
+
 # FE PS Model 
+
 
 # RE PS Model 
 
