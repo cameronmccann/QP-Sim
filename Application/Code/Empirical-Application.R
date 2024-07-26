@@ -67,28 +67,26 @@ source("Application/Functions/bootstrap_ci_re_paral.R")
 
 ## Wave I ------------------------------------------------------------------
 
-# Import student data
+# Import student data from Wave I of the Add Health study
 w1 <- readr::read_tsv(file = "Application/Data/ICPSR_21600/DS0001/21600-0001-Data.tsv")
 
-# Drop variables in wave I student data
+# Select relevant variables from Wave I student data
 w1 <- w1 %>% 
   select("AID":"SCH_YR", "S1":"S7", "S12", "S18", "S11", "S17", "PC22",
          "H1FS1":"H1FS19", # Feelings Scale (contains mostly CES-D items)
          "H1NF12B", "S44A14", "S44A18":"S44A29")
 
-# In School Questionnaire Code Book Public Use Sample (pg. 697 of Questionnaire.pdf)
-# age (S1)
-# sex (S2)
-# race/ethnicity (S4 - S7)
+# Rename variables according to the In School Questionnaire Code Book Public Use Sample (pg. 697 of Questionnaire.pdf)
 data <- w1 %>% 
   rename(age = S1, 
          sex = S2, 
-         ethnicity = S4, # Create ethnicity variable (indicates Hispanic or Spanish origin)
+         ethnicity = S4, # Indicates Hispanic or Spanish origin
          white = S6A, 
          black = S6B, 
          asian = S6C, 
          nativeAmerican = S6D, 
          raceOther = S6E)
+
 
 # will those indicating an 8 (for S4 or ethnicity variable) mess things up? (same with sex)
 summary(data$sex) #summary(data$S2)
@@ -97,11 +95,8 @@ summary(data$ethnicity) #summary(data$S4)
 data$ethnicity <- ifelse(data$ethnicity == 8, NA, data$ethnicity)
 # sum(I(data$ethnicity == 8), na.rm = TRUE)
 
-# parental education 
-## mother - How far in school did she go? (S12)
-## father - How far in school did he go? (S18)
-### [recode this to --> parental education (high school or less, some college, and college graduate or more)]
-
+# Recode parental education
+# 1 = High school or less, 2 = Some college, 3 = College graduate or more
 data$momEdu <- ifelse(data$S12 %in% c(1, 2, 3, 10), 1, 
                       ifelse(data$S12 >= 4 & data$S12 <= 6, 2, 
                              ifelse(data$S12 %in% c(7, 8), 3, 
@@ -116,45 +111,32 @@ table(data$dadEdu, data$momEdu)
 table(data$momEdu); sum(is.na(data$momEdu))
 table(data$dadEdu); sum(is.na(data$dadEdu))
 
+# Create a parental education variable (highest level of either parent)
 data$parentalEdu <- apply(data[, stringr::str_detect(colnames(data), pattern = "Edu$")], 1, function(x) max(x, na.rm = FALSE))
 
 # data %>% 
 #   select("dadEdu", "momEdu", "parentalEdu") %>% 
 #   head()
 
-
-# family structure 
-## mother - Do you live with your biological mother, stepmother, foster mother, or adoptive mother? (S11)
-## father - Do you live with your biological father, stepfather, foster father, or adoptive father? (S17)
-### [recode this to --> family structure (2 parents, single mom, and single dad or other)]
-
-
+# Recode family structure
+# S11: Living with mother figure, S17: Living with father figure
 data$familyStruct <- data$S11 + data$S17
+data$familyStruct <- ifelse(data$familyStruct == 10, NA, data$familyStruct) # Change "multiple response" to missing
 
 table(data$S11); sum(is.na(data$S11))
 table(data$S17); sum(is.na(data$S17))
 table(data$S11, data$S17)
-data$familyStruct <- ifelse(data$familyStruct == 10, NA, data$familyStruct) # change "multiple response" to missing 
 
 table(data$familyStruct)
 
-# gap in health insurance (wave 1) 
-## In the past 12 months, has there been a time when {NAME} had no health insurance? (PC22)
-data <-
-  data %>%
+# Recode health insurance gap (wave 1) [PC22: In the past 12 months, has there been a time when {NAME} had no health insurance?]
+data <- data %>%
   rename(healthInsur = PC22) %>%
   mutate(healthInsur = ifelse(healthInsur >= 98, NA, healthInsur)) # 98=don't know; 99=not applicable
 
-
-# Sports participation 
-## Have you played a sport? (H1NF12B)
-## Here is a list of clubs, organizations, and teams found at many schools. Darken the oval next to any of them that you are participating in this year, or that you plan to participate in later in the school year.
-## (S44A14 & S44A18 - S44A29)
-
-# sum number of sports 
-data$sport <-
-  rowSums(data[, colnames(data)[stringr::str_starts(colnames(data), pattern = "^S44A")]])
-# Dichotomize 
+# Calculate sports participation (H1NF12B)
+# Sum number of sports and create a binary participation variable
+data$sport <- rowSums(data[, colnames(data)[stringr::str_starts(colnames(data), pattern = "^S44A")]])
 data$sportPartic <- ifelse(data$sport >= 1, 1, 
                            ifelse(data$sport == 0, 0, 
                                   NA))
