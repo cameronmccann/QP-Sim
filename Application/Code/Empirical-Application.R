@@ -12,7 +12,7 @@
 # Script Description:
 #
 #
-# Last Updated: 07/25/2024 
+# Last Updated: 07/26/2024 
 #
 #
 # Notes:
@@ -776,7 +776,12 @@ new_labels <- c("Race: Black", "Race: White", "Health Insurance \n Coverage Gap"
                 "Family Structure", "Age", "Sex", 
                 "Feelings Scale Score", "Parental Education")
 
+
 # Create a Love Plot to visualize the Absolute SMD, using custom ordering
+## Save visual 
+# svg(filename = "Application/Output/Covariate-Balance.svg")
+pdf("Application/Output/Covariate-Balance.pdf")
+## Visual 
 ggplot(smd_combined, aes(x = ASMD, y = factor(covariate, levels = custom_order), color = type, shape = type)) +
   geom_vline(xintercept = 0.1, linetype = "dashed", color = "black") +  # Reference line for SMD threshold
   geom_vline(xintercept = 0, color = "black") +  # Line at zero for clarity
@@ -803,8 +808,9 @@ ggplot(smd_combined, aes(x = ASMD, y = factor(covariate, levels = custom_order),
                      name = NULL) +
   scale_y_discrete(labels = new_labels)  # Use new labels for the y-axis
 
-
-
+dev.off()
+# Save visual 
+ggsave(filename = "Application/Output/Covariate-Balance.png", plot = last_plot())
 
 
 # 
@@ -1427,6 +1433,9 @@ print(results_DF)
 #   theme(axis.text.y = element_text(angle = 0, hjust = 1))
 
 # NDE 
+## Save visual 
+pdf("Application/Output/NDE-Estimates.pdf")
+## Visual 
 results_DF %>% 
   mutate(
     # Model = paste(Model, "Mediator/Outcome Model"),  # Append to Model variable
@@ -1435,6 +1444,7 @@ results_DF %>%
   ggplot(aes(y = PS, x = NDE)) +
   geom_point(aes(color = Zero_Encompasses), size = 3) +
   geom_errorbarh(aes(xmin = NDE_LL, xmax = NDE_UL, color = Zero_Encompasses), height = 0.2) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black", alpha = 0.7) +
   labs(title = "Natural Direct Effect (NDE) with 95% Confidence Intervals",
        x = "Natural Direct Effect (NDE)",
        y = "Propensity Score (PS)") +
@@ -1443,6 +1453,12 @@ results_DF %>%
   theme_minimal() +
   theme(axis.text.y = element_text(angle = 0, hjust = 1),
         legend.position = "none")  # Remove legend
+
+## 
+dev.off()
+# Save visual 
+ggsave(filename = "Application/Output/NDE-Estimates.png", plot = last_plot())
+
 
 
 # # NIE 
@@ -1457,6 +1473,9 @@ results_DF %>%
 
 
 # NIE 
+## Save visual 
+pdf("Application/Output/NIE-Estimates.pdf")
+## Visual 
 results_DF %>% 
   mutate(
     # Model = paste(Model, "Mediator/Outcome Model"),  # Append to Model variable
@@ -1465,6 +1484,7 @@ results_DF %>%
   ggplot(aes(y = PS, x = NIE)) +
   geom_point(aes(color = Zero_Encompasses), size = 3) +
   geom_errorbarh(aes(xmin = NIE_LL, xmax = NIE_UL, color = Zero_Encompasses), height = 0.2) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black", alpha = 0.7) +
   labs(title = "Natural Indirect Effect (NIE) with 95% Confidence Intervals",
        x = "Natural Indirect Effect (NIE)",
        y = "Propensity Score (PS)") +
@@ -1473,3 +1493,9 @@ results_DF %>%
   theme_minimal() +
   theme(axis.text.y = element_text(angle = 0, hjust = 1),
         legend.position = "none")  # Remove legend
+
+## 
+dev.off()
+# Save visual 
+ggsave(filename = "Application/Output/NIE-Estimates.png", plot = last_plot())
+
