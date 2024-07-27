@@ -12,11 +12,15 @@
 # Script Description:
 #
 #
-# Last Updated: 07/26/2024 
+# Last Updated: 07/27/2024 
 #
 #
 # Notes:
 #   To-Do:
+#     + Change Insurance gap variable (drop from med & outcome models, only include wave 1 in PS model)
+#         - drop old code to add wave 3 & 4 insurance gap info 
+#     + estimate TNDE, PNIE, PNDE, & TNIE
+#     + Create table for all 4 estimates & their CIs
 # 
 #   Next: 
 #     + 
@@ -432,13 +436,13 @@ data <- data %>%
 
 # Select variables in PS model 
 t <- data %>% 
-  select(!c(AID, CLUSTER2, sport_w1, n, healthInsur_w3, healthInsur_w4, healthInsur_w1)) %>% 
+  select(!c(AID, CLUSTER2, sport_w1, n, healthInsur_w3, healthInsur_w4, healthInsur_gap)) %>% 
   # select(!c(AID, CLUSTER2, sport_w1, n, healthInsur_gap))
   # healthInsur_w3, healthInsur_w4, 
   # healthInsur_w1))
   select(c("sex_w1", "white_w1", "black_w1", 
            "sportPartic_w1", "selfEst_w3", "depress_w4", 
-           "familyStruct_w1", "parentalEdu_w1_sc", "healthInsur_gap", 
+           "familyStruct_w1", "parentalEdu_w1_sc", "healthInsur_w1", 
            "age_w1_sc", "feelings_w1_sc"))
 
 # Missing pattern 
@@ -548,7 +552,7 @@ out_icc # with 121 schools (5+ in size) outcome icc = 0.01868923
 ### SL Propensity Score Model -----------------------------------------------
 # Standard logistic regression model for propensity score estimation
 psmod_sl <- glm(formula = "sportPartic_w1 ~ feelings_w1_sc + sex_w1 + age_w1_sc + 
-                        white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap",
+                        white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1",
                 family = "binomial", 
                 data = data)
 
@@ -562,7 +566,7 @@ data <- cbind(data, iptw_sl = with(data, (sportPartic_w1 / ps_sl) + (1 - sportPa
 ### FE Propensity Score Model -----------------------------------------------
 # Fixed effects logistic regression model for propensity score estimation
 psmod_fe <- glm(formula = "sportPartic_w1 ~ feelings_w1_sc + sex_w1 + age_w1_sc + 
-                        white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap +
+                        white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 +
                 as.factor(CLUSTER2)",
                 family = "binomial", 
                 data = data)
@@ -577,7 +581,7 @@ data <- cbind(data, iptw_fe = with(data, (sportPartic_w1 / ps_fe) + (1 - sportPa
 ### RE Propensity Score Model -----------------------------------------------
 # Random effects logistic regression model for propensity score estimation
 psmod_re <- lme4::glmer(formula = "sportPartic_w1 ~ feelings_w1_sc + sex_w1 + age_w1_sc + 
-                        white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap +
+                        white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 +
                         (1 | CLUSTER2)",
                         family = "binomial", 
                         data = data) 
@@ -666,6 +670,24 @@ data <- data %>%
 
 # Covariate Balance Visuals -----------------------------------------------
 
+# Custom function to calculate weighted variance
+weighted.var <- function(x, w, na.rm = FALSE) {
+  if (na.rm) {
+    # Remove NA values
+    valid <- !is.na(x) & !is.na(w)
+    x <- x[valid]
+    w <- w[valid]
+  }
+  
+  # Calculate the weighted mean
+  wm <- weighted.mean(x, w)
+  
+  # Calculate the weighted variance
+  variance <- sum(w * (x - wm)^2) / sum(w)
+  
+  return(variance)
+}
+
 # Function to calculate Standardized Mean Difference (SMD)
 calculate_smd <- function(data, treatment, covariate) {
   # Calculate the mean for the treatment group
@@ -689,7 +711,7 @@ calculate_smd <- function(data, treatment, covariate) {
 # List of covariates to analyze for balance
 covariates <- c("feelings_w1_sc", "sex_w1", "age_w1_sc", "white_w1", 
                 "black_w1", "parentalEdu_w1_sc", "familyStruct_w1", 
-                "healthInsur_gap")
+                "healthInsur_w1")
 
 # Calculate SMD for each covariate before applying weights
 smd_before <- sapply(covariates, function(cov) calculate_smd(data, "sportPartic_w1", cov))
@@ -749,13 +771,13 @@ smd_combined <- rbind(smd_before_df, smd_sl_after_df, smd_fe_after_df, smd_re_af
 smd_combined$ASMD <- abs(smd_combined$SMD)
 
 # Define a custom order for the y-axis in the plot
-custom_order <- c("black_w1", "white_w1", "healthInsur_gap", 
-                  "familyStruct_w1", "age_w1_sc", "sex_w1", 
+custom_order <- c("black_w1", "white_w1", "familyStruct_w1", 
+                  "healthInsur_w1", "age_w1_sc", "sex_w1", 
                   "feelings_w1_sc", "parentalEdu_w1_sc")
 
 # Define new labels for the y-axis to enhance readability
-new_labels <- c("Race: Black", "Race: White", "Health Insurance \n Coverage Gap", 
-                "Family Structure", "Age", "Sex", 
+new_labels <- c("Race: Black", "Race: White", "Family Structure", 
+                "Health Insurance \n Coverage Gap", "Age", "Sex", 
                 "Feelings Scale Score", "Parental Education")
 
 
@@ -888,7 +910,7 @@ ggsave(filename = "Application/Output/Covariate-Balance.png", plot = last_plot()
 med_slsl <-
   glm(
     formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap",
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1",
     data = data,
     weights = iptw_sl
   )
@@ -897,7 +919,7 @@ med_slsl <-
 med_fesl <-
   glm(
     formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap",
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1",
     data = data,
     weights = iptw_fe
   )
@@ -906,7 +928,7 @@ med_fesl <-
 med_resl <-
   glm(
     formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap",
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1",
     data = data,
     weights = iptw_re
   )
@@ -917,7 +939,7 @@ med_resl <-
 # Model: SL PS & FE - Mediation/Outcome
 med_slfe <- glm(
   formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap + as.factor(CLUSTER2)", 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
   data = data, 
   weights = iptw_sl
 )
@@ -925,7 +947,7 @@ med_slfe <- glm(
 # Model: FE PS & FE - Mediation/Outcome 
 med_fefe <- glm(
   formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap + as.factor(CLUSTER2)", 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
   data = data, 
   weights = iptw_fe
 )
@@ -933,7 +955,7 @@ med_fefe <- glm(
 # Model: RE PS & FE - Mediation/Outcome
 med_refe <- glm(
   formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap + as.factor(CLUSTER2)", 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
   data = data, 
   weights = iptw_re
 )
@@ -948,7 +970,7 @@ data <- cbind(data, L2weight = rep(1, nrow(data)))
 med_slre <-
   WeMix::mix(
     formula = selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap + (1 | CLUSTER2),
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
     data = data,
     weights = c("iptw_sl", "L2weight")
   )
@@ -957,7 +979,7 @@ med_slre <-
 med_fere <- 
   WeMix::mix(
     formula = selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap + (1 | CLUSTER2),
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
     data = data,
     weights = c("iptw_fe", "L2weight")
   )
@@ -966,7 +988,7 @@ med_fere <-
 med_rere <- 
   WeMix::mix(
     formula = selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap + (1 | CLUSTER2),
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
     data = data,
     weights = c("iptw_re", "L2weight")
   )
@@ -982,7 +1004,7 @@ out_slsl <-
   glm(
     formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
       white_w1 + black_w1 + 
-      parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap",
+      parentalEdu_w1_sc + familyStruct_w1",
     data = data,
     weights = iptw_sl
   )
@@ -992,7 +1014,7 @@ out_fesl <-
   glm(
     "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
       white_w1 + black_w1 + 
-      parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap",
+      parentalEdu_w1_sc + familyStruct_w1",
     data = data,
     weights = iptw_fe
   )
@@ -1002,7 +1024,7 @@ out_resl <-
   glm(
     "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
       white_w1 + black_w1 + 
-      parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap",
+      parentalEdu_w1_sc + familyStruct_w1",
     data = data,
     weights = iptw_re
   )
@@ -1012,21 +1034,21 @@ out_resl <-
 # Model: SL PS & FE Mediation/Outcome
 out_slfe <- glm(formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
       white_w1 + black_w1 + 
-      parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap + as.factor(CLUSTER2)", 
+      parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
       data = data, 
       weights = iptw_sl)
 
 # Model: FE PS & FE Mediation/Outcome
 out_fefe <- glm(formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
       white_w1 + black_w1 + 
-      parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap + as.factor(CLUSTER2)", 
+      parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
       data = data, 
       weights = iptw_fe)
 
 # Model: RE PS & FE Mediation/Outcome
 out_refe <- glm(formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
       white_w1 + black_w1 + 
-      parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap + as.factor(CLUSTER2)", 
+      parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
       data = data,
       weights = iptw_re
 )
@@ -1041,7 +1063,7 @@ out_slre <-
   WeMix::mix(
     formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
       white_w1 + black_w1 + 
-      parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap + (1 | CLUSTER2),
+      parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
     data = data,
     weights = c("iptw_sl", "L2weight")
   )
@@ -1051,7 +1073,7 @@ out_fere <-
   WeMix::mix(
     formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
       white_w1 + black_w1 + 
-      parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap + (1 | CLUSTER2),
+      parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
     data = data,
     weights = c("iptw_fe", "L2weight")
   )
@@ -1061,7 +1083,7 @@ out_rere <-
   WeMix::mix(
     formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
       white_w1 + black_w1 + 
-      parentalEdu_w1_sc + familyStruct_w1 + healthInsur_gap + (1 | CLUSTER2),
+      parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
     data = data,
     weights = c("iptw_re", "L2weight")
   )
