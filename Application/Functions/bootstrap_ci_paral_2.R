@@ -1,22 +1,23 @@
 #---------------------------------------------------#
 # QP Project - Empirical Application 
-#' 
-#' # Bootstrap Confidence Interval Estimation for Mediation Analysis
-#' 
-#' `bootstrap_ci_paral()` performs percentile bootstrap resampling to estimate confidence 
+
+#' Bootstrap Confidence Interval Estimation for Mediation Analysis
+#'
+#' `bootstrap_ci_paral_2()` performs percentile bootstrap resampling to estimate confidence 
 #' intervals for direct and indirect effects in a mediation analysis using clustered 
 #' data. The function allows for parallel execution of bootstrap iterations to 
 #' enhance computational efficiency. It returns the estimated confidence intervals for the 
-#' direct effect (Total Natural Direct Effect; TNDE) and indirect effect (Pure Natural 
-#' Indirect Effect; PNIE). The function supports different model specifications 
-#' for the mediation and outcome analyses.
-#' 
+#' direct effect (Total Natural Direct Effect; TNDE or Pure Natural Direct Effect; PNDE) 
+#' and indirect effect (Pure Natural Indirect Effect; PNIE or Total Natural Indirect 
+#' Effect; TNIE). The function supports different model specifications for the mediation and outcome analyses.
+#'
 #' @param iterations Number of bootstrap iterations to perform (default is 50).
 #' @param iptw Inverse probability of treatment weights to be used in model fitting.
 #' @param data The dataset containing the variables needed for the mediation analysis.
 #' @param model The type of model to fit for the mediation and outcome (options: "SL" for Super Learner or "FE" for Fixed Effects).
 #' @param cores Number of CPU cores to use for parallel processing (default is 2).
 #' @param core_seeds Optional vector of seeds for each core; if NULL, random seeds will be generated.
+#' @param effect_type Type of indirect effect to estimate: "PNIE" for Pure Natural Indirect Effect or "TNIE" for Total Natural Indirect Effect (default is "PNIE").
 #' @returns A list containing:
 #'   - `indirect_ci`: Confidence interval for the indirect effect.
 #'   - `direct_ci`: Confidence interval for the direct effect.
@@ -25,17 +26,18 @@
 #'   - `mediator_converged_count`: Count of bootstrap iterations where the mediator model converged.
 #'   - `outcome_converged_count`: Count of bootstrap iterations where the outcome model converged.
 #'   - `both_converged_count`: Count of iterations where both models converged.
-#' 
+#'
 #' @example
-#' # Example usage of bootstrap_ci_paral
-#' result_par <- bootstrap_ci_paral(iterations = 100,
+#' # Example usage of bootstrap_ci_paral_2
+#' result_par <- bootstrap_ci_paral_2(iterations = 100,
 #'                                   iptw = iptw_re, 
 #'                                   data = data, 
 #'                                   model = "SL", 
 #'                                   cores = 4, 
-#'                                   core_seeds = c(4561, 4562, 4563, 4564))
-#' 
-bootstrap_ci_paral <- function(iterations = 50, iptw, data, model = "SL", cores = 2, core_seeds = NULL) {
+#'                                   core_seeds = c(4561, 4562, 4563, 4564), 
+#'                                   effect_type = "PNIE")
+#'
+bootstrap_ci_paral_2 <- function(iterations = 50, iptw, data, model = "SL", cores = 2, core_seeds = NULL, effect_type = "PNIE") {
   # Load required libraries for parallel processing and statistical modeling
   library(parallel)
   library(WeMix)
@@ -51,7 +53,7 @@ bootstrap_ci_paral <- function(iterations = 50, iptw, data, model = "SL", cores 
   }
   
   # Function to perform a single bootstrap iteration
-  bootstrap_iteration <- function(i, core_seed, iptw_str, data, model) {
+  bootstrap_iteration <- function(i, core_seed, iptw_str, data, model, effect_type) {
     set.seed(core_seed + i)  # Set a unique seed for reproducibility
     
     # Resample clusters with replacement to create a bootstrap dataset
@@ -71,10 +73,17 @@ bootstrap_ci_paral <- function(iterations = 50, iptw, data, model = "SL", cores 
       }, error = function(e) NULL)  # Handle errors gracefully
       
       # Fit outcome model
+      outcome_formula <- if (effect_type == "TNIE") {
+        depress_w4 ~ selfEst_w3_sc * sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 + 
+          parentalEdu_w1_sc + familyStruct_w1
+      } else {
+        depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 + 
+          parentalEdu_w1_sc + familyStruct_w1
+      }
+      
       outcome <- tryCatch({
         glm(
-          formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 + 
-            parentalEdu_w1_sc + familyStruct_w1,
+          formula = outcome_formula,
           data = data_boot,
           weights = data_boot[[iptw_str]]
         )
@@ -91,10 +100,17 @@ bootstrap_ci_paral <- function(iterations = 50, iptw, data, model = "SL", cores 
       }, error = function(e) NULL)
       
       # Fit outcome model with fixed effects
+      outcome_formula <- if (effect_type == "TNIE") {
+        depress_w4 ~ selfEst_w3_sc * sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 + 
+          parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)
+      } else {
+        depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 + 
+          parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)
+      }
+      
       outcome <- tryCatch({
         glm(
-          formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 + 
-            parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2),
+          formula = outcome_formula,
           data = data_boot,
           weights = data_boot[[iptw_str]]
         )
@@ -125,7 +141,7 @@ bootstrap_ci_paral <- function(iterations = 50, iptw, data, model = "SL", cores 
   # Execute bootstrap iterations in parallel
   results <- mclapply(1:iterations, function(i) {
     core_index <- (i - 1) %% cores + 1  # Assign iterations to cores
-    bootstrap_iteration(i, core_seeds[core_index], iptw_str, data, model)
+    bootstrap_iteration(i, core_seeds[core_index], iptw_str, data, model, effect_type)
   }, mc.cores = cores)
   
   # Extract results from the list of bootstrap iterations

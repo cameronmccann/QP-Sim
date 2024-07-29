@@ -12,19 +12,21 @@
 # Script Description:
 #
 #
-# Last Updated: 07/27/2024 
+# Last Updated: 07/29/2024 
 #
 #
 # Notes:
 #   To-Do:
-#     + Change Insurance gap variable (drop from med & outcome models, only include wave 1 in PS model)
-#         - drop old code to add wave 3 & 4 insurance gap info 
 #     + estimate TNDE, PNIE, PNDE, & TNIE
 #     + Create table for all 4 estimates & their CIs
 # 
+#     + Collect/extract estimates & CIs 
+#     + Create table to display estimates & CIs
+#     + Delete OlD CODE section 
+#       + Check on TNIE being less than PNIE is okay 
+# 
 #   Next: 
 #     + 
-#     + Figure out how to get covariate balance for all models on 1 visual (like Chang et al. article) 
 # 
 #   Done: 
 # 
@@ -72,15 +74,19 @@ source("Application/Functions/bootstrap_ci_re_paral.R")
 ## Wave I ------------------------------------------------------------------
 
 # Import student data from Wave I of the Add Health study
+# The Add Health study is a longitudinal study of adolescents in the United States
 w1 <- readr::read_tsv(file = "Application/Data/ICPSR_21600/DS0001/21600-0001-Data.tsv")
 
 # Select relevant variables from Wave I student data
+# This includes demographic information, feelings scale (CES-D items), and self-esteem scale
 w1 <- w1 %>% 
   select("AID":"SCH_YR", "S1":"S7", "S12", "S18", "S11", "S17", "PC22",
-         "H1FS1":"H1FS19", # Feelings Scale (contains mostly CES-D items)
-         "H1NF12B", "S44A14", "S44A18":"S44A29")
+         "H1FS1":"H1FS19", # Feelings Scale (contains mostly CES-D items for depression assessment)
+         "H1NF12B", "S44A14", "S44A18":"S44A29", 
+         "H1PF30", "H1PF32":"H1PF34", "H1PF36") # Self-esteem scale items
 
-# Rename variables according to the In School Questionnaire Code Book Public Use Sample (pg. 697 of Questionnaire.pdf)
+# Rename key demographic variables for clarity
+# Variable names are based on the In School Questionnaire Code Book Public Use Sample (pg. 697 of Questionnaire.pdf)
 data <- w1 %>% 
   rename(age = S1, 
          sex = S2, 
@@ -91,13 +97,30 @@ data <- w1 %>%
          nativeAmerican = S6D, 
          raceOther = S6E)
 
+# Data cleaning and scoring for self-esteem scale
 
-# will those indicating an 8 (for S4 or ethnicity variable) mess things up? (same with sex)
-summary(data$sex) #summary(data$S2)
-summary(data$ethnicity) #summary(data$S4)
-# Change 8 to NA
-data$ethnicity <- ifelse(data$ethnicity == 8, NA, data$ethnicity)
-# sum(I(data$ethnicity == 8), na.rm = TRUE)
+# Replace invalid responses (6=refused; 8=don't know) with NA for self-esteem items
+data[, colnames(data)[str_detect(colnames(data), pattern = "^H1PF\\d{2}")]] <- 
+  apply(data[, colnames(data)[str_detect(colnames(data), pattern = "^H1PF\\d{2}")]], 2,
+        function(x)
+          ifelse(x >= 6, NA, x))
+
+# Reverse code all 5-point scale items for self-esteem
+# This ensures that higher scores consistently indicate higher self-esteem
+data[, colnames(data)[str_detect(colnames(data), pattern = "^H1PF\\d{2}")]] <- 
+  apply(data[, colnames(data)[str_detect(colnames(data), pattern = "^H1PF\\d{2}")]], 2, function(x)
+    6 - x) 
+
+# Calculate total self-esteem score by summing individual item scores
+data$selfEst <- rowSums(data[, grep(pattern = "^H1PF\\d{2}", colnames(data))])
+
+
+# # will those indicating an 8 (for S4 or ethnicity variable) mess things up? (same with sex)
+# summary(data$sex) #summary(data$S2)
+# summary(data$ethnicity) #summary(data$S4)
+# # Change 8 to NA
+# data$ethnicity <- ifelse(data$ethnicity == 8, NA, data$ethnicity)
+# # sum(I(data$ethnicity == 8), na.rm = TRUE)
 
 # Recode parental education
 # 1 = High school or less, 2 = Some college, 3 = College graduate or more
@@ -175,7 +198,7 @@ data <- data %>%
   select(AID, CLUSTER2, everything()) %>%
   select("AID", "CLUSTER2", "age", "sex",
          "ethnicity", "white", "black", "asian", "nativeAmerican", "raceOther",
-         "healthInsur", "parentalEdu", "familyStruct", "sport", "sportPartic", "feelings")
+         "healthInsur", "parentalEdu", "familyStruct", "sport", "sportPartic", "feelings", "selfEst")
 
 colnames(data)[-c(1:2)] <- paste0(colnames(data)[-c(1:2)], "_w1")
 
@@ -227,14 +250,15 @@ w3$selfEst <- rowSums(w3[, grep(pattern = "^H3SP", colnames(w3))])
 # check 
 # hist(w3$selfEst)
 
-# gap in health insurance (wave 3) 
-# 1. Over the past 12 months, how many months did you have health insurance? (H3HS1)
-w3 <- w3 %>%
-  rename(healthInsur = H3HS1) %>%
-  mutate(healthInsur = ifelse(healthInsur >= 98, NA, healthInsur)) # 98=don't know; 99=not applicable
+# # gap in health insurance (wave 3) 
+# # 1. Over the past 12 months, how many months did you have health insurance? (H3HS1)
+# w3 <- w3 %>%
+#   rename(healthInsur = H3HS1) %>%
+#   mutate(healthInsur = ifelse(healthInsur >= 98, NA, healthInsur)) # 98=don't know; 99=not applicable
 
 # Add wave III student data to data set
-data <- merge(data, w3[, c("AID", "selfEst", "healthInsur")], by = "AID")
+data <- merge(data, w3[, c("AID", "selfEst")], by = "AID")
+# data <- merge(data, w3[, c("AID", "selfEst", "healthInsur")], by = "AID")
 
 # Import Wave III weights 
 # w3.w <- readr::read_tsv(file = "Empirical-Application/Data/ICPSR_21600/DS0018/21600-0018-Data.tsv") # GSWGT3_2 for level 1 weight 
@@ -262,8 +286,8 @@ w4 <- readr::read_tsv(file = "Application/Data/ICPSR_21600/DS0022/21600-0022-Dat
 # Drop variables in wave I student data
 w4 <- w4 %>% 
   select("AID":"BIO_SEX4", 
-         "H4MH18":"H4MH27", # CES-D-10 scale [NOTE: DOUBLE CHECK THESE ARE CORRECT ITEMS]
-         "H4HS3") # Health insurance item 
+         "H4MH18":"H4MH27") # CES-D-10 scale [NOTE: DOUBLE CHECK THESE ARE CORRECT ITEMS]
+         # "H4HS3") # Health insurance item 
 
 
 # CES-D-10
@@ -309,19 +333,20 @@ w4[, c("H4MH20", "H4MH24", "H4MH25")] <-
 # Score CES-D-10 (Depression) scale 
 w4$depress <- rowSums(w4[, colnames(w4)[str_detect(colnames(w4), pattern = "^H4MH")]])
 
-# check 
-hist(w4$depress)
-table(I(w4$depress > 10)); sum(I(w4$depress > 10), na.rm = T) / sum(!is.na(w4$depress)) # 16% would be classified with depression in Easterlin study
+# # check 
+# hist(w4$depress)
+# table(I(w4$depress > 10)); sum(I(w4$depress > 10), na.rm = T) / sum(!is.na(w4$depress)) # 16% would be classified with depression in Easterlin study
 
 
-# gap in health insurance (wave 4) 
-# 3. Over the past 12 months, how many months did you have health insurance? (H4HS3)
-w4 <- w4 %>%
-  rename(healthInsur = H4HS3) %>%
-  mutate(healthInsur = ifelse(healthInsur >= 98, NA, healthInsur)) # 98=don't know
+# # gap in health insurance (wave 4) 
+# # 3. Over the past 12 months, how many months did you have health insurance? (H4HS3)
+# w4 <- w4 %>%
+#   rename(healthInsur = H4HS3) %>%
+#   mutate(healthInsur = ifelse(healthInsur >= 98, NA, healthInsur)) # 98=don't know
 
 # Add wave IV student data to data set
-data <- merge(data, w4[, c("AID", "healthInsur", "depress")], by = "AID")
+data <- merge(data, w4[, c("AID", "depress")], by = "AID")
+# data <- merge(data, w4[, c("AID", "healthInsur", "depress")], by = "AID")
 
 # GSWGT4_2 for level 1 weights
 # SCHWT1 W4_2_WC for level 2 weights
@@ -347,10 +372,10 @@ colnames(data)[!grepl(pattern = paste(c("_w\\d{1}$", "AID", "CLUSTER2"), collaps
 
 # Create insurance gap variable based only on wave I
 data$healthInsur_w1 <- ifelse(data$healthInsur_w1 > 0, 1, 0)
-data$healthInsur_w3 <- ifelse(data$healthInsur_w3 > 0, 1, 0)
-data$healthInsur_w4 <- ifelse(data$healthInsur_w4 > 0, 1, 0)
-data$healthInsur_gap <- ifelse(data$healthInsur_w1 == 0 | data$healthInsur_w3 == 0 | data$healthInsur_w4 == 0,
-                               1, 0)
+# data$healthInsur_w3 <- ifelse(data$healthInsur_w3 > 0, 1, 0)
+# data$healthInsur_w4 <- ifelse(data$healthInsur_w4 > 0, 1, 0)
+# data$healthInsur_gap <- ifelse(data$healthInsur_w1 == 0 | data$healthInsur_w3 == 0 | data$healthInsur_w4 == 0,
+#                                1, 0)
 
 # Add cluster (school) size variable 
 data <- data %>% 
@@ -417,8 +442,6 @@ summary(data[, c(
   "sport_w1",
   "sportPartic_w1",
   "feelings_w1",
-  "healthInsur_w3",
-  "healthInsur_w4",
   "depress_w4"
 )])
 
@@ -430,20 +453,21 @@ data <- data %>%
   mutate(
     age_w1_sc = as.vector(scale(age_w1)),
     parentalEdu_w1_sc = as.vector(scale(parentalEdu_w1)),
-    feelings_w1_sc = as.vector(scale(feelings_w1))
+    feelings_w1_sc = as.vector(scale(feelings_w1)), 
+    selfEst_w1_sc = as.vector(scale(selfEst_w1))
   ) %>%
   select(-age_w1, -parentalEdu_w1, -feelings_w1)  # Remove original columns if desired
 
 # Select variables in PS model 
 t <- data %>% 
-  select(!c(AID, CLUSTER2, sport_w1, n, healthInsur_w3, healthInsur_w4, healthInsur_gap)) %>% 
+  select(!c(AID, CLUSTER2, sport_w1, n)) %>% 
   # select(!c(AID, CLUSTER2, sport_w1, n, healthInsur_gap))
   # healthInsur_w3, healthInsur_w4, 
   # healthInsur_w1))
   select(c("sex_w1", "white_w1", "black_w1", 
            "sportPartic_w1", "selfEst_w3", "depress_w4", 
            "familyStruct_w1", "parentalEdu_w1_sc", "healthInsur_w1", 
-           "age_w1_sc", "feelings_w1_sc"))
+           "age_w1_sc", "feelings_w1_sc", "selfEst_w1_sc"))
 
 # Missing pattern 
 md.pattern(t, rotate.names = TRUE)
@@ -552,7 +576,7 @@ out_icc # with 121 schools (5+ in size) outcome icc = 0.01868923
 ### SL Propensity Score Model -----------------------------------------------
 # Standard logistic regression model for propensity score estimation
 psmod_sl <- glm(formula = "sportPartic_w1 ~ feelings_w1_sc + sex_w1 + age_w1_sc + 
-                        white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1",
+                        white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 + selfEst_w1_sc",
                 family = "binomial", 
                 data = data)
 
@@ -566,7 +590,7 @@ data <- cbind(data, iptw_sl = with(data, (sportPartic_w1 / ps_sl) + (1 - sportPa
 ### FE Propensity Score Model -----------------------------------------------
 # Fixed effects logistic regression model for propensity score estimation
 psmod_fe <- glm(formula = "sportPartic_w1 ~ feelings_w1_sc + sex_w1 + age_w1_sc + 
-                        white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 +
+                        white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 + selfEst_w1_sc +
                 as.factor(CLUSTER2)",
                 family = "binomial", 
                 data = data)
@@ -581,7 +605,7 @@ data <- cbind(data, iptw_fe = with(data, (sportPartic_w1 / ps_fe) + (1 - sportPa
 ### RE Propensity Score Model -----------------------------------------------
 # Random effects logistic regression model for propensity score estimation
 psmod_re <- lme4::glmer(formula = "sportPartic_w1 ~ feelings_w1_sc + sex_w1 + age_w1_sc + 
-                        white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 +
+                        white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 + selfEst_w1_sc + 
                         (1 | CLUSTER2)",
                         family = "binomial", 
                         data = data) 
@@ -711,7 +735,7 @@ calculate_smd <- function(data, treatment, covariate) {
 # List of covariates to analyze for balance
 covariates <- c("feelings_w1_sc", "sex_w1", "age_w1_sc", "white_w1", 
                 "black_w1", "parentalEdu_w1_sc", "familyStruct_w1", 
-                "healthInsur_w1")
+                "healthInsur_w1", "selfEst_w1_sc")
 
 # Calculate SMD for each covariate before applying weights
 smd_before <- sapply(covariates, function(cov) calculate_smd(data, "sportPartic_w1", cov))
@@ -773,12 +797,12 @@ smd_combined$ASMD <- abs(smd_combined$SMD)
 # Define a custom order for the y-axis in the plot
 custom_order <- c("black_w1", "white_w1", "familyStruct_w1", 
                   "healthInsur_w1", "age_w1_sc", "sex_w1", 
-                  "feelings_w1_sc", "parentalEdu_w1_sc")
+                  "selfEst_w1_sc", "feelings_w1_sc", "parentalEdu_w1_sc")
 
 # Define new labels for the y-axis to enhance readability
 new_labels <- c("Race: Black", "Race: White", "Family Structure", 
                 "Health Insurance \n Coverage Gap", "Age", "Sex", 
-                "Feelings Scale Score", "Parental Education")
+                "Self-Esteem Score", "Feelings Scale Score", "Parental Education")
 
 
 # Create a Love Plot to visualize the Absolute SMD, using custom ordering
@@ -897,6 +921,354 @@ ggsave(filename = "Application/Output/Covariate-Balance.png", plot = last_plot()
 
 
 
+# Estimate Effects --------------------------------------------------------
+
+## Mediator models ---------------------------------------------------------
+
+#### Single-Level (SL) Models ------------------------------------------------
+
+# Model: SL PS & SL - Mediation/Outcome
+med_slsl <-
+  glm(
+    formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1",
+    data = data,
+    weights = iptw_sl
+  )
+
+# Model: FE PS & SL - Mediation/Outcome
+med_fesl <-
+  glm(
+    formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1",
+    data = data,
+    weights = iptw_fe
+  )
+
+# Model: RE PS & SL - Mediation/Outcome
+med_resl <-
+  glm(
+    formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1",
+    data = data,
+    weights = iptw_re
+  )
+
+
+#### Fixed-Effect (FE) Models ------------------------------------------------
+
+# Model: SL PS & FE - Mediation/Outcome
+med_slfe <- glm(
+  formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
+  data = data, 
+  weights = iptw_sl
+)
+
+# Model: FE PS & FE - Mediation/Outcome 
+med_fefe <- glm(
+  formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
+  data = data, 
+  weights = iptw_fe
+)
+
+# Model: RE PS & FE - Mediation/Outcome
+med_refe <- glm(
+  formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
+  data = data, 
+  weights = iptw_re
+)
+
+
+#### Random-Effect (RE) Models ------------------------------------------------
+
+### Add a column of ones for level-2 weights
+data <- cbind(data, L2weight = rep(1, nrow(data)))
+
+# Model: SL PS & RE - Mediation/Outcome
+med_slre <-
+  WeMix::mix(
+    formula = selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
+    data = data,
+    weights = c("iptw_sl", "L2weight")
+  )
+
+# Model: FE PS & RE - Mediation/Outcome 
+med_fere <- 
+  WeMix::mix(
+    formula = selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
+    data = data,
+    weights = c("iptw_fe", "L2weight")
+  )
+
+# Model: RE PS & RE - Mediation/Outcome
+med_rere <- 
+  WeMix::mix(
+    formula = selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
+    data = data,
+    weights = c("iptw_re", "L2weight")
+  )
+
+
+
+## Outcome Models (TNDE & PNIE) --------------------------------------------
+
+#### Single-Level (SL) Models ------------------------------------------------
+
+# Model: SL PS & SL Mediation/Outcome
+out_slsl <-
+  glm(
+    formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + 
+      parentalEdu_w1_sc + familyStruct_w1",
+    data = data,
+    weights = iptw_sl
+  )
+
+# Model: FE PS & SL Mediation/Outcome
+out_fesl <-
+  glm(
+    "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + 
+      parentalEdu_w1_sc + familyStruct_w1",
+    data = data,
+    weights = iptw_fe
+  )
+
+# Model: RE PS & SL Mediation/Outcome
+out_resl <-
+  glm(
+    "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + 
+      parentalEdu_w1_sc + familyStruct_w1",
+    data = data,
+    weights = iptw_re
+  )
+
+#### Fixed-Effect (FE) Models ------------------------------------------------
+
+# Model: SL PS & FE Mediation/Outcome
+out_slfe <- glm(formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + 
+      parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
+      data = data, 
+      weights = iptw_sl)
+
+# Model: FE PS & FE Mediation/Outcome
+out_fefe <- glm(formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + 
+      parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
+      data = data, 
+      weights = iptw_fe)
+
+# Model: RE PS & FE Mediation/Outcome
+out_refe <- glm(formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + 
+      parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
+      data = data,
+      weights = iptw_re
+)
+
+#### Random-Effect (RE) Models ------------------------------------------------
+
+# Prepare data for Random-Effect Models: Add a column for level-2 weights
+data <- cbind(data, L2weight = rep(1, nrow(data)))
+
+# Model: SL PS & RE Mediation/Outcome
+out_slre <-
+  WeMix::mix(
+    formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + 
+      parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
+    data = data,
+    weights = c("iptw_sl", "L2weight")
+  )
+
+# Model: FE PS & RE Mediation/Outcome
+out_fere <- 
+  WeMix::mix(
+    formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + 
+      parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
+    data = data,
+    weights = c("iptw_fe", "L2weight")
+  )
+
+# Model: RE PS & RE Mediation/Outcome
+out_rere <- 
+  WeMix::mix(
+    formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + 
+      parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
+    data = data,
+    weights = c("iptw_re", "L2weight")
+  )
+
+
+
+## Outcome Models (PNDE & TNIE) --------------------------------------------
+
+#### Single-Level (SL) Models ------------------------------------------------
+
+# Model: SL PS & SL Mediation/Outcome
+out_slsl_interac <-
+  glm(
+    formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + 
+    selfEst_w3_sc:sportPartic_w1",
+    data = data,
+    weights = iptw_sl
+  )
+
+# Model: FE PS & SL Mediation/Outcome
+out_fesl_interac <-
+  glm(
+    "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + 
+    selfEst_w3_sc:sportPartic_w1",
+    data = data,
+    weights = iptw_fe
+  )
+
+# Model: RE PS & SL Mediation/Outcome
+out_resl_interac <-
+  glm(
+    "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + 
+    selfEst_w3_sc:sportPartic_w1",
+    data = data,
+    weights = iptw_re
+  )
+
+#### Fixed-Effect (FE) Models ------------------------------------------------
+
+# Model: SL PS & FE Mediation/Outcome
+out_slfe_interac <- glm(formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + 
+      selfEst_w3_sc:sportPartic_w1 + as.factor(CLUSTER2)", 
+      data = data, 
+      weights = iptw_sl)
+
+# Model: FE PS & FE Mediation/Outcome
+out_fefe_interac <- glm(formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + 
+      selfEst_w3_sc:sportPartic_w1 + as.factor(CLUSTER2)", 
+      data = data, 
+      weights = iptw_fe)
+
+# Model: RE PS & FE Mediation/Outcome
+out_refe_interac <- glm(formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + 
+      selfEst_w3_sc:sportPartic_w1 + as.factor(CLUSTER2)", 
+      data = data,
+      weights = iptw_re
+)
+
+#### Random-Effect (RE) Models ------------------------------------------------
+
+# Prepare data for Random-Effect Models: Add a column for level-2 weights
+data <- cbind(data, L2weight = rep(1, nrow(data)))
+
+# Model: SL PS & RE Mediation/Outcome
+out_slre_interac <-
+  WeMix::mix(
+    formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + 
+      selfEst_w3_sc:sportPartic_w1 + (1 | CLUSTER2),
+    data = data,
+    weights = c("iptw_sl", "L2weight")
+  )
+
+# Model: FE PS & RE Mediation/Outcome
+out_fere_interac <- 
+  WeMix::mix(
+    formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + 
+      selfEst_w3_sc:sportPartic_w1 + (1 | CLUSTER2),
+    data = data,
+    weights = c("iptw_fe", "L2weight")
+  )
+
+# Model: RE PS & RE Mediation/Outcome
+out_rere_interac <- 
+  WeMix::mix(
+    formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + 
+      selfEst_w3_sc:sportPartic_w1 + (1 | CLUSTER2),
+    data = data,
+    weights = c("iptw_re", "L2weight")
+  )
+
+
+
+# Display Estimates -------------------------------------------------------
+
+# Define conditions
+conditions <- c("slsl", "fesl", "resl", "slfe", "fefe", "refe", "slre", "fere", "rere")
+
+# Extract TNDE estimates
+TNDE <- sapply(conditions, function(cond) {
+  model_name <- paste0("out_", cond)
+  summary(get(model_name))$coef["sportPartic_w1", "Estimate"]
+})
+
+# Extract PNIE estimates
+PNIE <- sapply(conditions, function(cond) {
+  med_model_name <- paste0("med_", cond)
+  out_model_name <- paste0("out_", cond)
+  summary(get(med_model_name))$coef["sportPartic_w1", "Estimate"] * 
+    summary(get(out_model_name))$coef["selfEst_w3_sc", "Estimate"]
+})
+
+# Extract PNDE estimates
+PNDE <- sapply(conditions, function(cond) {
+  model_name <- paste0("out_", cond, "_interac")
+  summary(get(model_name))$coef["sportPartic_w1", "Estimate"]
+})
+
+# Extract TNIE estimates
+TNIE <- sapply(conditions, function(cond) {
+  med_model_name <- paste0("med_", cond)
+  out_model_name <- paste0("out_", cond, "_interac")
+  summary(get(med_model_name))$coef["sportPartic_w1", "Estimate"] * 
+    summary(get(out_model_name))$coef["selfEst_w3_sc", "Estimate"] + 
+    summary(get(out_model_name))$coef["selfEst_w3_sc:sportPartic_w1", "Estimate"]
+})
+
+
+
+
+# Create results DataFrame
+results_DF <- data.frame(
+  cond = conditions,
+  TNDE = TNDE,
+  PNDE = PNDE,
+  PNIE = PNIE,
+  TNIE = TNIE
+)
+
+# Display results
+rownames(results_DF) <- NULL
+results_DF
+#   cond       TNDE       PNDE        PNIE          TNIE
+# 1 slsl -0.2764533 -0.2764801 -0.03027051  0.0180582390
+# 2 fesl -0.1973009 -0.1976276 -0.09752048 -0.0367624900
+# 3 resl -0.2400019 -0.2401109 -0.07276088 -0.0045414414
+# 4 slfe -0.1804319 -0.1808842 -0.09704172 -0.0363361536
+# 5 fefe -0.1889825 -0.1894340 -0.09570423 -0.0002112213
+# 6 refe -0.1958658 -0.1963458 -0.09240229  0.0030725382
+# 7 slre -0.2208416 -0.2210517 -0.06717527 -0.0117677236
+# 8 fere -0.1946794 -0.1951001 -0.09536315 -0.0126787393
+# 9 rere -0.2171489 -0.2174313 -0.08069368  0.0039460448
+
+
+
+############################## OLD CODE - DELETE ################################################################
 
 
 
@@ -1130,145 +1502,296 @@ results_DF
 # 8 fere -0.2279858 -0.2074429
 # 9 rere -0.2482880 -0.1817158
 
-
+################################ END OF OLD CODE - DELETE #############################################################
 
 
 # Conduct Bootstrap Confidence Intervals (CI) ---------------------------------
 
+## TNDE & PNIE -------------------------------------------------------------
+
 #### Single-Level (SL) Med/Out Models  ---------------------------------------
 # SL PS Model 
-slsl_ci <- bootstrap_ci_paral(iterations = 1000,
-                              iptw = iptw_sl,
-                              data = data,
-                              model = "SL",
-                              cores = 6,
-                              core_seeds = c(4561:4566))
+slsl_ci_PNIE <- bootstrap_ci_paral_2(iterations = 1000,
+                                iptw = iptw_sl,
+                                data = data,
+                                model = "SL",
+                                cores = 6,
+                                core_seeds = c(4561:4566), 
+                                effect_type = "PNIE")
 
 # FE PS Model 
-fesl_ci <- bootstrap_ci_paral(iterations = 1000,
+fesl_ci_PNIE <- bootstrap_ci_paral_2(iterations = 1000,
                               iptw = iptw_fe,
                               data = data,
                               model = "SL",
                               cores = 6,
-                              core_seeds = c(4561:4566))
+                              core_seeds = c(4561:4566), 
+                              effect_type = "PNIE")
 
 # RE PS Model 
-resl_ci <- bootstrap_ci_paral(iterations = 1000,
+resl_ci_PNIE <- bootstrap_ci_paral_2(iterations = 1000,
                               iptw = iptw_re,
                               data = data,
                               model = "SL",
                               cores = 6,
-                              core_seeds = c(4561:4566))
+                              core_seeds = c(4561:4566),
+                              effect_type = "PNIE")
 
 #### Fixed-Effect (FE) Med/Out Models ----------------------------------------
 # SL PS Model 
-slfe_ci <- bootstrap_ci_paral(iterations = 1000,
+slfe_ci_PNIE <- bootstrap_ci_paral_2(iterations = 1000,
                               iptw = iptw_sl,
                               data = data,
                               model = "FE",
                               cores = 6,
-                              core_seeds = c(4561:4566))
+                              core_seeds = c(4561:4566), 
+                              effect_type = "PNIE")
 
 # FE PS Model 
-fefe_ci <- bootstrap_ci_paral(iterations = 1000,
+fefe_ci_PNIE <- bootstrap_ci_paral_2(iterations = 1000,
                               iptw = iptw_fe,
                               data = data,
                               model = "FE",
                               cores = 6,
-                              core_seeds = c(4561:4566))
+                              core_seeds = c(4561:4566), 
+                              effect_type = "PNIE")
 
 # RE PS Model 
-refe_ci <- bootstrap_ci_paral(iterations = 1000,
+refe_ci_PNIE <- bootstrap_ci_paral_2(iterations = 1000,
                               iptw = iptw_re,
                               data = data,
                               model = "FE",
                               cores = 6,
-                              core_seeds = c(4561:4566))
+                              core_seeds = c(4561:4566), 
+                              effect_type = "PNIE")
 
 #### Random-Effect (RE) Med/Out Models ---------------------------------------
 # SL PS Model 
 execution_time_slre <- system.time({ # Track computation time 
-  slre_ci <- bootstrap_ci_re_paral(iterations = 1500, 
+  slre_ci_PNIE <- bootstrap_ci_re_paral_2(iterations = 1500, 
                                    iptw = iptw_sl, 
                                    data = data, 
                                    cores = 6, 
-                                   core_seeds = c(4561:4566))
+                                   core_seeds = c(4561:4566), 
+                                   effect_type = "PNIE")
 })
 # Print the execution time
 print(execution_time_slre)
-# user   system  elapsed 
-# 6039.100   49.430 1383.943 
+# 
 
 # Print the elapsed time specifically
 cat("Elapsed time:", execution_time_slre["elapsed"], "seconds\n")
-# Elapsed time: 1383.943 seconds
+# 
 
 # Print convergence statistics
-paste0("Number of converged mediator models: ", slre_ci$mediator_converged_count, 
-       " (", (slre_ci$mediator_converged_count / length(slre_ci$direct_effects)) * 100, "%)")
-paste0("Number of converged outcome models: ", slre_ci$outcome_converged_count, 
-       " (", (slre_ci$outcome_converged_count / length(slre_ci$direct_effects)) * 100, "%)")
-paste0("Number of iterations with both models converged: ", slre_ci$both_converged_count, 
-       " (", (slre_ci$both_converged_count / length(slre_ci$direct_effects)) * 100, "%)")
-# [1] "Number of converged mediator models: 1152 (76.8%)"
-# [1] "Number of converged outcome models: 1498 (99.8666666666667%)"
-# [1] "Number of iterations with both models converged: 1152 (76.8%)"
+paste0("Number of converged mediator models: ", slre_ci_PNIE$mediator_converged_count, 
+       " (", (slre_ci_PNIE$mediator_converged_count / length(slre_ci_PNIE$direct_effects)) * 100, "%)")
+paste0("Number of converged outcome models: ", slre_ci_PNIE$outcome_converged_count, 
+       " (", (slre_ci_PNIE$outcome_converged_count / length(slre_ci_PNIE$direct_effects)) * 100, "%)")
+paste0("Number of iterations with both models converged: ", slre_ci_PNIE$both_converged_count, 
+       " (", (slre_ci_PNIE$both_converged_count / length(slre_ci_PNIE$direct_effects)) * 100, "%)")
+# 
 
 # FE PS Model
 execution_time_fere <- system.time({ # Track computation time 
-  fere_ci <- bootstrap_ci_re_paral(iterations = 1500, 
+  fere_ci_PNIE <- bootstrap_ci_re_paral_2(iterations = 1500, 
                                    iptw = iptw_fe, 
                                    data = data, 
                                    cores = 6, 
-                                   core_seeds = c(4561:4566))
+                                   core_seeds = c(4561:4566), 
+                                   effect_type = "PNIE")
 })
 # Print the execution time
 print(execution_time_fere)
-# user   system  elapsed 
-# 6116.785   45.386 1271.666 
+# 
 
 # Print the elapsed time specifically
 cat("Elapsed time:", execution_time_fere["elapsed"], "seconds\n")
-# Elapsed time: 1271.666 seconds
+# 
 
 # Print convergence statistics
-paste0("Number of converged mediator models: ", fere_ci$mediator_converged_count, 
-       " (", (fere_ci$mediator_converged_count / length(fere_ci$direct_effects)) * 100, "%)")
-paste0("Number of converged outcome models: ", fere_ci$outcome_converged_count, 
-       " (", (fere_ci$outcome_converged_count / length(fere_ci$direct_effects)) * 100, "%)")
-paste0("Number of iterations with both models converged: ", fere_ci$both_converged_count, 
-       " (", (fere_ci$both_converged_count / length(fere_ci$direct_effects)) * 100, "%)")
-# [1] "Number of converged mediator models: 1152 (76.8%)"
-# [1] "Number of converged outcome models: 1498 (99.8666666666667%)"
-# [1] "Number of iterations with both models converged: 1152 (76.8%)"
+paste0("Number of converged mediator models: ", fere_ci_PNIE$mediator_converged_count, 
+       " (", (fere_ci_PNIE$mediator_converged_count / length(fere_ci_PNIE$direct_effects)) * 100, "%)")
+paste0("Number of converged outcome models: ", fere_ci_PNIE$outcome_converged_count, 
+       " (", (fere_ci_PNIE$outcome_converged_count / length(fere_ci_PNIE$direct_effects)) * 100, "%)")
+paste0("Number of iterations with both models converged: ", fere_ci_PNIE$both_converged_count, 
+       " (", (fere_ci_PNIE$both_converged_count / length(fere_ci_PNIE$direct_effects)) * 100, "%)")
+# 
 
 # RE PS Model
 execution_time_rere <- system.time({ # Track computation time 
-  rere_ci <- bootstrap_ci_re_paral(iterations = 1500, 
+  rere_ci_PNIE <- bootstrap_ci_re_paral_2(iterations = 1500, 
                                    iptw = iptw_re, 
                                    data = data, 
                                    cores = 6, 
-                                   core_seeds = c(4561:4566))
+                                   core_seeds = c(4561:4566), 
+                                   effect_type = "PNIE")
 })
 # Print the execution time
 print(execution_time_rere)
-# user   system  elapsed 
-# 6019.628   23.378 1239.493 
+# 
 
 # Print the elapsed time specifically
 cat("Elapsed time:", execution_time_rere["elapsed"], "seconds\n")
-# Elapsed time: 1239.493 seconds
+# 
 
 # Print convergence statistics
-paste0("Number of converged mediator models: ", rere_ci$mediator_converged_count, 
-       " (", (rere_ci$mediator_converged_count / length(rere_ci$direct_effects)) * 100, "%)")
-paste0("Number of converged outcome models: ", rere_ci$outcome_converged_count, 
-       " (", (rere_ci$outcome_converged_count / length(rere_ci$direct_effects)) * 100, "%)")
-paste0("Number of iterations with both models converged: ", rere_ci$both_converged_count, 
-       " (", (rere_ci$both_converged_count / length(rere_ci$direct_effects)) * 100, "%)")
-# [1] "Number of converged mediator models: 1152 (76.8%)"
-# [1] "Number of converged outcome models: 1498 (99.8666666666667%)"
-# [1] "Number of iterations with both models converged: 1152 (76.8%)"
+paste0("Number of converged mediator models: ", rere_ci_PNIE$mediator_converged_count, 
+       " (", (rere_ci_PNIE$mediator_converged_count / length(rere_ci_PNIE$direct_effects)) * 100, "%)")
+paste0("Number of converged outcome models: ", rere_ci_PNIE$outcome_converged_count, 
+       " (", (rere_ci_PNIE$outcome_converged_count / length(rere_ci_PNIE$direct_effects)) * 100, "%)")
+paste0("Number of iterations with both models converged: ", rere_ci_PNIE$both_converged_count, 
+       " (", (rere_ci_PNIE$both_converged_count / length(rere_ci_PNIE$direct_effects)) * 100, "%)")
+# 
+
+
+## PNDE & TNIE -------------------------------------------------------------
+
+#### Single-Level (SL) Med/Out Models  ---------------------------------------
+# SL PS Model 
+slsl_ci_TNIE <- bootstrap_ci_paral_2(iterations = 1000,
+                                     iptw = iptw_sl,
+                                     data = data,
+                                     model = "SL",
+                                     cores = 6,
+                                     core_seeds = c(4561:4566), 
+                                     effect_type = "TNIE")
+
+# FE PS Model 
+fesl_ci_TNIE <- bootstrap_ci_paral_2(iterations = 1000,
+                                     iptw = iptw_fe,
+                                     data = data,
+                                     model = "SL",
+                                     cores = 6,
+                                     core_seeds = c(4561:4566), 
+                                     effect_type = "TNIE")
+
+# RE PS Model 
+resl_ci_TNIE <- bootstrap_ci_paral_2(iterations = 1000,
+                                     iptw = iptw_re,
+                                     data = data,
+                                     model = "SL",
+                                     cores = 6,
+                                     core_seeds = c(4561:4566),
+                                     effect_type = "TNIE")
+
+#### Fixed-Effect (FE) Med/Out Models ----------------------------------------
+# SL PS Model 
+slfe_ci_TNIE <- bootstrap_ci_paral_2(iterations = 1000,
+                                     iptw = iptw_sl,
+                                     data = data,
+                                     model = "FE",
+                                     cores = 6,
+                                     core_seeds = c(4561:4566), 
+                                     effect_type = "TNIE")
+
+# FE PS Model 
+fefe_ci_TNIE <- bootstrap_ci_paral_2(iterations = 1000,
+                                     iptw = iptw_fe,
+                                     data = data,
+                                     model = "FE",
+                                     cores = 6,
+                                     core_seeds = c(4561:4566), 
+                                     effect_type = "TNIE")
+
+# RE PS Model 
+refe_ci_TNIE <- bootstrap_ci_paral_2(iterations = 1000,
+                                     iptw = iptw_re,
+                                     data = data,
+                                     model = "FE",
+                                     cores = 6,
+                                     core_seeds = c(4561:4566), 
+                                     effect_type = "TNIE")
+
+#### Random-Effect (RE) Med/Out Models ---------------------------------------
+# SL PS Model 
+execution_time_slre <- system.time({ # Track computation time 
+  slre_ci_TNIE <- bootstrap_ci_re_paral_2(iterations = 1500, 
+                                          iptw = iptw_sl, 
+                                          data = data, 
+                                          cores = 6, 
+                                          core_seeds = c(4561:4566), 
+                                          effect_type = "TNIE")
+})
+# Print the execution time
+print(execution_time_slre)
+# 
+
+# Print the elapsed time specifically
+cat("Elapsed time:", execution_time_slre["elapsed"], "seconds\n")
+# 
+
+# Print convergence statistics
+paste0("Number of converged mediator models: ", slre_ci_TNIE$mediator_converged_count, 
+       " (", (slre_ci_TNIE$mediator_converged_count / length(slre_ci_TNIE$direct_effects)) * 100, "%)")
+paste0("Number of converged outcome models: ", slre_ci_TNIE$outcome_converged_count, 
+       " (", (slre_ci_TNIE$outcome_converged_count / length(slre_ci_TNIE$direct_effects)) * 100, "%)")
+paste0("Number of iterations with both models converged: ", slre_ci_TNIE$both_converged_count, 
+       " (", (slre_ci_TNIE$both_converged_count / length(slre_ci_TNIE$direct_effects)) * 100, "%)")
+# 
+
+# FE PS Model
+execution_time_fere <- system.time({ # Track computation time 
+  fere_ci_TNIE <- bootstrap_ci_re_paral_2(iterations = 1500, 
+                                          iptw = iptw_fe, 
+                                          data = data, 
+                                          cores = 6, 
+                                          core_seeds = c(4561:4566), 
+                                          effect_type = "TNIE")
+})
+# Print the execution time
+print(execution_time_fere)
+# 
+
+# Print the elapsed time specifically
+cat("Elapsed time:", execution_time_fere["elapsed"], "seconds\n")
+# 
+
+# Print convergence statistics
+paste0("Number of converged mediator models: ", fere_ci_TNIE$mediator_converged_count, 
+       " (", (fere_ci_TNIE$mediator_converged_count / length(fere_ci_TNIE$direct_effects)) * 100, "%)")
+paste0("Number of converged outcome models: ", fere_ci_TNIE$outcome_converged_count, 
+       " (", (fere_ci_TNIE$outcome_converged_count / length(fere_ci_TNIE$direct_effects)) * 100, "%)")
+paste0("Number of iterations with both models converged: ", fere_ci_TNIE$both_converged_count, 
+       " (", (fere_ci_TNIE$both_converged_count / length(fere_ci_TNIE$direct_effects)) * 100, "%)")
+# 
+
+# RE PS Model
+execution_time_rere <- system.time({ # Track computation time 
+  rere_ci_TNIE <- bootstrap_ci_re_paral_2(iterations = 1500, 
+                                          iptw = iptw_re, 
+                                          data = data, 
+                                          cores = 6, 
+                                          core_seeds = c(4561:4566), 
+                                          effect_type = "TNIE")
+})
+# Print the execution time
+print(execution_time_rere)
+# 
+
+# Print the elapsed time specifically
+cat("Elapsed time:", execution_time_rere["elapsed"], "seconds\n")
+# 
+
+# Print convergence statistics
+paste0("Number of converged mediator models: ", rere_ci_TNIE$mediator_converged_count, 
+       " (", (rere_ci_TNIE$mediator_converged_count / length(rere_ci_TNIE$direct_effects)) * 100, "%)")
+paste0("Number of converged outcome models: ", rere_ci_TNIE$outcome_converged_count, 
+       " (", (rere_ci_TNIE$outcome_converged_count / length(rere_ci_TNIE$direct_effects)) * 100, "%)")
+paste0("Number of iterations with both models converged: ", rere_ci_TNIE$both_converged_count, 
+       " (", (rere_ci_TNIE$both_converged_count / length(rere_ci_TNIE$direct_effects)) * 100, "%)")
+# 
+
+
+
+
+
+
+
+
+# [next] ------------------------------------------------------------------
+
+# next update the code below to extract the TNIE, PNDE, PNIE, & TNDE CIs & store and present them. Then create a table for the QP document to display these results 
 
 
 

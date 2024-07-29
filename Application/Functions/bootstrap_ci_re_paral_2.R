@@ -1,21 +1,22 @@
 #---------------------------------------------------#
 # QP Project - Empirical Application 
-#' 
-#' # Bootstrap Confidence Interval Estimation for Random Effects Mediation Analysis
-#' 
-#' `bootstrap_ci_re_paral()` performs percentile bootstrap resampling to estimate confidence 
+
+#' Bootstrap Confidence Interval Estimation for Random Effects Mediation Analysis
+#'
+#' `bootstrap_ci_re_paral_2()` performs percentile bootstrap resampling to estimate confidence 
 #' intervals for direct and indirect effects in a mediation analysis using clustered 
 #' data with random effects. The function allows for parallel execution of bootstrap 
 #' iterations. It returns the estimated confidence intervals for the direct 
-#' effect (Total Natural Direct Effect; TNDE) and indirect effect (Pure Natural 
-#' Indirect Effect; PNIE). The function supports random effects modeling for both 
-#' mediator and outcome analyses.
-#' 
+#' effect (Total Natural Direct Effect; TNDE or Pure Natural Direct Effect; PNDE) 
+#' and indirect effect (Pure Natural Indirect Effect; PNIE or Total Natural Indirect 
+#' Effect; TNIE). The function supports random effects modeling for both mediator and outcome analyses.
+#'
 #' @param iterations Number of bootstrap iterations to perform (default is 50).
 #' @param iptw Inverse probability of treatment weights to be used in model fitting.
 #' @param data The dataset containing the variables needed for the mediation analysis.
 #' @param cores Number of CPU cores to use for parallel processing (default is 2).
 #' @param core_seeds Optional vector of seeds for each core; if NULL, random seeds will be generated.
+#' @param effect_type Type of indirect effect to estimate: "PNIE" for Pure Natural Indirect Effect or "TNIE" for Total Natural Indirect Effect (default is "PNIE").
 #' @returns A list containing:
 #'   - `indirect_ci`: Confidence interval for the indirect effect.
 #'   - `direct_ci`: Confidence interval for the direct effect.
@@ -24,16 +25,18 @@
 #'   - `mediator_converged_count`: Count of bootstrap iterations where the mediator model converged.
 #'   - `outcome_converged_count`: Count of bootstrap iterations where the outcome model converged.
 #'   - `both_converged_count`: Count of iterations where both models converged.
-#' 
+#'
 #' @example
-#' # Example usage of bootstrap_ci_re_paral
-#' result_re <- bootstrap_ci_re_paral(iterations = 10,
+#' # Example usage of bootstrap_ci_re_paral_2
+#' result_re <- bootstrap_ci_re_paral_2(iterations = 10,
 #'                                     iptw = iptw_re, 
 #'                                     data = data, 
 #'                                     cores = 6, 
-#'                                     core_seeds = c(4561, 4562, 4563, 4564, 4565, 4566))
-#' 
-bootstrap_ci_re_paral <- function(iterations = 50, iptw, data, cores = 2, core_seeds = NULL) {
+#'                                     core_seeds = c(4561, 4562, 4563, 4564, 4565, 4566), 
+#'                                     effect_type = "PNIE")
+#'
+
+bootstrap_ci_re_paral_2 <- function(iterations = 50, iptw, data, cores = 2, core_seeds = NULL, effect_type = "PNIE") {
   # Load required libraries for parallel processing and mixed models
   library(parallel)
   library(WeMix)
@@ -49,7 +52,7 @@ bootstrap_ci_re_paral <- function(iterations = 50, iptw, data, cores = 2, core_s
   }
   
   # Function to perform a single bootstrap iteration
-  bootstrap_iteration <- function(i, core_seed, iptw_str, data) {
+  bootstrap_iteration <- function(i, core_seed, iptw_str, data, effect_type) {
     set.seed(core_seed + i)  # Set a unique seed for reproducibility
     
     # Resample clusters with replacement to create a bootstrap dataset
@@ -69,10 +72,17 @@ bootstrap_ci_re_paral <- function(iterations = 50, iptw, data, cores = 2, core_s
       )
     }, error = function(e) NULL)  # Handle errors gracefully
     
+    outcome_formula <- if (effect_type == "TNIE") {
+      depress_w4 ~ selfEst_w3_sc * sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 + 
+        parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2)
+    } else {
+      depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 + 
+        parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2)
+    }
+    
     outcome_rere <- tryCatch({
       WeMix::mix(
-        formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 + 
-          parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
+        formula = outcome_formula,
         data = data_boot, 
         weights = c(iptw_str, "L2weight")
       )
@@ -100,7 +110,7 @@ bootstrap_ci_re_paral <- function(iterations = 50, iptw, data, cores = 2, core_s
   # Run bootstrap iterations in parallel
   results <- mclapply(1:iterations, function(i) {
     core_index <- (i - 1) %% cores + 1  # Assign iterations to cores
-    bootstrap_iteration(i, core_seeds[core_index], iptw_str, data)
+    bootstrap_iteration(i, core_seeds[core_index], iptw_str, data, effect_type)
   }, mc.cores = cores)
   
   # Extract results from the list of bootstrap iterations
@@ -124,5 +134,6 @@ bootstrap_ci_re_paral <- function(iterations = 50, iptw, data, cores = 2, core_s
     both_converged_count = sum(mediator_converged & outcome_converged)
   )
 }
+
 
 ##################################### END ######################################
