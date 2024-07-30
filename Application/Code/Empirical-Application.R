@@ -12,18 +12,12 @@
 # Script Description:
 #
 #
-# Last Updated: 07/29/2024 
+# Last Updated: 07/30/2024 
 #
 #
 # Notes:
 #   To-Do:
-#     + estimate TNDE, PNIE, PNDE, & TNIE
-#     + Create table for all 4 estimates & their CIs
-# 
-#     + Collect/extract estimates & CIs 
-#     + Create table to display estimates & CIs
-#     + Delete OlD CODE section 
-#       + Check on TNIE being less than PNIE is okay 
+#     + Clean up code comments (especially in data cleaning sections) 
 # 
 #   Next: 
 #     + 
@@ -63,8 +57,8 @@ pacman::p_load(
 )
 
 # Load Functions 
-source("Application/Functions/bootstrap_ci_paral.R")
-source("Application/Functions/bootstrap_ci_re_paral.R")
+source("Application/Functions/bootstrap_ci_paral_2.R")
+source("Application/Functions/bootstrap_ci_re_paral_2.R")
 
 
 
@@ -1268,243 +1262,6 @@ results_DF
 
 
 
-############################## OLD CODE - DELETE ################################################################
-
-
-
-# Estimate Effects --------------------------------------------------------
-
-## Mediator models ---------------------------------------------------------
-
-#### Single-Level (SL) Models ------------------------------------------------
-
-# Model: SL PS & SL - Mediation/Outcome
-med_slsl <-
-  glm(
-    formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1",
-    data = data,
-    weights = iptw_sl
-  )
-
-# Model: FE PS & SL - Mediation/Outcome
-med_fesl <-
-  glm(
-    formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1",
-    data = data,
-    weights = iptw_fe
-  )
-
-# Model: RE PS & SL - Mediation/Outcome
-med_resl <-
-  glm(
-    formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1",
-    data = data,
-    weights = iptw_re
-  )
-
-
-#### Fixed-Effect (FE) Models ------------------------------------------------
-
-# Model: SL PS & FE - Mediation/Outcome
-med_slfe <- glm(
-  formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
-  data = data, 
-  weights = iptw_sl
-)
-
-# Model: FE PS & FE - Mediation/Outcome 
-med_fefe <- glm(
-  formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
-  data = data, 
-  weights = iptw_fe
-)
-
-# Model: RE PS & FE - Mediation/Outcome
-med_refe <- glm(
-  formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
-  data = data, 
-  weights = iptw_re
-)
-
-
-#### Random-Effect (RE) Models ------------------------------------------------
-
-### Add a column of ones for level-2 weights
-data <- cbind(data, L2weight = rep(1, nrow(data)))
-
-# Model: SL PS & RE - Mediation/Outcome
-med_slre <-
-  WeMix::mix(
-    formula = selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
-    data = data,
-    weights = c("iptw_sl", "L2weight")
-  )
-
-# Model: FE PS & RE - Mediation/Outcome 
-med_fere <- 
-  WeMix::mix(
-    formula = selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
-    data = data,
-    weights = c("iptw_fe", "L2weight")
-  )
-
-# Model: RE PS & RE - Mediation/Outcome
-med_rere <- 
-  WeMix::mix(
-    formula = selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
-    data = data,
-    weights = c("iptw_re", "L2weight")
-  )
-
-
-
-## Outcome Models ----------------------------------------------------------
-
-#### Single-Level (SL) Models ------------------------------------------------
-
-# Model: SL PS & SL Mediation/Outcome
-out_slsl <-
-  glm(
-    formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + 
-      parentalEdu_w1_sc + familyStruct_w1",
-    data = data,
-    weights = iptw_sl
-  )
-
-# Model: FE PS & SL Mediation/Outcome
-out_fesl <-
-  glm(
-    "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + 
-      parentalEdu_w1_sc + familyStruct_w1",
-    data = data,
-    weights = iptw_fe
-  )
-
-# Model: RE PS & SL Mediation/Outcome
-out_resl <-
-  glm(
-    "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + 
-      parentalEdu_w1_sc + familyStruct_w1",
-    data = data,
-    weights = iptw_re
-  )
-
-#### Fixed-Effect (FE) Models ------------------------------------------------
-
-# Model: SL PS & FE Mediation/Outcome
-out_slfe <- glm(formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + 
-      parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
-      data = data, 
-      weights = iptw_sl)
-
-# Model: FE PS & FE Mediation/Outcome
-out_fefe <- glm(formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + 
-      parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
-      data = data, 
-      weights = iptw_fe)
-
-# Model: RE PS & FE Mediation/Outcome
-out_refe <- glm(formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + 
-      parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
-      data = data,
-      weights = iptw_re
-)
-
-#### Random-Effect (RE) Models ------------------------------------------------
-
-# Prepare data for Random-Effect Models: Add a column for level-2 weights
-data <- cbind(data, L2weight = rep(1, nrow(data)))
-
-# Model: SL PS & RE Mediation/Outcome
-out_slre <-
-  WeMix::mix(
-    formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + 
-      parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
-    data = data,
-    weights = c("iptw_sl", "L2weight")
-  )
-
-# Model: FE PS & RE Mediation/Outcome
-out_fere <- 
-  WeMix::mix(
-    formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + 
-      parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
-    data = data,
-    weights = c("iptw_fe", "L2weight")
-  )
-
-# Model: RE PS & RE Mediation/Outcome
-out_rere <- 
-  WeMix::mix(
-    formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + 
-      parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
-    data = data,
-    weights = c("iptw_re", "L2weight")
-  )
-
-
-
-# Display Estimates -------------------------------------------------------
-
-# Define conditions
-conditions <- c("slsl", "fesl", "resl", "slfe", "fefe", "refe", "slre", "fere", "rere")
-
-# Extract NDE estimates
-NDE <- sapply(conditions, function(cond) {
-  model_name <- paste0("out_", cond)
-  summary(get(model_name))$coef["sportPartic_w1", "Estimate"]
-})
-
-# Extract NIE estimates
-NIE <- sapply(conditions, function(cond) {
-  med_model_name <- paste0("med_", cond)
-  out_model_name <- paste0("out_", cond)
-  summary(get(med_model_name))$coef["sportPartic_w1", "Estimate"] * 
-    summary(get(out_model_name))$coef["selfEst_w3_sc", "Estimate"]
-})
-
-# Create results DataFrame
-results_DF <- data.frame(
-  cond = conditions,
-  NDE = NDE,
-  NIE = NIE
-)
-
-# Display results
-rownames(results_DF) <- NULL
-results_DF
-# cond        NDE        NIE
-# 1 slsl -0.3279340 -0.1349289
-# 2 fesl -0.2337515 -0.2072494
-# 3 resl -0.2772344 -0.1727740
-# 4 slfe -0.2024146 -0.1935592
-# 5 fefe -0.2212818 -0.2102262
-# 6 refe -0.2245736 -0.1958965
-# 7 slre -0.2510726 -0.1651808
-# 8 fere -0.2279858 -0.2074429
-# 9 rere -0.2482880 -0.1817158
-
-################################ END OF OLD CODE - DELETE #############################################################
-
-
 # Conduct Bootstrap Confidence Intervals (CI) ---------------------------------
 
 ## TNDE & PNIE -------------------------------------------------------------
@@ -1577,11 +1334,12 @@ execution_time_slre <- system.time({ # Track computation time
 })
 # Print the execution time
 print(execution_time_slre)
-# 
+#    user   system  elapsed 
+# 8656.601 1124.463 3393.450 
 
 # Print the elapsed time specifically
 cat("Elapsed time:", execution_time_slre["elapsed"], "seconds\n")
-# 
+# Elapsed time: 3393.45 seconds
 
 # Print convergence statistics
 paste0("Number of converged mediator models: ", slre_ci_PNIE$mediator_converged_count, 
@@ -1590,7 +1348,9 @@ paste0("Number of converged outcome models: ", slre_ci_PNIE$outcome_converged_co
        " (", (slre_ci_PNIE$outcome_converged_count / length(slre_ci_PNIE$direct_effects)) * 100, "%)")
 paste0("Number of iterations with both models converged: ", slre_ci_PNIE$both_converged_count, 
        " (", (slre_ci_PNIE$both_converged_count / length(slre_ci_PNIE$direct_effects)) * 100, "%)")
-# 
+# [1] "Number of converged mediator models: 1154 (76.9333333333333%)"
+# [1] "Number of converged outcome models: 1488 (99.2%)"
+# [1] "Number of iterations with both models converged: 1146 (76.4%)"
 
 # FE PS Model
 execution_time_fere <- system.time({ # Track computation time 
@@ -1603,11 +1363,12 @@ execution_time_fere <- system.time({ # Track computation time
 })
 # Print the execution time
 print(execution_time_fere)
-# 
+#     user    system   elapsed 
+# 12087.304  1923.361  6444.097 
 
 # Print the elapsed time specifically
 cat("Elapsed time:", execution_time_fere["elapsed"], "seconds\n")
-# 
+# Elapsed time: 6444.097 seconds
 
 # Print convergence statistics
 paste0("Number of converged mediator models: ", fere_ci_PNIE$mediator_converged_count, 
@@ -1616,7 +1377,9 @@ paste0("Number of converged outcome models: ", fere_ci_PNIE$outcome_converged_co
        " (", (fere_ci_PNIE$outcome_converged_count / length(fere_ci_PNIE$direct_effects)) * 100, "%)")
 paste0("Number of iterations with both models converged: ", fere_ci_PNIE$both_converged_count, 
        " (", (fere_ci_PNIE$both_converged_count / length(fere_ci_PNIE$direct_effects)) * 100, "%)")
-# 
+# [1] "Number of converged mediator models: 1154 (76.9333333333333%)"
+# [1] "Number of converged outcome models: 1488 (99.2%)"
+# [1] "Number of iterations with both models converged: 1146 (76.4%)"
 
 # RE PS Model
 execution_time_rere <- system.time({ # Track computation time 
@@ -1629,11 +1392,12 @@ execution_time_rere <- system.time({ # Track computation time
 })
 # Print the execution time
 print(execution_time_rere)
-# 
+#     user    system   elapsed 
+# 10658.977  1202.641  2922.896 
 
 # Print the elapsed time specifically
 cat("Elapsed time:", execution_time_rere["elapsed"], "seconds\n")
-# 
+# Elapsed time: 2922.896 seconds
 
 # Print convergence statistics
 paste0("Number of converged mediator models: ", rere_ci_PNIE$mediator_converged_count, 
@@ -1642,7 +1406,9 @@ paste0("Number of converged outcome models: ", rere_ci_PNIE$outcome_converged_co
        " (", (rere_ci_PNIE$outcome_converged_count / length(rere_ci_PNIE$direct_effects)) * 100, "%)")
 paste0("Number of iterations with both models converged: ", rere_ci_PNIE$both_converged_count, 
        " (", (rere_ci_PNIE$both_converged_count / length(rere_ci_PNIE$direct_effects)) * 100, "%)")
-# 
+# [1] "Number of converged mediator models: 1154 (76.9333333333333%)"
+# [1] "Number of converged outcome models: 1488 (99.2%)"
+# [1] "Number of iterations with both models converged: 1146 (76.4%)"
 
 
 ## PNDE & TNIE -------------------------------------------------------------
@@ -1715,11 +1481,12 @@ execution_time_slre <- system.time({ # Track computation time
 })
 # Print the execution time
 print(execution_time_slre)
-# 
+#    user   system  elapsed 
+# 6963.170 1059.563 2095.475 
 
 # Print the elapsed time specifically
 cat("Elapsed time:", execution_time_slre["elapsed"], "seconds\n")
-# 
+# Elapsed time: 2095.475 seconds
 
 # Print convergence statistics
 paste0("Number of converged mediator models: ", slre_ci_TNIE$mediator_converged_count, 
@@ -1728,7 +1495,9 @@ paste0("Number of converged outcome models: ", slre_ci_TNIE$outcome_converged_co
        " (", (slre_ci_TNIE$outcome_converged_count / length(slre_ci_TNIE$direct_effects)) * 100, "%)")
 paste0("Number of iterations with both models converged: ", slre_ci_TNIE$both_converged_count, 
        " (", (slre_ci_TNIE$both_converged_count / length(slre_ci_TNIE$direct_effects)) * 100, "%)")
-# 
+# [1] "Number of converged mediator models: 1154 (76.9333333333333%)"
+# [1] "Number of converged outcome models: 1488 (99.2%)"
+# [1] "Number of iterations with both models converged: 1144 (76.2666666666667%)"
 
 # FE PS Model
 execution_time_fere <- system.time({ # Track computation time 
@@ -1741,11 +1510,12 @@ execution_time_fere <- system.time({ # Track computation time
 })
 # Print the execution time
 print(execution_time_fere)
-# 
+#   user   system  elapsed 
+# 6804.245  544.192 3079.205 
 
 # Print the elapsed time specifically
 cat("Elapsed time:", execution_time_fere["elapsed"], "seconds\n")
-# 
+# Elapsed time: 3079.205 seconds
 
 # Print convergence statistics
 paste0("Number of converged mediator models: ", fere_ci_TNIE$mediator_converged_count, 
@@ -1754,7 +1524,9 @@ paste0("Number of converged outcome models: ", fere_ci_TNIE$outcome_converged_co
        " (", (fere_ci_TNIE$outcome_converged_count / length(fere_ci_TNIE$direct_effects)) * 100, "%)")
 paste0("Number of iterations with both models converged: ", fere_ci_TNIE$both_converged_count, 
        " (", (fere_ci_TNIE$both_converged_count / length(fere_ci_TNIE$direct_effects)) * 100, "%)")
-# 
+# [1] "Number of converged mediator models: 1154 (76.9333333333333%)"
+# [1] "Number of converged outcome models: 1488 (99.2%)"
+# [1] "Number of iterations with both models converged: 1144 (76.2666666666667%)"
 
 # RE PS Model
 execution_time_rere <- system.time({ # Track computation time 
@@ -1767,11 +1539,12 @@ execution_time_rere <- system.time({ # Track computation time
 })
 # Print the execution time
 print(execution_time_rere)
-# 
+#    user   system  elapsed 
+# 6713.972  607.371 1913.623 
 
 # Print the elapsed time specifically
 cat("Elapsed time:", execution_time_rere["elapsed"], "seconds\n")
-# 
+# Elapsed time: 1913.623 seconds
 
 # Print convergence statistics
 paste0("Number of converged mediator models: ", rere_ci_TNIE$mediator_converged_count, 
@@ -1780,18 +1553,9 @@ paste0("Number of converged outcome models: ", rere_ci_TNIE$outcome_converged_co
        " (", (rere_ci_TNIE$outcome_converged_count / length(rere_ci_TNIE$direct_effects)) * 100, "%)")
 paste0("Number of iterations with both models converged: ", rere_ci_TNIE$both_converged_count, 
        " (", (rere_ci_TNIE$both_converged_count / length(rere_ci_TNIE$direct_effects)) * 100, "%)")
-# 
-
-
-
-
-
-
-
-
-# [next] ------------------------------------------------------------------
-
-# next update the code below to extract the TNIE, PNDE, PNIE, & TNDE CIs & store and present them. Then create a table for the QP document to display these results 
+# [1] "Number of converged mediator models: 1154 (76.9333333333333%)"
+# [1] "Number of converged outcome models: 1488 (99.2%)"
+# [1] "Number of iterations with both models converged: 1144 (76.2666666666667%)"
 
 
 
@@ -1809,9 +1573,13 @@ get_non_na_pairs <- function(direct, indirect, n = 1000) {
 }
 
 # Apply the function to our data
-slre_ci_DF <- get_non_na_pairs(slre_ci$direct_effects, slre_ci$indirect_effects)
-fere_ci_DF <- get_non_na_pairs(fere_ci$direct_effects, fere_ci$indirect_effects)
-rere_ci_DF <- get_non_na_pairs(rere_ci$direct_effects, rere_ci$indirect_effects)
+slre_ci_PNIE_DF <- get_non_na_pairs(slre_ci_PNIE$direct_effects, slre_ci_PNIE$indirect_effects) 
+fere_ci_PNIE_DF <- get_non_na_pairs(fere_ci_PNIE$direct_effects, fere_ci_PNIE$indirect_effects)
+rere_ci_PNIE_DF <- get_non_na_pairs(rere_ci_PNIE$direct_effects, rere_ci_PNIE$indirect_effects)
+
+slre_ci_TNIE_DF <- get_non_na_pairs(slre_ci_TNIE$direct_effects, slre_ci_TNIE$indirect_effects) 
+fere_ci_TNIE_DF <- get_non_na_pairs(fere_ci_TNIE$direct_effects, fere_ci_TNIE$indirect_effects)
+rere_ci_TNIE_DF <- get_non_na_pairs(rere_ci_TNIE$direct_effects, rere_ci_TNIE$indirect_effects)
 
 
 ###### Store RE Med/Outcome Model CIs --------------------------------------
@@ -1819,21 +1587,31 @@ rere_ci_DF <- get_non_na_pairs(rere_ci$direct_effects, rere_ci$indirect_effects)
 # Create the results dataframe
 results_DF_RE <- data.frame(
   cond = c("slre", "fere", "rere"),
-  NIE_LL = numeric(3),
-  NIE_UL = numeric(3),
-  NDE_LL = numeric(3),
-  NDE_UL = numeric(3),
+  PNIE_LL = numeric(3),
+  PNIE_UL = numeric(3),
+  TNDE_LL = numeric(3),
+  TNDE_UL = numeric(3),
+  TNIE_LL = numeric(3),
+  TNIE_UL = numeric(3),
+  PNDE_LL = numeric(3),
+  PNDE_UL = numeric(3),
   stringsAsFactors = FALSE
 )
 
 # List of dataframes to process
-df_list <- list(slre_ci_DF, fere_ci_DF, rere_ci_DF)
+df_list_PNIE <- list(slre_ci_PNIE_DF, fere_ci_PNIE_DF, rere_ci_PNIE_DF)
+df_list_TNIE <- list(slre_ci_TNIE_DF, fere_ci_TNIE_DF, rere_ci_TNIE_DF)
 
 # Calculate CIs and fill the dataframe
 for (i in 1:3) {
-  results_DF_RE[i, c("NIE_LL", "NIE_UL")] <- quantile(df_list[[i]]$indirect, probs = c(0.025, 0.975))
-  results_DF_RE[i, c("NDE_LL", "NDE_UL")] <- quantile(df_list[[i]]$direct, probs = c(0.025, 0.975))
+  results_DF_RE[i, c("PNIE_LL", "PNIE_UL")] <- quantile(df_list_PNIE[[i]]$indirect, probs = c(0.025, 0.975))
+  results_DF_RE[i, c("TNDE_LL", "TNDE_UL")] <- quantile(df_list_PNIE[[i]]$direct, probs = c(0.025, 0.975))
+  
+  results_DF_RE[i, c("TNIE_LL", "TNIE_UL")] <- quantile(df_list_TNIE[[i]]$indirect, probs = c(0.025, 0.975))
+  results_DF_RE[i, c("PNDE_LL", "PNDE_UL")] <- quantile(df_list_TNIE[[i]]$indirect, probs = c(0.025, 0.975))
 }
+
+# results_DF_RE
 
 
 ###### Join CI & point estimates for RE med/outcome ------------------------
@@ -1843,7 +1621,7 @@ results_DF_RE <- merge(results_DF[results_DF$cond %in% c("slre", "fere", "rere")
                        results_DF_RE)
 
 # Clean up environment (drop functions & objects from this section that are no longer needed)
-rm(get_non_na_pairs, slre_ci_DF, fere_ci_DF, rere_ci_DF)
+rm(get_non_na_pairs, slre_ci_PNIE_DF, slre_ci_TNIE_DF, fere_ci_PNIE_DF, fere_ci_TNIE_DF, rere_ci_PNIE_DF, rere_ci_TNIE_DF)
 
 
 #### SL & FE Mediator/Outcome Models CI ------------------------------------
@@ -1851,8 +1629,18 @@ rm(get_non_na_pairs, slre_ci_DF, fere_ci_DF, rere_ci_DF)
 ###### Join CI & point estimates for SL & FE med/outcome -------------------
 
 # List of your lists
-list_names <- c("slsl_ci", "fesl_ci", "resl_ci", "slfe_ci", "fefe_ci", "refe_ci")
-lists <- list(slsl_ci, fesl_ci, resl_ci, slfe_ci, fefe_ci, refe_ci)
+list_names <- c("slsl_ci_TNIE", "slsl_ci_PNIE", 
+                "fesl_ci_TNIE", "fesl_ci_PNIE",
+                "resl_ci_TNIE", "resl_ci_PNIE", 
+                "slfe_ci_TNIE", "slfe_ci_PNIE", 
+                "fefe_ci_TNIE", "fefe_ci_PNIE",
+                "refe_ci_TNIE", "refe_ci_PNIE")
+lists <- list(slsl_ci_TNIE, slsl_ci_PNIE, 
+              fesl_ci_TNIE, fesl_ci_PNIE, 
+              resl_ci_TNIE, resl_ci_PNIE, 
+              slfe_ci_TNIE, slfe_ci_PNIE, 
+              fefe_ci_TNIE, fefe_ci_PNIE, 
+              refe_ci_TNIE, refe_ci_PNIE)
 
 # Extracting 'indirect_ci'
 indirect_df <- do.call(rbind, lapply(seq_along(lists), function(i) {
@@ -1879,20 +1667,29 @@ direct_df <- do.call(rbind, lapply(seq_along(lists), function(i) {
 # Combine both into a single data frame
 combined_df <- merge(indirect_df, direct_df, by = "list_name")
 
-# Drop "_ci" from 1st column 
-combined_df$list_name <- sub("_ci$", "", combined_df$list_name)
+# Create the 'effect' column & modify 'list_name' to keep only the first 4 characters
+combined_df <- combined_df %>%
+  mutate(effect = substr(list_name, nchar(list_name) - 3, nchar(list_name))) %>% 
+  mutate(list_name = substr(list_name, 1, 4))
 
-# Rename columns starting with "indirect_ci" to "NIE"
-colnames(combined_df) <- gsub("^indirect_ci", "NIE", colnames(combined_df))
+# Pivot the dataframe to wide format
+combined_df_wide <- combined_df %>%
+  pivot_longer(cols = c(indirect_ci_LL, indirect_ci_UL, direct_ci_LL, direct_ci_UL), 
+               names_to = "variable", values_to = "value") %>%
+  unite("variable", effect, variable, sep = "_") %>%
+  pivot_wider(names_from = variable, values_from = value) %>% 
+  as.data.frame()
 
-# Rename columns starting with "direct_ci" to "NDE"
-colnames(combined_df) <- gsub("^direct_ci", "NDE", colnames(combined_df))
+# Change column names 
+colnames(combined_df_wide) <- c("cond", 
+                                "PNIE_LL", "PNIE_UL", "TNDE_LL", "TNDE_UL", 
+                                "TNIE_LL", "TNIE_UL", "PNDE_LL", "PNDE_UL")
 
 # Merge with existing results
-results_DF_noRE <- merge(results_DF[1:6, ], combined_df, by.x = "cond", by.y = "list_name")
+results_DF_noRE <- merge(results_DF[1:6, ], combined_df_wide, by = "cond")
 
 # Clean up environment (drop objects from this section that are no longer needed)
-rm(lists, list_names, direct_df, indirect_df)
+rm(lists, list_names, direct_df, indirect_df, combined_df, combined_df_wide)
 
 
 #### Create dataframe of final estimates -----------------------------------
@@ -1902,17 +1699,16 @@ results_DF <- rbind(results_DF_noRE, results_DF_RE)
 
 # View the results
 print(results_DF)
-#   cond        NDE        NIE     NIE_LL       NIE_UL     NDE_LL      NDE_UL
-# 1 fefe -0.2212818 -0.2102262 -0.4080094 -0.004401872 -0.4624698  0.03589144
-# 2 fesl -0.2337515 -0.2072494 -0.3932524 -0.012611251 -0.4800913  0.01226658
-# 3 refe -0.2245736 -0.1958965 -0.3876489  0.009442654 -0.4698303  0.01990022
-# 4 resl -0.2772344 -0.1727740 -0.3489316  0.018722813 -0.5234119 -0.03857419
-# 5 slfe -0.2024146 -0.1935592 -0.3780337  0.017820865 -0.4569169  0.03960417
-# 6 slsl -0.3279340 -0.1349289 -0.3157658  0.050019477 -0.5774336 -0.07859867
-# 7 fere -0.2279858 -0.2074429 -0.4315686 -0.014924474 -0.4870868  0.02146335
-# 8 rere -0.2482880 -0.1817158 -0.3919542  0.001995522 -0.4914180 -0.01117623
-# 9 slre -0.2510726 -0.1651808 -0.3655679  0.019904633 -0.4900618 -0.01770076
-
+#   cond       TNDE       PNDE        PNIE          TNIE    PNIE_LL    PNIE_UL    TNDE_LL      TNDE_UL    TNIE_LL    TNIE_UL    PNDE_LL     PNDE_UL
+# 1 fefe -0.1889825 -0.1894340 -0.09570423 -0.0002112213 -0.2966453 0.10177927 -0.4418273  0.059211894 -0.3019212 0.10584214 -0.4397014  0.06128061
+# 2 fesl -0.1973009 -0.1976276 -0.09752048 -0.0367624900 -0.2846837 0.09221394 -0.4424248  0.046017498 -0.2909517 0.09654751 -0.4436347  0.04782185
+# 3 refe -0.1958658 -0.1963458 -0.09240229  0.0030725382 -0.2852170 0.09831936 -0.4478837  0.046145304 -0.2902472 0.10347047 -0.4487281  0.04482294
+# 4 resl -0.2400019 -0.2401109 -0.07276088 -0.0045414414 -0.2526444 0.10399138 -0.4826027 -0.004350140 -0.2584021 0.10995042 -0.4826292 -0.00266291
+# 5 slfe -0.1804319 -0.1808842 -0.09704172 -0.0363361536 -0.2882729 0.09692833 -0.4341171  0.062637519 -0.2928385 0.10242150 -0.4350416  0.06349128
+# 6 slsl -0.2764533 -0.2764801 -0.03027051  0.0180582390 -0.2159972 0.15090354 -0.5105975 -0.029469066 -0.2171044 0.15043562 -0.5132218 -0.03095103
+# 7 fere -0.1946794 -0.1951001 -0.09536315 -0.0126787393 -0.3103216 0.09548134 -0.4548479  0.045418542 -0.3232379 0.09920591 -0.3232379  0.09920591
+# 8 rere -0.2171489 -0.2174313 -0.08069368  0.0039460448 -0.2753214 0.10296388 -0.4714517  0.012829715 -0.2980896 0.10930377 -0.2980896  0.10930377
+# 9 slre -0.2208416 -0.2210517 -0.06717527 -0.0117677236 -0.2650267 0.11912664 -0.4662056 -0.001344533 -0.2763510 0.12138392 -0.2763510  0.12138392
 
 # Add PS model & Mediator/Outcome model labels 
 results_DF <- results_DF %>%
@@ -1933,47 +1729,38 @@ results_DF <- results_DF %>%
 
 # Print the modified dataframe
 print(results_DF)
-#   cond        NDE        NIE     NIE_LL       NIE_UL     NDE_LL      NDE_UL            PS         Model
-# 1 fefe -0.2212818 -0.2102262 -0.4080094 -0.004401872 -0.4624698  0.03589144  Fixed-Effect  Fixed-Effect
-# 2 fesl -0.2337515 -0.2072494 -0.3932524 -0.012611251 -0.4800913  0.01226658  Fixed-Effect  Single-Level
-# 3 refe -0.2245736 -0.1958965 -0.3876489  0.009442654 -0.4698303  0.01990022 Random-Effect  Fixed-Effect
-# 4 resl -0.2772344 -0.1727740 -0.3489316  0.018722813 -0.5234119 -0.03857419 Random-Effect  Single-Level
-# 5 slfe -0.2024146 -0.1935592 -0.3780337  0.017820865 -0.4569169  0.03960417  Single-Level  Fixed-Effect
-# 6 slsl -0.3279340 -0.1349289 -0.3157658  0.050019477 -0.5774336 -0.07859867  Single-Level  Single-Level
-# 7 fere -0.2279858 -0.2074429 -0.4315686 -0.014924474 -0.4870868  0.02146335  Fixed-Effect Random-Effect
-# 8 rere -0.2482880 -0.1817158 -0.3919542  0.001995522 -0.4914180 -0.01117623 Random-Effect Random-Effect
-# 9 slre -0.2510726 -0.1651808 -0.3655679  0.019904633 -0.4900618 -0.01770076  Single-Level Random-Effect
+#   cond       TNDE       PNDE        PNIE          TNIE    PNIE_LL    PNIE_UL    TNDE_LL      TNDE_UL    TNIE_LL    TNIE_UL    PNDE_LL     PNDE_UL            PS         Model
+# 1 fefe -0.1889825 -0.1894340 -0.09570423 -0.0002112213 -0.2966453 0.10177927 -0.4418273  0.059211894 -0.3019212 0.10584214 -0.4397014  0.06128061  Fixed-Effect  Fixed-Effect
+# 2 fesl -0.1973009 -0.1976276 -0.09752048 -0.0367624900 -0.2846837 0.09221394 -0.4424248  0.046017498 -0.2909517 0.09654751 -0.4436347  0.04782185  Fixed-Effect  Single-Level
+# 3 refe -0.1958658 -0.1963458 -0.09240229  0.0030725382 -0.2852170 0.09831936 -0.4478837  0.046145304 -0.2902472 0.10347047 -0.4487281  0.04482294 Random-Effect  Fixed-Effect
+# 4 resl -0.2400019 -0.2401109 -0.07276088 -0.0045414414 -0.2526444 0.10399138 -0.4826027 -0.004350140 -0.2584021 0.10995042 -0.4826292 -0.00266291 Random-Effect  Single-Level
+# 5 slfe -0.1804319 -0.1808842 -0.09704172 -0.0363361536 -0.2882729 0.09692833 -0.4341171  0.062637519 -0.2928385 0.10242150 -0.4350416  0.06349128  Single-Level  Fixed-Effect
+# 6 slsl -0.2764533 -0.2764801 -0.03027051  0.0180582390 -0.2159972 0.15090354 -0.5105975 -0.029469066 -0.2171044 0.15043562 -0.5132218 -0.03095103  Single-Level  Single-Level
+# 7 fere -0.1946794 -0.1951001 -0.09536315 -0.0126787393 -0.3103216 0.09548134 -0.4548479  0.045418542 -0.3232379 0.09920591 -0.3232379  0.09920591  Fixed-Effect Random-Effect
+# 8 rere -0.2171489 -0.2174313 -0.08069368  0.0039460448 -0.2753214 0.10296388 -0.4714517  0.012829715 -0.2980896 0.10930377 -0.2980896  0.10930377 Random-Effect Random-Effect
+# 9 slre -0.2208416 -0.2210517 -0.06717527 -0.0117677236 -0.2650267 0.11912664 -0.4662056 -0.001344533 -0.2763510 0.12138392 -0.2763510  0.12138392  Single-Level Random-Effect
 
+# Save dataframe of results 
+write_rds(results_DF, file = "Application/Output/Estimates.rds")
 
 
 # Result visuals ----------------------------------------------------------
 
-
-# # NDE 
-# ggplot(results_DF, aes(y = cond, x = NDE)) +
-#   geom_point(size = 3) +
-#   geom_errorbarh(aes(xmin = NDE_LL, xmax = NDE_UL), height = 0.2) +
-#   labs(title = "Natural Direct Effect (NDE) with 95% Confidence Intervals",
-#        x = "Natural Direct Effect (NDE)",
-#        y = "Condition") +
-#   theme_minimal() +
-#   theme(axis.text.y = element_text(angle = 0, hjust = 1))
-
-# NDE 
+# TNDE 
 ## Save visual 
-pdf("Application/Output/NDE-Estimates.pdf")
+pdf("Application/Output/TNDE-Estimates.pdf")
 ## Visual 
 results_DF %>% 
   mutate(
     # Model = paste(Model, "Mediator/Outcome Model"),  # Append to Model variable
-    Zero_Encompasses = ifelse(NDE_LL > 0 | NDE_UL < 0, "Below 0", "Includes 0")
+    Zero_Encompasses = ifelse(TNDE_LL > 0 | TNDE_UL < 0, "Below 0", "Includes 0")
   ) %>% 
-  ggplot(aes(y = PS, x = NDE)) +
+  ggplot(aes(y = PS, x = TNDE)) +
   geom_point(aes(color = Zero_Encompasses), size = 3) +
-  geom_errorbarh(aes(xmin = NDE_LL, xmax = NDE_UL, color = Zero_Encompasses), height = 0.2) +
+  geom_errorbarh(aes(xmin = TNDE_LL, xmax = TNDE_UL, color = Zero_Encompasses), height = 0.2) +
   geom_vline(xintercept = 0, linetype = "dashed", color = "black", alpha = 0.7) +
-  labs(title = "Natural Direct Effect (NDE) with 95% Confidence Intervals",
-       x = "Natural Direct Effect (NDE)",
+  labs(title = "Total Natural Direct Effect (TNDE) with 95% Confidence Intervals",
+       x = "Total Natural Direct Effect (TNDE)",
        y = "Propensity Score (PS)") +
   facet_wrap(~ Model, ncol = 1) +  # Facet by updated Model variable
   scale_color_manual(values = c("Below 0" = "red", "Includes 0" = "black")) +  # Set colors
@@ -1984,36 +1771,24 @@ results_DF %>%
 ## 
 dev.off()
 # Save visual 
-ggsave(filename = "Application/Output/NDE-Estimates.png", plot = last_plot())
+ggsave(filename = "Application/Output/TNDE-Estimates.png", plot = last_plot())
 
 
-
-# # NIE 
-# ggplot(results_DF, aes(y = cond, x = NIE)) +
-#   geom_point(size = 3) +
-#   geom_errorbarh(aes(xmin = NIE_LL, xmax = NIE_UL), height = 0.2) +
-#   labs(title = "Natural Indirect Effect (NIE) with 95% Confidence Intervals",
-#        x = "Natural Indirect Effect (NIE)",
-#        y = "Condition") +
-#   theme_minimal() +
-#   theme(axis.text.y = element_text(angle = 0, hjust = 1))
-
-
-# NIE 
+# PNDE 
 ## Save visual 
-pdf("Application/Output/NIE-Estimates.pdf")
+pdf("Application/Output/PNDE-Estimates.pdf")
 ## Visual 
 results_DF %>% 
   mutate(
     # Model = paste(Model, "Mediator/Outcome Model"),  # Append to Model variable
-    Zero_Encompasses = ifelse(NIE_LL > 0 | NIE_UL < 0, "Below 0", "Includes 0")
+    Zero_Encompasses = ifelse(PNDE_LL > 0 | PNDE_UL < 0, "Below 0", "Includes 0")
   ) %>% 
-  ggplot(aes(y = PS, x = NIE)) +
+  ggplot(aes(y = PS, x = PNDE)) +
   geom_point(aes(color = Zero_Encompasses), size = 3) +
-  geom_errorbarh(aes(xmin = NIE_LL, xmax = NIE_UL, color = Zero_Encompasses), height = 0.2) +
+  geom_errorbarh(aes(xmin = PNDE_LL, xmax = PNDE_UL, color = Zero_Encompasses), height = 0.2) +
   geom_vline(xintercept = 0, linetype = "dashed", color = "black", alpha = 0.7) +
-  labs(title = "Natural Indirect Effect (NIE) with 95% Confidence Intervals",
-       x = "Natural Indirect Effect (NIE)",
+  labs(title = "Pure Natural Direct Effect (PNDE) with 95% Confidence Intervals",
+       x = "Pure Natural Direct Effect (PNDE)",
        y = "Propensity Score (PS)") +
   facet_wrap(~ Model, ncol = 1) +  # Facet by updated Model variable
   scale_color_manual(values = c("Below 0" = "red", "Includes 0" = "black")) +  # Set colors
@@ -2024,5 +1799,75 @@ results_DF %>%
 ## 
 dev.off()
 # Save visual 
-ggsave(filename = "Application/Output/NIE-Estimates.png", plot = last_plot())
+ggsave(filename = "Application/Output/PNDE-Estimates.png", plot = last_plot())
+
+
+
+
+# TNIE 
+## Save visual 
+pdf("Application/Output/TNIE-Estimates.pdf")
+## Visual 
+results_DF %>% 
+  mutate(
+    # Model = paste(Model, "Mediator/Outcome Model"),  # Append to Model variable
+    Zero_Encompasses = ifelse(TNIE_LL > 0 | TNIE_UL < 0, "Below 0", "Includes 0")
+  ) %>% 
+  ggplot(aes(y = PS, x = TNIE)) +
+  geom_point(aes(color = Zero_Encompasses), size = 3) +
+  geom_errorbarh(aes(xmin = TNIE_LL, xmax = TNIE_UL, color = Zero_Encompasses), height = 0.2) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black", alpha = 0.7) +
+  labs(title = "Total Natural Indirect Effect (TNIE) with 95% Confidence Intervals",
+       x = "Total Natural Indirect Effect (TNIE)",
+       y = "Propensity Score (PS)") +
+  facet_wrap(~ Model, ncol = 1) +  # Facet by updated Model variable
+  scale_color_manual(values = c("Below 0" = "red", "Includes 0" = "black")) +  # Set colors
+  theme_minimal() +
+  theme(axis.text.y = element_text(angle = 0, hjust = 1),
+        legend.position = "none")  # Remove legend
+
+## 
+dev.off()
+# Save visual 
+ggsave(filename = "Application/Output/TNIE-Estimates.png", plot = last_plot())
+
+
+# PNIE 
+## Save visual 
+pdf("Application/Output/PNIE-Estimates.pdf")
+## Visual 
+results_DF %>% 
+  mutate(
+    # Model = paste(Model, "Mediator/Outcome Model"),  # Append to Model variable
+    Zero_Encompasses = ifelse(PNIE_LL > 0 | PNIE_UL < 0, "Below 0", "Includes 0")
+  ) %>% 
+  ggplot(aes(y = PS, x = PNIE)) +
+  geom_point(aes(color = Zero_Encompasses), size = 3) +
+  geom_errorbarh(aes(xmin = PNIE_LL, xmax = PNIE_UL, color = Zero_Encompasses), height = 0.2) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black", alpha = 0.7) +
+  labs(title = "Pure Natural Indirect Effect (PNIE) with 95% Confidence Intervals",
+       x = "Pure Natural Indirect Effect (PNIE)",
+       y = "Propensity Score (PS)") +
+  facet_wrap(~ Model, ncol = 1) +  # Facet by updated Model variable
+  scale_color_manual(values = c("Below 0" = "red", "Includes 0" = "black")) +  # Set colors
+  theme_minimal() +
+  theme(axis.text.y = element_text(angle = 0, hjust = 1),
+        legend.position = "none")  # Remove legend
+
+## 
+dev.off()
+# Save visual 
+ggsave(filename = "Application/Output/PNIE-Estimates.png", plot = last_plot())
+
+
+
+
+# Result Table ------------------------------------------------------------
+
+results_DF[, c("PS", "Model", 
+               "TNDE", "TNDE_LL", "TNDE_UL", 
+               "PNDE", "PNDE_LL", "PNDE_UL", 
+               "TNIE", "TNIE_LL", "TNIE_UL", 
+               "PNIE", "PNIE_LL", "PNIE_UL")]
+
 
