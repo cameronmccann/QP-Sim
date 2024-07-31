@@ -894,6 +894,13 @@ ggplot(smd_combined, aes(x = ASMD, y = factor(covariate, levels = custom_order),
 
 dev.off()
 # Save visual 
+ggsave(filename = "Application/Output/Covariate-Balance_QP-Doc.pdf", 
+       plot = last_plot(), 
+       width = 6, 
+       height = 8, 
+       units = "in", 
+       dpi = 300)
+
 ggsave(filename = "Application/Output/Covariate-Balance_QP-Doc.png", plot = last_plot())
 
 
