@@ -12,7 +12,7 @@
 # Script Description:
 #
 #
-# Last Updated: 07/30/2024 
+# Last Updated: 07/31/2024 
 #
 #
 # Notes:
@@ -561,6 +561,27 @@ out_res <- data.frame(lme4::VarCorr(out_unconditional))[2, 4] # residual varianc
 out_icc <- out_var / (out_var + out_res)
 out_icc # with 121 schools (5+ in size) outcome icc = 0.01868923
 
+# ICC for some of the variables in PS models 
+# ## Parent education
+# parent_uncond <- lme4::lmer(parentalEdu_w1_sc ~ (1 | CLUSTER2), data = data)
+# data.frame(lme4::VarCorr(parent_uncond))[1, 4] / ( data.frame(lme4::VarCorr(parent_uncond))[1, 4] + data.frame(lme4::VarCorr(parent_uncond))[2, 4])
+# 
+# ## Feeling scale 
+# feeling_uncond <- lme4::lmer(feelings_w1_sc ~ (1 | CLUSTER2), data = data)
+# data.frame(lme4::VarCorr(feeling_uncond))[1, 4] / ( data.frame(lme4::VarCorr(feeling_uncond))[1, 4] + data.frame(lme4::VarCorr(feeling_uncond))[2, 4])
+# 
+# ## age
+# age_uncond <- lme4::lmer(age_w1_sc ~ (1 | CLUSTER2), data = data)
+# data.frame(lme4::VarCorr(age_uncond))[1, 4] / ( data.frame(lme4::VarCorr(age_uncond))[1, 4] + data.frame(lme4::VarCorr(age_uncond))[2, 4])
+# 
+# ## self-esteem
+# selfEst_uncond <- lme4::lmer(selfEst_w1_sc ~ (1 | CLUSTER2), data = data)
+# data.frame(lme4::VarCorr(selfEst_uncond))[1, 4] / ( data.frame(lme4::VarCorr(selfEst_uncond))[1, 4] + data.frame(lme4::VarCorr(selfEst_uncond))[2, 4])
+# 
+# ## white 
+# white_uncod <- lme4::lmer(white_w1 ~ (1 | CLUSTER2), data = data)
+# data.frame(lme4::VarCorr(white_uncod))[1, 4] / ( data.frame(lme4::VarCorr(white_uncod))[1, 4] + data.frame(lme4::VarCorr(white_uncod))[2, 4])
+
 
 
 # PS & IPTW Calculation ---------------------------------------------------------------
@@ -802,7 +823,7 @@ new_labels <- c("Race: Black", "Race: White", "Family Structure",
 # Create a Love Plot to visualize the Absolute SMD, using custom ordering
 ## Save visual 
 # svg(filename = "Application/Output/Covariate-Balance.svg")
-pdf("Application/Output/Covariate-Balance.pdf")
+pdf("Application/Output/Covariate-Balance_Love-Plot.pdf")
 ## Visual 
 ggplot(smd_combined, aes(x = ASMD, y = factor(covariate, levels = custom_order), color = type, shape = type)) +
   geom_vline(xintercept = 0.1, linetype = "dashed", color = "black") +  # Reference line for SMD threshold
@@ -832,7 +853,52 @@ ggplot(smd_combined, aes(x = ASMD, y = factor(covariate, levels = custom_order),
 
 dev.off()
 # Save visual 
-ggsave(filename = "Application/Output/Covariate-Balance.png", plot = last_plot())
+ggsave(filename = "Application/Output/Covariate-Balance_Love-Plot.png", plot = last_plot())
+
+
+
+# Create a Love Plot for paper 
+library(extrafont)
+loadfonts()
+## Save visual 
+pdf("Application/Output/Covariate-Balance_QP-Doc.pdf")
+## Visual 
+ggplot(smd_combined, aes(x = ASMD, y = factor(covariate, levels = custom_order), color = type, shape = type)) +
+  geom_vline(xintercept = 0.1, linetype = "dashed", color = "black") +  # Reference line for SMD threshold
+  geom_vline(xintercept = 0, color = "black") +  # Line at zero for clarity
+  geom_point(size = 3, stroke = 1.5) +  # Points with increased size and stroke for emphasis
+  labs(#title = "Love Plot",
+       #subtitle = "Covariate Balance of Individual-Level Covariates",
+       x = "\n Absolute Standardized Mean Difference (ASMD)",
+       y = "") +
+  theme_minimal() +  # Apply a minimal theme for clean aesthetics
+  theme(text = element_text(family = "Times New Roman"),
+        axis.text = element_text(family = "Times New Roman"),
+        axis.text.y = element_text(angle = 0, hjust = 1, size = 10),  # Adjust y-axis text for clarity
+        axis.title = element_text(size = 14),  # Increase axis title size for visibility
+        plot.title = element_text(size = 16, face = "bold"),  # Bold title for emphasis
+        plot.subtitle = element_text(size = 14),  # Subtitle size for readability
+        legend.position = "top") +  # Position legend at the top
+  scale_color_manual(values = c("Unweighted" = "#1f77b4",  # Blue for unweighted
+                                "Single-Level" = "#2ca02c",  # Green for single-level weighting
+                                "Fixed-Effect" = "#ff7f0e",  # Orange for fixed-effect weighting
+                                "Random-Effects" = "#9467bd"),  # Purple for random-effects weighting
+                     name = NULL) +
+  scale_shape_manual(values = c("Unweighted" = 16,  # Circle shape for unweighted
+                                "Single-Level" = 17,  # Triangle shape for single-level
+                                "Fixed-Effect" = 15,  # Square shape for fixed-effect
+                                "Random-Effects" = 18),  # Diamond shape for random-effects
+                     name = NULL) +
+  # geom_text()
+  scale_y_discrete(labels = new_labels)  # Use new labels for the y-axis
+
+dev.off()
+# Save visual 
+ggsave(filename = "Application/Output/Covariate-Balance_QP-Doc.png", plot = last_plot())
+
+
+
+
 
 
 # 
