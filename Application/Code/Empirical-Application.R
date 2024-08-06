@@ -897,7 +897,7 @@ dev.off()
 ggsave(filename = "Application/Output/Covariate-Balance_QP-Doc.pdf", 
        plot = last_plot(), 
        width = 6, 
-       height = 8, 
+       height = 7, 
        units = "in", 
        dpi = 300)
 
