@@ -39,5 +39,53 @@ The repository is organized as follows:
     └── S2_Simulation-Output
 ```
 
+The repository is organized as follows:
+```
+├── QP-Sim.Rproj
+├── README.md    
+├── Code                          # Code to conduct simulations (i.e., generating & analyzing data) & report results (i.e., RMSE & relative bias)
+│   ├── S1_Conduct-Simulation.R   
+│   ├── S1_Obtain-Results.R       
+│   ├── S2B_Conduct-Simulation.R  
+│   ├── S2B_Obtain-Results.R      
+│   ├── S2_Conduct-Simulation.R   
+│   ├── S2_Obtain-Results.R       
+├── Functions                     # Functions used in simulations 
+│   ├── AnalysisFunc_Sim1.R
+│   ├── AnalysisFunc_Sim2.R
+│   ├── AnalysisFunc_Sim2B.R
+│   ├── genOneData_Sim1.R
+│   ├── genOneData_Sim2.R
+│   ├── genOneData_Sim2B.R
+├── Output                        # Output from simulations 
+│   ├── S1_Results
+│   │   └── Data
+│   ├── S1_Simulation-Output
+│   ├── S2B_Results
+│   │   └── Data
+│   ├── S2B_Simulation-Output
+│   ├── S2_Results
+│   │   └── Data
+│   ├── S2_Simulation-Output
+│   └── Estimates
+│       └── Estimates.rds
+└── Application                   # Main folder for the empirical application 
+    ├── Code                      # Scripts for data cleaning and analysis
+    │   ├── Empirical-Application_Analysis.R
+    │   └── Empirical-Application_Data-Cleaning.R
+    ├── Data                      # Folder containing datasets
+    │   ├── Raw                   # Original datasets (no modifications)
+    │   │   └── ICPSR_21600       # Subfolder for specific original data sources
+    │   └── Cleaned               # Final clean dataset used for analysis
+    ├── Functions   
+    │   ├── bootstrap_ci_paral_2.R
+    │   ├── bootstrap_ci_paral.R
+    │   ├── bootstrap_ci_re_paral_2.R
+    │   └── bootstrap_ci_re_paral.R
+    └── Output                    # Results from the empirical analysis
+        ├── Visuals               # Plots, graphs, and other visuals
+        └── Estimates
+            └── Estimates.rds
+```
 
 

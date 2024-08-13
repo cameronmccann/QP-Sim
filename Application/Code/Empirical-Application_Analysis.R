@@ -41,7 +41,7 @@ pacman::p_load(
   # Packages 
   tidyverse, 
   ggplot2, 
-  flextable, 
+  extrafont, 
   stringr, 
   mice, 
   cobalt, 
@@ -51,601 +51,148 @@ pacman::p_load(
   lme4, 
   WeMix, 
   parallel
-  # ggdag, 
-  # dagitty, 
-  # huxtable
 )
 
 # Load Functions 
 source("Application/Functions/bootstrap_ci_paral_2.R")
 source("Application/Functions/bootstrap_ci_re_paral_2.R")
+source("Application/Functions/bootstrap_ci_re_mean_paral.R")
 
 
 
+# Import Data -----------------------------------------------------
+# Load clean dataset 
+data <- read_rds(file = "Application/Data/Cleaned/Empirical-Application-Data.rds")
 
-# Import & Clean Data -----------------------------------------------------
 
-## Wave I ------------------------------------------------------------------
 
-# Import student data from Wave I of the Add Health study
-# The Add Health study is a longitudinal study of adolescents in the United States
-w1 <- readr::read_tsv(file = "Application/Data/ICPSR_21600/DS0001/21600-0001-Data.tsv")
+# Intraclass Correlation Coefficients (ICC) --------------------------
 
-# Select relevant variables from Wave I student data
-# This includes demographic information, feelings scale (CES-D items), and self-esteem scale
-w1 <- w1 %>% 
-  select("AID":"SCH_YR", "S1":"S7", "S12", "S18", "S11", "S17", "PC22",
-         "H1FS1":"H1FS19", # Feelings Scale (contains mostly CES-D items for depression assessment)
-         "H1NF12B", "S44A14", "S44A18":"S44A29", 
-         "H1PF30", "H1PF32":"H1PF34", "H1PF36") # Self-esteem scale items
+## ICC for Mediator ---------------------------------------------------
+# Calculate the ICC for the mediator (self-esteem) to assess the proportion of variance
+# that is attributable to differences between clusters (schools).
+med_unconditional <- lme4::lmer(selfEst_w3 ~ (1 | CLUSTER2), data = data) # Unconditional model
+# summary(med_unconditional)
 
-# Rename key demographic variables for clarity
-# Variable names are based on the In School Questionnaire Code Book Public Use Sample (pg. 697 of Questionnaire.pdf)
-data <- w1 %>% 
-  rename(age = S1, 
-         sex = S2, 
-         ethnicity = S4, # Indicates Hispanic or Spanish origin
-         white = S6A, 
-         black = S6B, 
-         asian = S6C, 
-         nativeAmerican = S6D, 
-         raceOther = S6E)
+med_var <- data.frame(lme4::VarCorr(med_unconditional))[1, 4] # Level-2 (between-cluster) variance
+med_res <- data.frame(lme4::VarCorr(med_unconditional))[2, 4] # Residual (within-cluster) variance
+med_icc <- med_var / (med_var + med_res) # Calculate ICC for mediator
+med_icc # Display the ICC (with 121 schools, ICC ~ 0.006)
 
-# Data cleaning and scoring for self-esteem scale
+## ICC for Outcome ----------------------------------------------------
+# Calculate the ICC for the outcome (depression) to assess the proportion of variance
+# that is attributable to differences between clusters (schools).
+out_unconditional <- lme4::lmer(depress_w4 ~ (1 | CLUSTER2), data = data) # Unconditional model
+# summary(out_unconditional)
 
-# Replace invalid responses (6=refused; 8=don't know) with NA for self-esteem items
-data[, colnames(data)[str_detect(colnames(data), pattern = "^H1PF\\d{2}")]] <- 
-  apply(data[, colnames(data)[str_detect(colnames(data), pattern = "^H1PF\\d{2}")]], 2,
-        function(x)
-          ifelse(x >= 6, NA, x))
+out_var <- data.frame(lme4::VarCorr(out_unconditional))[1, 4] # Level-2 (between-cluster) variance
+out_res <- data.frame(lme4::VarCorr(out_unconditional))[2, 4] # Residual (within-cluster) variance
+out_icc <- out_var / (out_var + out_res) # Calculate ICC for outcome
+out_icc # Display the ICC (with 121 schools, ICC ~ 0.018)
 
-# Reverse code all 5-point scale items for self-esteem
-# This ensures that higher scores consistently indicate higher self-esteem
-data[, colnames(data)[str_detect(colnames(data), pattern = "^H1PF\\d{2}")]] <- 
-  apply(data[, colnames(data)[str_detect(colnames(data), pattern = "^H1PF\\d{2}")]], 2, function(x)
-    6 - x) 
+## Optional: ICC for Variables in Propensity Score (PS) Models -------------
+# Uncomment the following lines to calculate ICCs for other variables used in PS models.
 
-# Calculate total self-esteem score by summing individual item scores
-data$selfEst <- rowSums(data[, grep(pattern = "^H1PF\\d{2}", colnames(data))])
-
-
-# # will those indicating an 8 (for S4 or ethnicity variable) mess things up? (same with sex)
-# summary(data$sex) #summary(data$S2)
-# summary(data$ethnicity) #summary(data$S4)
-# # Change 8 to NA
-# data$ethnicity <- ifelse(data$ethnicity == 8, NA, data$ethnicity)
-# # sum(I(data$ethnicity == 8), na.rm = TRUE)
-
-# Recode parental education
-# 1 = High school or less, 2 = Some college, 3 = College graduate or more
-data$momEdu <- ifelse(data$S12 %in% c(1, 2, 3, 10), 1, 
-                      ifelse(data$S12 >= 4 & data$S12 <= 6, 2, 
-                             ifelse(data$S12 %in% c(7, 8), 3, 
-                                    NA)))
-
-data$dadEdu <- ifelse(data$S18 %in% c(1, 2, 3, 10), 1, 
-                      ifelse(data$S18 >= 4 & data$S18 <= 6, 2, 
-                             ifelse(data$S18 %in% c(7, 8), 3, 
-                                    NA)))
-
-table(data$dadEdu, data$momEdu)
-table(data$momEdu); sum(is.na(data$momEdu))
-table(data$dadEdu); sum(is.na(data$dadEdu))
-
-# Create a parental education variable (highest level of either parent)
-data$parentalEdu <- apply(data[, stringr::str_detect(colnames(data), pattern = "Edu$")], 1, function(x) max(x, na.rm = FALSE))
-
-# data %>% 
-#   select("dadEdu", "momEdu", "parentalEdu") %>% 
-#   head()
-
-# Recode family structure
-# S11: Living with mother figure, S17: Living with father figure
-data$familyStruct <- data$S11 + data$S17
-data$familyStruct <- ifelse(data$familyStruct == 10, NA, data$familyStruct) # Change "multiple response" to missing
-
-table(data$S11); sum(is.na(data$S11))
-table(data$S17); sum(is.na(data$S17))
-table(data$S11, data$S17)
-
-table(data$familyStruct)
-
-# Recode health insurance gap (wave 1) [PC22: In the past 12 months, has there been a time when {NAME} had no health insurance?]
-data <- data %>%
-  rename(healthInsur = PC22) %>%
-  mutate(healthInsur = ifelse(healthInsur >= 98, NA, healthInsur)) # 98=don't know; 99=not applicable
-
-# Calculate sports participation (H1NF12B)
-# Sum number of sports and create a binary participation variable
-data$sport <- rowSums(data[, colnames(data)[stringr::str_starts(colnames(data), pattern = "^S44A")]])
-data$sportPartic <- ifelse(data$sport >= 1, 1, 
-                           ifelse(data$sport == 0, 0, 
-                                  NA))
-
-table(data$sportPartic)
-
-
-# Feelings Scale 
-data %>% 
-  select("H1FS1":"H1FS19")
-# Change values for Feelings Scale items to NA
-data[, colnames(data)[str_detect(colnames(data), pattern = "^H1FS")]] <-
-  apply(data[, colnames(data)[str_detect(colnames(data), pattern = "^H1FS")]], 2, function(x)
-    ifelse(x >= 6, NA, x)) # 6=refused; 8=don't know
-
-# Reverse code items 4, 8, 11, & 15 on the Feelings Scale (4-point scale items; max value = 3)
-data[, c("H1FS4", "H1FS8", "H1FS11", "H1FS15")] <-
-  apply(data[, c("H1FS4", "H1FS8", "H1FS11", "H1FS15")], 2, function(x)
-    3 - x)
-
-# Score Feelings Scale 
-data$feelings <- rowSums(data[, colnames(data)[str_detect(colnames(data), pattern = "^H1FS")]])
-
-# Import wave I sampling weights (to get CLUSTER2 to match to school weights later)
-w1.w <- readr::read_tsv(file = "Application/Data/ICPSR_21600/DS0004/21600-0004-Data.tsv")
-
-# Add cluster indicator (CLUSTER2)
-data <- merge(data, w1.w[, c("AID", "CLUSTER2")], by = "AID")
-
-# Reorder variables & add wave number to variable names
-data <- data %>%
-  select(AID, CLUSTER2, everything()) %>%
-  select("AID", "CLUSTER2", "age", "sex",
-         "ethnicity", "white", "black", "asian", "nativeAmerican", "raceOther",
-         "healthInsur", "parentalEdu", "familyStruct", "sport", "sportPartic", "feelings", "selfEst")
-
-colnames(data)[-c(1:2)] <- paste0(colnames(data)[-c(1:2)], "_w1")
-
-
-
-## Wave III ----------------------------------------------------------------
-# Wave III (21600-0008-Codebook) pg. 395
-
-# Import student data
-w3 <- readr::read_tsv(file = "Application/Data/ICPSR_21600/DS0008/21600-0008-Data.tsv")
-
-# Drop variables in wave III student data
-w3 <- w3 %>% 
-  select("AID":"BIO_SEX3", 
-         "H3SP7", "H3SP19":"H3SP22", # self-esteem scale [NOTE: STILL MISSING AN ITEM]
-         "H3HS1") # Health insurance item 
-
-# # Add wave III student data to data set
-# data <- merge(data, w3, by = "AID")
-
-# self-esteem scale
-# Easterlin et al. (2019) article: 
-# Uses responses to 5 statements to create a scale measure of self-esteem: “Do you agree or disagree with the following statement?” 
-## “You have a lot of good qualities,” (H3SP19)
-## “you have a lot to be proud of,” (H3SP20)
-## “you like yourself just the way you are,” (H3SP21)
-## and “you feel loved and wanted,”                     [CANNOT FIND COLUMN NAME FOR THIS QUESTION]
-# used "Do you agree or disagree that you feel you are doing things just about right?" (H3SP22) as replacement 
-### with responses on a 5-point scale ranging from 1 (strongly agree) to 5 (strongly disagree) (reverse coded), 
-## and “How often was the following been true over the past week? You felt that you were just as good as other people,” (H3SP7)
-### with responses ranging from 0 (never or rarely) to 3 (most of the time or all of the time). Higher scores indicate greater self-esteem.28
-
-# change values for self-esteem items to NA 
-w3$H3SP7 <- ifelse(w3$H3SP7 >= 6, NA, w3$H3SP7) # 6=refused; 8=don't know; 9=not applicable 
-
-w3[, colnames(w3)[str_detect(colnames(w3), pattern = "^H3SP\\d{2}")]] <-
-  apply(w3[, colnames(w3)[str_detect(colnames(w3), pattern = "^H3SP\\d{2}")]], 2,
-        function(x)
-          ifelse(x >= 96, NA, x)) # 96=refused; 98=don't know; 99=not applicable 
-
-# reverse code the four 5-point scale items
-w3[, colnames(w3)[str_detect(colnames(w3), pattern = "^H3SP\\d{2}")]] <-
-  apply(w3[, colnames(w3)[str_detect(colnames(w3), pattern = "^H3SP\\d{2}")]], 2, function(x)
-    6 - x) 
-
-# Score self-esteem scale 
-w3$selfEst <- rowSums(w3[, grep(pattern = "^H3SP", colnames(w3))])
-
-# check 
-# hist(w3$selfEst)
-
-# # gap in health insurance (wave 3) 
-# # 1. Over the past 12 months, how many months did you have health insurance? (H3HS1)
-# w3 <- w3 %>%
-#   rename(healthInsur = H3HS1) %>%
-#   mutate(healthInsur = ifelse(healthInsur >= 98, NA, healthInsur)) # 98=don't know; 99=not applicable
-
-# Add wave III student data to data set
-data <- merge(data, w3[, c("AID", "selfEst")], by = "AID")
-# data <- merge(data, w3[, c("AID", "selfEst", "healthInsur")], by = "AID")
-
-# Import Wave III weights 
-# w3.w <- readr::read_tsv(file = "Empirical-Application/Data/ICPSR_21600/DS0018/21600-0018-Data.tsv") # GSWGT3_2 for level 1 weight 
-# w3.sch.w <- readr::read_tsv(file = "Empirical-Application/Data/ICPSR_21600/DS0019/21600-0019-Data.tsv") # SCHWT1 W3_2_WC for level 2 weight 
-
-# w3.w %>%
-#   count(PTWGT3_2) %>%
-#   dim() # 
-
-# Add wave III weights to data set
-# data <- merge(data, w3.sch.w, by = "CLUSTER2")
-# data <- merge(data, w3.w, by = "AID") 
-
-# Add wave number to variable names
-colnames(data)[!grepl(pattern = paste(c("_w1$", "AID", "CLUSTER2"), collapse = "|"), colnames(data))] <-
-  paste0(colnames(data)[!grepl(pattern = paste(c("_w1$", "AID", "CLUSTER2"), collapse = "|"), colnames(data))], "_w3")
-
-
-
-## Wave IV -----------------------------------------------------------------
-
-# Wave IV (21600-0022-Codebook) pg. 184 
-w4 <- readr::read_tsv(file = "Application/Data/ICPSR_21600/DS0022/21600-0022-Data.tsv")
-
-# Drop variables in wave I student data
-w4 <- w4 %>% 
-  select("AID":"BIO_SEX4", 
-         "H4MH18":"H4MH27") # CES-D-10 scale [NOTE: DOUBLE CHECK THESE ARE CORRECT ITEMS]
-         # "H4HS3") # Health insurance item 
-
-
-# CES-D-10
-
-# THESE ITEMS ARE FROM ONLINE 
-# 1. I was bothered by things that usually don't bother me. (H4MH18)
-# 2. I had trouble keeping my mind on what I was doing. (H4MH21)
-# 3. I felt depressed. (H4MH22)
-# 4. I felt that everything I did was an effort. (H4MH23)
-# 5. I felt hopeful about the future. 
-# 6. I felt fearful. 
-# 7. My sleep was restless. 
-# 8. I was happy. (H4MH24)
-# 9. I felt lonely.
-# 10. I could not "get going." 
-
-# Add Health report (https://addhealth.cpc.unc.edu/wp-content/uploads/docs/data_briefs/Depressive_Symptoms_Data_Brief.pdf)
-# These items ask respondents how many days in the last week they felt: “depressed,” “sad,” “like they could not shake off the blues,” “happy
-# (reverse coded),” and “like life was not worth living.” The response scale for each item ranges from 0 (rarely, 0 days) to 3 (severe, 5-7 days).
-
-#       [I BELIEVE THESE ARE ALL 10 OF CES-D-10 BUT NOT CERTAIN ABOUT THREE OF THE ITEMS]
-# 18. You were bothered by things that usually don't bother you. (H4MH18)
-# 19. (During the past seven days:) You could not shake off the blues, even with help from your family and your friends. (H4MH19)
-# 20. (During the past seven days:) You felt you were just as good as other people. (H4MH20)
-# 21. (During the past seven days:) You had trouble keeping your mind on what you were doing. (H4MH21)
-# 22. (During the past seven days:) You felt depressed. (H4MH22)
-# 23. (During the past seven days:) You felt that you were too tired to do things. (H4MH23)
-# 24. (During the past seven days:) You felt happy. (H4MH24)
-# 25. (During the past seven days:) You enjoyed life. (H4MH25)
-# 26. (During the past seven days:) You felt sad. (H4MH26)
-# 27. (During the past seven days:) You felt that people disliked you, during the past seven days. (H4MH27)
-
-# Change values for CES-D-10 items to NA
-w4[, colnames(w4)[str_detect(colnames(w4), pattern = "^H4MH")]] <-
-  apply(w4[, colnames(w4)[str_detect(colnames(w4), pattern = "^H4MH")]], 2, function(x)
-    ifelse(x >= 6, NA, x)) # 6=refused; 8=don't know
-
-# Reverse code items 20, 24, & 25 on the CES-D-10 (4-point scale items; max value = 3)
-w4[, c("H4MH20", "H4MH24", "H4MH25")] <-
-  apply(w4[, c("H4MH20", "H4MH24", "H4MH25")], 2, function(x)
-    3 - x)
-
-# Score CES-D-10 (Depression) scale 
-w4$depress <- rowSums(w4[, colnames(w4)[str_detect(colnames(w4), pattern = "^H4MH")]])
-
-# # check 
-# hist(w4$depress)
-# table(I(w4$depress > 10)); sum(I(w4$depress > 10), na.rm = T) / sum(!is.na(w4$depress)) # 16% would be classified with depression in Easterlin study
-
-
-# # gap in health insurance (wave 4) 
-# # 3. Over the past 12 months, how many months did you have health insurance? (H4HS3)
-# w4 <- w4 %>%
-#   rename(healthInsur = H4HS3) %>%
-#   mutate(healthInsur = ifelse(healthInsur >= 98, NA, healthInsur)) # 98=don't know
-
-# Add wave IV student data to data set
-data <- merge(data, w4[, c("AID", "depress")], by = "AID")
-# data <- merge(data, w4[, c("AID", "healthInsur", "depress")], by = "AID")
-
-# GSWGT4_2 for level 1 weights
-# SCHWT1 W4_2_WC for level 2 weights
-
-# Import Wave IV weights 
-# w4.w <- readr::read_tsv(file = "Empirical-Application/Data/ICPSR_21600/DS0031/21600-0031-Data.tsv") # 
-
-# Add wave IV weights to data set
-# data <- merge(data, w4.w[, -2], by = "AID")
-
-# Add wave number to variable names
-colnames(data)[!grepl(pattern = paste(c("_w\\d{1}$", "AID", "CLUSTER2"), collapse = "|"), colnames(data))] <- 
-  paste0(colnames(data)[!grepl(pattern = paste(c("_w\\d{1}$", "AID", "CLUSTER2"), collapse = "|"), colnames(data))], "_w4")
-
-
-# Calculated number of months not covered with health insurance 
-# data$mnthsNotCovered <- 
-#   rowSums(data[, colnames(data)[str_detect(colnames(data), pattern = "^healthInsur_")]])
-# data$insuranceGap <- ifelse(data$mnthsNotCovered > 0, 1, 0)
-# head(
-#   data[, c(colnames(data)[str_detect(colnames(data), pattern = "^healthInsur_")], "mnthsNotCovered")]
-# )
-
-# Create insurance gap variable based only on wave I
-data$healthInsur_w1 <- ifelse(data$healthInsur_w1 > 0, 1, 0)
-# data$healthInsur_w3 <- ifelse(data$healthInsur_w3 > 0, 1, 0)
-# data$healthInsur_w4 <- ifelse(data$healthInsur_w4 > 0, 1, 0)
-# data$healthInsur_gap <- ifelse(data$healthInsur_w1 == 0 | data$healthInsur_w3 == 0 | data$healthInsur_w4 == 0,
-#                                1, 0)
-
-# Add cluster (school) size variable 
-data <- data %>% 
-  group_by(CLUSTER2) %>% 
-  mutate(n = n()) %>% 
-  ungroup()
-
-
-
-# Drop small clusters -----------------------------------------------------
-
-# First drop those missing sport participation (treatment)
-data <- data %>% 
-  filter(is.na(sportPartic_w1) != TRUE) # 4208 - 3155 = 1,053 dropped 
-
-# Calculate cluster sizes  
-data <- data %>% 
-  group_by(CLUSTER2) %>% 
-  mutate(n = n()) %>% 
-  ungroup()
-
-# Check clusters in order of size 
-data %>% 
-  group_by(CLUSTER2) %>% 
-  summarize(n = max(n)) %>% 
-  arrange(desc(n)) %>% 
-  print(n = 132) # 123 schools (cluster sizes ranged from 1 to 81 students)
-
-# Drop cluster sizes < 5
-data <- data %>%
-  filter(n >= 5) # To avoid convergence issues, we restricted our analysis to the schools with 5 or more students (121 schools)
-
-# Look at cluster sizes
-data %>% 
-  group_by(CLUSTER2) %>% 
-  summarize(n = n()) %>% 
-  arrange(desc(n)) %>% 
-  print(n = 132)  # 121 schools (cluster sizes ranged from 5 to 81 students)
-
-
-
-# Missing Data ------------------------------------------------------------
-
-# Check proportions of categorical variables & Scale variables (maybe create the scaled version of the mediator (selfEst_w3) after imputing data)
-head(data)
-colnames(data)
-
-# head(scale(data))
-summary(data[, c(
-  "sex_w1",
-  "ethnicity_w1",
-  "white_w1",
-  "black_w1",
-  "asian_w1",
-  "nativeAmerican_w1",
-  "raceOther_w1"
-)])   # Might need to collapse asian, native american, & other b/c the proportion of students in each group is only 0.0466, 0.058, & 0.0682 
-
-
-summary(data[, c(
-  "healthInsur_w1",
-  "parentalEdu_w1",
-  "familyStruct_w1", # Maybe drop this variable or look into its meaning more (has 3 distinct values: 0, 1, 2)
-  "sport_w1",
-  "sportPartic_w1",
-  "feelings_w1",
-  "depress_w4"
-)])
-
-# PS model includes: "sportPartic_w1 ~ feelings_w1 + age_w1 + sex_w1 + ethnicity_w1 + white_w1 + black_w1 + asian_w1 + nativeAmerican_w1 + raceOther_w1 + parentalEdu_w1 + familyStruct_w1 + healthInsur_w1 + (1 | CLUSTER2)"
-
-# Need to scale: 
-# Scale, rename, & drop non-scaled variable
-data <- data %>%
-  mutate(
-    age_w1_sc = as.vector(scale(age_w1)),
-    parentalEdu_w1_sc = as.vector(scale(parentalEdu_w1)),
-    feelings_w1_sc = as.vector(scale(feelings_w1)), 
-    selfEst_w1_sc = as.vector(scale(selfEst_w1))
-  ) %>%
-  select(-age_w1, -parentalEdu_w1, -feelings_w1)  # Remove original columns if desired
-
-# Select variables in PS model 
-t <- data %>% 
-  select(!c(AID, CLUSTER2, sport_w1, n)) %>% 
-  # select(!c(AID, CLUSTER2, sport_w1, n, healthInsur_gap))
-  # healthInsur_w3, healthInsur_w4, 
-  # healthInsur_w1))
-  select(c("sex_w1", "white_w1", "black_w1", 
-           "sportPartic_w1", "selfEst_w3", "depress_w4", 
-           "familyStruct_w1", "parentalEdu_w1_sc", "healthInsur_w1", 
-           "age_w1_sc", "feelings_w1_sc", "selfEst_w1_sc"))
-
-# Missing pattern 
-md.pattern(t, rotate.names = TRUE)
-
-
-
-# md.pairs(t)
-
-# number of missing outcome variable & cluster size by cluster 
-# data %>% 
-#   group_by(CLUSTER2) %>% 
-#   summarize(missing = sum(is.na(sportPartic_w1)), 
-#             n = n()) %>% 
-#   arrange(desc(missing)) %>% 
-#   print(n = 132)
-
-# Imputation 
-imp <- mice(t, m = 1, seed = 875421)
-
-# Create complete data 
-t_imp <- complete(imp, "long", include = TRUE)
-
-# head(t); head(t_imp[t_imp$.imp == 1, ])
-
-# replace missing values in original data set
-var <- colnames(t)
-for (i in 1:length(var)) {
-  
-  data[, var[i]] <- t_imp[t_imp$.imp == 1, var[i]]
-  
-}
-
-# Checking data after imputing values 
-# mice::md.pattern(data[, var])
-# summary(data$sportPartic_w1)
-# head(data[, var])
-
-
-# Add a scaled version of the mediator to use in outcome model 
-data <- data %>%
-  mutate(selfEst_w3_sc = as.vector(scale(selfEst_w3)))
-
-# Re-check 
-
-# Check proportions of categorical variables & Scale variables (maybe create the scaled version of the mediator (selfEst_w3) after imputing data)
-head(data)
-colnames(data)
-
-head(scale(data))
-summary(data[, c(
-  "sex_w1",
-  "ethnicity_w1",
-  "white_w1",
-  "black_w1",
-  "asian_w1",
-  "nativeAmerican_w1",
-  "raceOther_w1"
-)])   # Might need to collapse asian, native american, & other b/c the proportion of students in each group is only 0.0466, 0.058, & 0.0682 
-
-# 
-# summary(data[, c(
-#   "healthInsur_w1",
-#   "parentalEdu_w1",
-#   "familyStruct_w1", # Maybe drop this variable or look into its meaning more (has 3 distinct values: 0, 1, 2)
-#   "sport_w1",
-#   "sportPartic_w1",
-#   "feelings_w1",
-#   "healthInsur_w3",
-#   "healthInsur_w4",
-#   "depress_w4"
-# )])
-
-
-# Clean up environment 
-rm(imp, t, t_imp, 
-   w1, w3, w4)
-
-
-
-## ICC ---------------------------------------------------------------------
-
-# ICC for mediator 
-med_unconditional <- lme4::lmer(selfEst_w3 ~ (1 | CLUSTER2), data = data)
-summary(med_unconditional)
-
-med_var <- data.frame(lme4::VarCorr(med_unconditional))[1, 4] # variance due to level-2
-med_res <- data.frame(lme4::VarCorr(med_unconditional))[2, 4] # residual variance 
-med_icc <- med_var / (med_var + med_res)
-med_icc # with 121 schools (5+ in size) med icc = 0.006954964
-
-# ICC for outcome 
-out_unconditional <- lme4::lmer(depress_w4 ~ (1 | CLUSTER2), data = data)
-summary(out_unconditional)
-
-out_var <- data.frame(lme4::VarCorr(out_unconditional))[1, 4] # variance due to level-2
-out_res <- data.frame(lme4::VarCorr(out_unconditional))[2, 4] # residual variance 
-out_icc <- out_var / (out_var + out_res)
-out_icc # with 121 schools (5+ in size) outcome icc = 0.01868923
-
-# ICC for some of the variables in PS models 
-# ## Parent education
+# ## Parent Education
 # parent_uncond <- lme4::lmer(parentalEdu_w1_sc ~ (1 | CLUSTER2), data = data)
-# data.frame(lme4::VarCorr(parent_uncond))[1, 4] / ( data.frame(lme4::VarCorr(parent_uncond))[1, 4] + data.frame(lme4::VarCorr(parent_uncond))[2, 4])
-# 
-# ## Feeling scale 
+# data.frame(lme4::VarCorr(parent_uncond))[1, 4] / 
+#   (data.frame(lme4::VarCorr(parent_uncond))[1, 4] + data.frame(lme4::VarCorr(parent_uncond))[2, 4])
+
+# ## Feelings Scale
 # feeling_uncond <- lme4::lmer(feelings_w1_sc ~ (1 | CLUSTER2), data = data)
-# data.frame(lme4::VarCorr(feeling_uncond))[1, 4] / ( data.frame(lme4::VarCorr(feeling_uncond))[1, 4] + data.frame(lme4::VarCorr(feeling_uncond))[2, 4])
-# 
-# ## age
+# data.frame(lme4::VarCorr(feeling_uncond))[1, 4] / 
+#   (data.frame(lme4::VarCorr(feeling_uncond))[1, 4] + data.frame(lme4::VarCorr(feeling_uncond))[2, 4])
+
+# ## Age
 # age_uncond <- lme4::lmer(age_w1_sc ~ (1 | CLUSTER2), data = data)
-# data.frame(lme4::VarCorr(age_uncond))[1, 4] / ( data.frame(lme4::VarCorr(age_uncond))[1, 4] + data.frame(lme4::VarCorr(age_uncond))[2, 4])
-# 
-# ## self-esteem
+# data.frame(lme4::VarCorr(age_uncond))[1, 4] / 
+#   (data.frame(lme4::VarCorr(age_uncond))[1, 4] + data.frame(lme4::VarCorr(age_uncond))[2, 4])
+
+# ## Self-Esteem (Wave 1)
 # selfEst_uncond <- lme4::lmer(selfEst_w1_sc ~ (1 | CLUSTER2), data = data)
-# data.frame(lme4::VarCorr(selfEst_uncond))[1, 4] / ( data.frame(lme4::VarCorr(selfEst_uncond))[1, 4] + data.frame(lme4::VarCorr(selfEst_uncond))[2, 4])
-# 
-# ## white 
-# white_uncod <- lme4::lmer(white_w1 ~ (1 | CLUSTER2), data = data)
-# data.frame(lme4::VarCorr(white_uncod))[1, 4] / ( data.frame(lme4::VarCorr(white_uncod))[1, 4] + data.frame(lme4::VarCorr(white_uncod))[2, 4])
+# data.frame(lme4::VarCorr(selfEst_uncond))[1, 4] / 
+#   (data.frame(lme4::VarCorr(selfEst_uncond))[1, 4] + data.frame(lme4::VarCorr(selfEst_uncond))[2, 4])
+
+# ## White Ethnicity
+# white_uncond <- lme4::lmer(white_w1 ~ (1 | CLUSTER2), data = data)
+# data.frame(lme4::VarCorr(white_uncond))[1, 4] / 
+#   (data.frame(lme4::VarCorr(white_uncond))[1, 4] + data.frame(lme4::VarCorr(white_uncond))[2, 4])
+
+# Propensity Score (PS) & Inverse Probability of Treatment Weight (IPTW) Calculation ------
+# This section calculates propensity scores and IPTW using three different models: 
+# Standard Logistic (SL), Fixed Effects (FE), and Random Effects (RE).
 
 
 
 # PS & IPTW Calculation ---------------------------------------------------------------
 # This script calculates propensity scores and Inverse Probability of Treatment Weights (IPTW)
-# for three models: SL (Standard Logistic), FE (Fixed Effects), and RE (Random Effects).
+# for three models: SL (Single-Level), FE (Fixed-Effect), and RE (Random-Effect).
 
 ### SL Propensity Score Model -----------------------------------------------
-# Standard logistic regression model for propensity score estimation
-psmod_sl <- glm(formula = "sportPartic_w1 ~ feelings_w1_sc + sex_w1 + age_w1_sc + 
+# Single-level logistic regression model for propensity score estimation
+psmod_sl <- glm(
+  formula = "sportPartic_w1 ~ feelings_w1_sc + sex_w1 + age_w1_sc + 
                         white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 + selfEst_w1_sc",
-                family = "binomial", 
-                data = data)
+  family = "binomial", 
+  data = data
+)
 
-# Predict propensity scores and log-odds for SL model
-data$ps_sl <- predict(psmod_sl, type = "response") 
-data$ps_sl_logit <- predict(psmod_sl, type = "link")
+# Predict propensity scores and log-odds for the SL model
+data$ps_sl <- predict(psmod_sl, type = "response") # Propensity scores
+data$ps_sl_logit <- predict(psmod_sl, type = "link") # Log-odds
 
-# Calculate IPTW for SL model
+# Calculate IPTW for the SL model
 data <- cbind(data, iptw_sl = with(data, (sportPartic_w1 / ps_sl) + (1 - sportPartic_w1) / (1 - ps_sl)))
 
-### FE Propensity Score Model -----------------------------------------------
-# Fixed effects logistic regression model for propensity score estimation
-psmod_fe <- glm(formula = "sportPartic_w1 ~ feelings_w1_sc + sex_w1 + age_w1_sc + 
+### FE Propensity Score Model ----------------------------------------
+# Fixed-effect logistic regression model for propensity score estimation.
+psmod_fe <- glm(
+  formula = "sportPartic_w1 ~ feelings_w1_sc + sex_w1 + age_w1_sc + 
                         white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 + selfEst_w1_sc +
                 as.factor(CLUSTER2)",
-                family = "binomial", 
-                data = data)
+  family = "binomial", 
+  data = data
+)
 
-# Predict propensity scores and log-odds for FE model
-data$ps_fe <- predict(psmod_fe, type = "response")
-data$ps_fe_logit <- predict(psmod_fe, type = "link")
+# Predict propensity scores and log-odds for the FE model
+data$ps_fe <- predict(psmod_fe, type = "response") # Propensity scores
+data$ps_fe_logit <- predict(psmod_fe, type = "link") # Log-odds
 
-# Calculate IPTW for FE model
+# Calculate IPTW for the FE model
 data <- cbind(data, iptw_fe = with(data, (sportPartic_w1 / ps_fe) + (1 - sportPartic_w1) / (1 - ps_fe)))
 
-### RE Propensity Score Model -----------------------------------------------
-# Random effects logistic regression model for propensity score estimation
-psmod_re <- lme4::glmer(formula = "sportPartic_w1 ~ feelings_w1_sc + sex_w1 + age_w1_sc + 
+### RE Propensity Score Model ----------------------------------------
+# Random-effect logistic regression model for propensity score estimation.
+psmod_re <- lme4::glmer(
+  formula = "sportPartic_w1 ~ feelings_w1_sc + sex_w1 + age_w1_sc + 
                         white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 + selfEst_w1_sc + 
                         (1 | CLUSTER2)",
-                        family = "binomial", 
-                        data = data) 
+  family = "binomial", 
+  data = data
+)
 
-# Predict propensity scores and log-odds for RE model
-data$ps_re <- predict(psmod_re, type = "response")
-data$ps_re_logit <- predict(psmod_re, type = "link")
+# Predict propensity scores and log-odds for the RE model
+data$ps_re <- predict(psmod_re, type = "response") # Propensity scores
+data$ps_re_logit <- predict(psmod_re, type = "link") # Log-odds
 
-# Calculate IPTW for RE model
+# Calculate IPTW for the RE model
 data <- cbind(data, iptw_re = with(data, (sportPartic_w1 / ps_re) + (1 - sportPartic_w1) / (1 - ps_re)))
 
 
 
 # Truncate Non-overlap Cases ---------------------------------------------------------
 
-### SL (Single Level) ------------------------------------------------------
+### SL (Single-Level) ------------------------------------------------------
+# Identify and count instances of extreme PS values
+paste0("Number of PSs < 0.01: ", sum(I(data$ps_sl < 0.01)), 
+       "; Number of PSs > 0.99: ", sum(I(data$ps_sl > 0.99)))
 
-# Count instances where propensity scores (PS) are outside the valid range
-paste0("Number of PSs < 0.0111: ", sum(I(data$ps_sl < 0.0111)), 
-       "; Number of PSs > 0.999: ", sum(I(data$ps_sl > 0.999)))
-
-# Count cases below the 1st percentile and above the 99th percentile of IPTW
+# Determine the 1st and 99th percentiles of the IPTW distribution for the SL model.
+# Cases below the 1st percentile or above the 99th percentile are considered outliers.
 first_percentile <- quantile(data$iptw_sl, probs = 0.01)
 ninety_ninth_percentile <- quantile(data$iptw_sl, probs = 0.99)
 
+# Count the number of cases below the 1st percentile and above the 99th percentile of IPTW.
 paste0(
   "Number of cases < 1st percentile of IPTW (", first_percentile, 
   "): ", sum(I(data$iptw_sl < first_percentile)), 
@@ -659,16 +206,16 @@ data <- data %>%
                           ifelse(iptw_sl > ninety_ninth_percentile, ninety_ninth_percentile, 
                                  iptw_sl)))
 
-### FE (Fixed Effects) -------------------------------------------------------------
+### FE (Fixed-Effect) -------------------------------------------------------------
+# Identify and count instances of extreme PS values
+paste0("Number of PSs < 0.01: ", sum(I(data$ps_fe < 0.01)), 
+       "; Number of PSs > 0.99: ", sum(I(data$ps_fe > 0.99)))
 
-# Count instances where propensity scores (PS) are outside the valid range
-paste0("Number of PSs < 0.0111: ", sum(I(data$ps_fe < 0.0111)), 
-       "; Number of PSs > 0.999: ", sum(I(data$ps_fe > 0.999)))
-
-# Count cases below the 1st percentile and above the 99th percentile of IPTW
+# Determine the 1st and 99th percentiles of the IPTW distribution for the FE model.
 first_percentile <- quantile(data$iptw_fe, probs = 0.01)
 ninety_ninth_percentile <- quantile(data$iptw_fe, probs = 0.99)
 
+# Count the number of cases below the 1st percentile and above the 99th percentile of IPTW.
 paste0(
   "Number of cases < 1st percentile of IPTW (", first_percentile, 
   "): ", sum(I(data$iptw_fe < first_percentile)), 
@@ -676,22 +223,22 @@ paste0(
   "): ", sum(I(data$iptw_fe > ninety_ninth_percentile))
 )
 
-# Adjust IPTW values to the 1st and 99th percentile thresholds
+# Adjust IPTW values to the 1st and 99th percentile thresholds 
 data <- data %>% 
   mutate(iptw_fe = ifelse(iptw_fe < first_percentile, first_percentile, 
                           ifelse(iptw_fe > ninety_ninth_percentile, ninety_ninth_percentile, 
                                  iptw_fe)))
 
-### RE (Random Effects) -------------------------------------------------------------
+### RE (Random-Effect) -------------------------------------------------------------
+# Identify and count instances of extreme PS values
+paste0("Number of PSs < 0.01: ", sum(I(data$ps_re < 0.01)), 
+       "; Number of PSs > 0.99: ", sum(I(data$ps_re > 0.99)))
 
-# Count instances where propensity scores (PS) are outside the valid range
-paste0("Number of PSs < 0.0111: ", sum(I(data$ps_re < 0.0111)), 
-       "; Number of PSs > 0.999: ", sum(I(data$ps_re > 0.999)))
-
-# Count cases below the 1st percentile and above the 99th percentile of IPTW
+# Determine the 1st and 99th percentiles of the IPTW distribution for the RE model.
 first_percentile <- quantile(data$iptw_re, probs = 0.01)
 ninety_ninth_percentile <- quantile(data$iptw_re, probs = 0.99)
 
+# Count the number of cases below the 1st percentile and above the 99th percentile of IPTW.
 paste0(
   "Number of cases < 1st percentile of IPTW (", first_percentile, 
   "): ", sum(I(data$iptw_re < first_percentile)), 
@@ -699,7 +246,7 @@ paste0(
   "): ", sum(I(data$iptw_re > ninety_ninth_percentile))
 )
 
-# Adjust IPTW values to the 1st and 99th percentile thresholds
+# Adjust IPTW values to the 1st and 99th percentile thresholds 
 data <- data %>% 
   mutate(iptw_re = ifelse(iptw_re < first_percentile, first_percentile, 
                           ifelse(iptw_re > ninety_ninth_percentile, ninety_ninth_percentile, 
@@ -707,12 +254,13 @@ data <- data %>%
 
 
 
-# Covariate Balance Visuals -----------------------------------------------
+# Covariate Balance Visualization -----------------------------------
 
-# Custom function to calculate weighted variance
+## Create Functions --------------------------------------------------------
+# Function to calculate weighted variance, which accounts for different sample weights
 weighted.var <- function(x, w, na.rm = FALSE) {
   if (na.rm) {
-    # Remove NA values
+    # Remove NA values from the variables and weights
     valid <- !is.na(x) & !is.na(w)
     x <- x[valid]
     w <- w[valid]
@@ -721,18 +269,18 @@ weighted.var <- function(x, w, na.rm = FALSE) {
   # Calculate the weighted mean
   wm <- weighted.mean(x, w)
   
-  # Calculate the weighted variance
+  # Calculate the weighted variance using the weighted mean
   variance <- sum(w * (x - wm)^2) / sum(w)
   
-  return(variance)
+  return(variance)  # Return the calculated weighted variance
 }
 
-# Function to calculate Standardized Mean Difference (SMD)
+# Function to calculate the Standardized Mean Difference (SMD) between two groups
 calculate_smd <- function(data, treatment, covariate) {
-  # Calculate the mean for the treatment group
+  # Calculate the mean of the covariate for the treatment group
   mean_treatment <- mean(data[[covariate]][data[[treatment]] == 1], na.rm = TRUE)
   
-  # Calculate the mean for the control group
+  # Calculate the mean of the covariate for the control group
   mean_control <- mean(data[[covariate]][data[[treatment]] == 0], na.rm = TRUE)
   
   # Calculate the standard deviation for the treatment group
@@ -741,45 +289,33 @@ calculate_smd <- function(data, treatment, covariate) {
   # Calculate the standard deviation for the control group
   sd_control <- sd(data[[covariate]][data[[treatment]] == 0], na.rm = TRUE)
   
-  # Compute the SMD using the means and pooled standard deviations
+  # Compute the SMD using the pooled standard deviations
   smd <- (mean_treatment - mean_control) / sqrt((sd_treatment^2 + sd_control^2) / 2)
   
   return(smd)  # Return the calculated SMD
 }
 
-# List of covariates to analyze for balance
-covariates <- c("feelings_w1_sc", "sex_w1", "age_w1_sc", "white_w1", 
-                "black_w1", "parentalEdu_w1_sc", "familyStruct_w1", 
-                "healthInsur_w1", "selfEst_w1_sc")
-
-# Calculate SMD for each covariate before applying weights
-smd_before <- sapply(covariates, function(cov) calculate_smd(data, "sportPartic_w1", cov))
-
-# Convert the SMD results into a data frame for easier manipulation
-smd_before_df <- data.frame(covariate = covariates, SMD = smd_before)
-smd_before_df$type <- "Unweighted"  # Label the type as 'Unweighted'
-
-# Function to calculate weighted SMD, allowing for weights as an argument
+# Function to calculate weighted SMD, which includes the use of weights for covariate balance
 calculate_weighted_smd <- function(data, treatment, covariate, weights_col) {
   # Subset the data into treatment and control groups
   treatment_group <- data[data[[treatment]] == 1, ]
   control_group <- data[data[[treatment]] == 0, ]
   
-  # Check if either group is empty; return NA if so
+  # Return NA if either group is empty after subsetting
   if (nrow(treatment_group) == 0 || nrow(control_group) == 0) {
-    return(NA)  # Return NA if either group is empty
+    return(NA)
   }
   
   # Remove rows with missing values in the covariate or weights
   treatment_group <- treatment_group[!is.na(treatment_group[[covariate]]) & !is.na(treatment_group[[weights_col]]), ]
   control_group <- control_group[!is.na(control_group[[covariate]]) & !is.na(control_group[[weights_col]]), ]
   
-  # Check lengths after removing NAs; return NA if either group is empty
+  # Return NA if either group is empty after removing NAs
   if (nrow(treatment_group) == 0 || nrow(control_group) == 0) {
-    return(NA)  # Return NA if either group is empty after filtering
+    return(NA)
   }
   
-  # Calculate weighted means for both groups
+  # Calculate weighted means for both treatment and control groups
   mean_treatment <- weighted.mean(treatment_group[[covariate]], treatment_group[[weights_col]], na.rm = TRUE)
   mean_control <- weighted.mean(control_group[[covariate]], control_group[[weights_col]], na.rm = TRUE)
   
@@ -787,113 +323,96 @@ calculate_weighted_smd <- function(data, treatment, covariate, weights_col) {
   sd_treatment <- sqrt(weighted.var(treatment_group[[covariate]], treatment_group[[weights_col]], na.rm = TRUE))
   sd_control <- sqrt(weighted.var(control_group[[covariate]], control_group[[weights_col]], na.rm = TRUE))
   
-  # Compute the SMD using the weighted means and pooled standard deviations
+  # Compute the weighted SMD using the weighted means and pooled standard deviations
   smd <- (mean_treatment - mean_control) / sqrt((sd_treatment^2 + sd_control^2) / 2)
   
   return(smd)  # Return the calculated weighted SMD
 }
 
-# Calculate SMD for each covariate after applying different weighting methods
+## Covariate Balance Calculations -----------------------------------
+
+# Define the covariates to be assessed for balance
+covariates <- c("feelings_w1_sc", "sex_w1", "age_w1_sc", "white_w1", 
+                "black_w1", "parentalEdu_w1_sc", "familyStruct_w1", 
+                "healthInsur_w1", "selfEst_w1_sc")
+
+# Calculate the SMD for each covariate before applying weights (unweighted)
+smd_before <- sapply(covariates, function(cov) calculate_smd(data, "sportPartic_w1", cov))
+
+# Convert the SMD results into a data frame for easier handling and labeling
+smd_before_df <- data.frame(covariate = covariates, SMD = smd_before)
+smd_before_df$type <- "Unweighted"  # Label the SMDs as 'Unweighted'
+
+# Calculate weighted SMD for each covariate using different weighting methods
 smd_sl_after <- sapply(covariates, function(cov) calculate_weighted_smd(data, "sportPartic_w1", cov, "iptw_sl"))
 smd_fe_after <- sapply(covariates, function(cov) calculate_weighted_smd(data, "sportPartic_w1", cov, "iptw_fe"))
 smd_re_after <- sapply(covariates, function(cov) calculate_weighted_smd(data, "sportPartic_w1", cov, "iptw_re"))
 
-# Convert the results into data frames for easier handling
+# Convert the weighted SMD results into data frames
 smd_sl_after_df <- data.frame(covariate = covariates, SMD = smd_sl_after, type = "Single-Level")
 smd_fe_after_df <- data.frame(covariate = covariates, SMD = smd_fe_after, type = "Fixed-Effect")
-smd_re_after_df <- data.frame(covariate = covariates, SMD = smd_re_after, type = "Random-Effects")
+smd_re_after_df <- data.frame(covariate = covariates, SMD = smd_re_after, type = "Random-Effect")
 
 # Combine all SMD data frames into one for comprehensive analysis
 smd_combined <- rbind(smd_before_df, smd_sl_after_df, smd_fe_after_df, smd_re_after_df)
 
-# Calculate the Absolute Standardized Mean Difference (ASMD)
+# Calculate the Absolute Standardized Mean Difference (ASMD) for all covariates
 smd_combined$ASMD <- abs(smd_combined$SMD)
 
-# Define a custom order for the y-axis in the plot
+## Visualization: Love Plot ------------------------------------------
+
+# Define a custom order for the covariates on the y-axis in the plot
 custom_order <- c("black_w1", "white_w1", "familyStruct_w1", 
                   "healthInsur_w1", "age_w1_sc", "sex_w1", 
                   "selfEst_w1_sc", "feelings_w1_sc", "parentalEdu_w1_sc")
 
-# Define new labels for the y-axis to enhance readability
+# Define new labels for the y-axis to improve readability
 new_labels <- c("Race: Black", "Race: White", "Family Structure", 
                 "Health Insurance \n Coverage Gap", "Age", "Sex", 
                 "Self-Esteem Score", "Feelings Scale Score", "Parental Education")
 
 
-# Create a Love Plot to visualize the Absolute SMD, using custom ordering
-## Save visual 
-# svg(filename = "Application/Output/Covariate-Balance.svg")
-pdf("Application/Output/Covariate-Balance_Love-Plot.pdf")
-## Visual 
-ggplot(smd_combined, aes(x = ASMD, y = factor(covariate, levels = custom_order), color = type, shape = type)) +
-  geom_vline(xintercept = 0.1, linetype = "dashed", color = "black") +  # Reference line for SMD threshold
-  geom_vline(xintercept = 0, color = "black") +  # Line at zero for clarity
-  geom_point(size = 3, stroke = 1.5) +  # Points with increased size and stroke for emphasis
-  labs(title = "Love Plot",
-       subtitle = "Covariate Balance of Individual-Level Covariates",
-       x = "Absolute Standardized Mean Difference (ASMD)",
-       y = "") +
-  theme_minimal() +  # Apply a minimal theme for clean aesthetics
-  theme(axis.text.y = element_text(angle = 0, hjust = 1, size = 10),  # Adjust y-axis text for clarity
-        axis.title = element_text(size = 14),  # Increase axis title size for visibility
-        plot.title = element_text(size = 16, face = "bold"),  # Bold title for emphasis
-        plot.subtitle = element_text(size = 14),  # Subtitle size for readability
-        legend.position = "top") +  # Position legend at the top
-  scale_color_manual(values = c("Unweighted" = "#1f77b4",  # Blue for unweighted
-                                "Single-Level" = "#2ca02c",  # Green for single-level weighting
-                                "Fixed-Effect" = "#ff7f0e",  # Orange for fixed-effect weighting
-                                "Random-Effects" = "#9467bd"),  # Purple for random-effects weighting
-                     name = NULL) +
-  scale_shape_manual(values = c("Unweighted" = 16,  # Circle shape for unweighted
-                                "Single-Level" = 17,  # Triangle shape for single-level
-                                "Fixed-Effect" = 15,  # Square shape for fixed-effect
-                                "Random-Effects" = 18),  # Diamond shape for random-effects
-                     name = NULL) +
-  scale_y_discrete(labels = new_labels)  # Use new labels for the y-axis
+## Visualization: Love Plot for Paper --------------------------------
 
-dev.off()
-# Save visual 
-ggsave(filename = "Application/Output/Covariate-Balance_Love-Plot.png", plot = last_plot())
+# Load Times New Roman font for publication-quality visuals
+# loadfonts()
 
-
-
-# Create a Love Plot for paper 
-library(extrafont)
-loadfonts()
-## Save visual 
+# Save the Love Plot visualization for the paper as a PDF
 pdf("Application/Output/Covariate-Balance_QP-Doc.pdf")
-## Visual 
+
+# Create and customize the Love Plot for the paper, using Times New Roman font
 ggplot(smd_combined, aes(x = ASMD, y = factor(covariate, levels = custom_order), color = type, shape = type)) +
-  geom_vline(xintercept = 0.1, linetype = "dashed", color = "black") +  # Reference line for SMD threshold
-  geom_vline(xintercept = 0, color = "black") +  # Line at zero for clarity
-  geom_point(size = 3, stroke = 1.5) +  # Points with increased size and stroke for emphasis
-  labs(#title = "Love Plot",
-       #subtitle = "Covariate Balance of Individual-Level Covariates",
-       x = "\n Absolute Standardized Mean Difference (ASMD)",
-       y = "") +
-  theme_minimal() +  # Apply a minimal theme for clean aesthetics
+  geom_vline(xintercept = 0.1, linetype = "dashed", color = "black") +  # Reference line for SMD threshold (0.1)
+  geom_vline(xintercept = 0, color = "black") +  # Line at zero to indicate no difference
+  geom_point(size = 3, stroke = 1.5) +  # Plot points with increased size and stroke 
+  labs(#title = "Love Plot",  
+    #subtitle = "Covariate Balance of Individual-Level Covariates",  
+    x = "\n Absolute Standardized Mean Difference (ASMD)",
+    y = "") +
+  theme_minimal() +  
   theme(text = element_text(family = "Times New Roman"),
         axis.text = element_text(family = "Times New Roman"),
-        axis.text.y = element_text(angle = 0, hjust = 1, size = 10),  # Adjust y-axis text for clarity
-        axis.title = element_text(size = 14),  # Increase axis title size for visibility
-        plot.title = element_text(size = 16, face = "bold"),  # Bold title for emphasis
-        plot.subtitle = element_text(size = 14),  # Subtitle size for readability
-        legend.position = "top") +  # Position legend at the top
+        axis.text.y = element_text(angle = 0, hjust = 1, size = 10),  # Adjust y-axis text 
+        # axis.title = element_text(size = 14),  # Increase axis title size for better visibility
+        # plot.title = element_text(size = 16, face = "bold"),  # Bold title for emphasis
+        # plot.subtitle = element_text(size = 14),  # Increase subtitle size for readability
+        legend.position = "top") +  # Position legend at the top for easy reference
   scale_color_manual(values = c("Unweighted" = "#1f77b4",  # Blue for unweighted
                                 "Single-Level" = "#2ca02c",  # Green for single-level weighting
                                 "Fixed-Effect" = "#ff7f0e",  # Orange for fixed-effect weighting
-                                "Random-Effects" = "#9467bd"),  # Purple for random-effects weighting
+                                "Random-Effect" = "#9467bd"),  # Purple for random-effect weighting
                      name = NULL) +
   scale_shape_manual(values = c("Unweighted" = 16,  # Circle shape for unweighted
                                 "Single-Level" = 17,  # Triangle shape for single-level
                                 "Fixed-Effect" = 15,  # Square shape for fixed-effect
-                                "Random-Effects" = 18),  # Diamond shape for random-effects
+                                "Random-Effect" = 18),  # Diamond shape for random-effect
                      name = NULL) +
-  # geom_text()
-  scale_y_discrete(labels = new_labels)  # Use new labels for the y-axis
+  scale_y_discrete(labels = new_labels)  # Apply new labels to the y-axis
 
+# Close the PDF device
 dev.off()
-# Save visual 
+
+# Save the Love Plot visualization for the paper as a PNG
 ggsave(filename = "Application/Output/Covariate-Balance_QP-Doc.pdf", 
        plot = last_plot(), 
        width = 6, 
@@ -902,6 +421,14 @@ ggsave(filename = "Application/Output/Covariate-Balance_QP-Doc.pdf",
        dpi = 300)
 
 ggsave(filename = "Application/Output/Covariate-Balance_QP-Doc.png", plot = last_plot())
+
+
+
+
+
+
+
+
 
 
 
@@ -987,44 +514,37 @@ ggsave(filename = "Application/Output/Covariate-Balance_QP-Doc.png", plot = last
 
 
 
-
 # Estimate Effects --------------------------------------------------------
 
-## Mediator models ---------------------------------------------------------
+## Mediator models ---------------------------------------------------
 
-#### Single-Level (SL) Models ------------------------------------------------
-
-# Model: SL PS & SL - Mediation/Outcome
-med_slsl <-
-  glm(
-    formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
+### Single-Level (SL) ------------------------------------------
+# Single-level mediator model with PS weights from single-level PS model.
+med_slsl <- glm(
+  formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
       white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1",
-    data = data,
-    weights = iptw_sl
-  )
+  data = data,
+  weights = iptw_sl
+)
 
-# Model: FE PS & SL - Mediation/Outcome
-med_fesl <-
-  glm(
-    formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
+# Single-level mediator model with PS weights from fixed-effect PS model.
+med_fesl <- glm(
+  formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
       white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1",
-    data = data,
-    weights = iptw_fe
-  )
+  data = data,
+  weights = iptw_fe
+)
 
-# Model: RE PS & SL - Mediation/Outcome
-med_resl <-
-  glm(
-    formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
+# Single-level mediator model with PS weights from random-effect PS model.
+med_resl <- glm(
+  formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
       white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1",
-    data = data,
-    weights = iptw_re
-  )
+  data = data,
+  weights = iptw_re
+)
 
-
-#### Fixed-Effect (FE) Models ------------------------------------------------
-
-# Model: SL PS & FE - Mediation/Outcome
+### Fixed-Effect (FE) ------------------------------------------
+# Fixed-effect mediator model with PS weights from single-level PS model.
 med_slfe <- glm(
   formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
       white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
@@ -1032,7 +552,7 @@ med_slfe <- glm(
   weights = iptw_sl
 )
 
-# Model: FE PS & FE - Mediation/Outcome 
+# Fixed-effect mediator model with PS weights from fixed-effect PS model.
 med_fefe <- glm(
   formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
       white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
@@ -1040,7 +560,7 @@ med_fefe <- glm(
   weights = iptw_fe
 )
 
-# Model: RE PS & FE - Mediation/Outcome
+# Fixed-effect mediator model with PS weights from random-effect PS model.
 med_refe <- glm(
   formula = "selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
       white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
@@ -1048,235 +568,308 @@ med_refe <- glm(
   weights = iptw_re
 )
 
-
-#### Random-Effect (RE) Models ------------------------------------------------
-
-### Add a column of ones for level-2 weights
+### Random-Effect (RE) -----------------------------------------
+# Add a column of ones for level-2 weights, required for the WeMix package.
 data <- cbind(data, L2weight = rep(1, nrow(data)))
 
-# Model: SL PS & RE - Mediation/Outcome
-med_slre <-
-  WeMix::mix(
-    formula = selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
-    data = data,
-    weights = c("iptw_sl", "L2weight")
-  )
-
-# Model: FE PS & RE - Mediation/Outcome 
-med_fere <- 
-  WeMix::mix(
-    formula = selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
-    data = data,
-    weights = c("iptw_fe", "L2weight")
-  )
-
-# Model: RE PS & RE - Mediation/Outcome
-med_rere <- 
-  WeMix::mix(
-    formula = selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
-    data = data,
-    weights = c("iptw_re", "L2weight")
-  )
-
-
-
-## Outcome Models (TNDE & PNIE) --------------------------------------------
-
-#### Single-Level (SL) Models ------------------------------------------------
-
-# Model: SL PS & SL Mediation/Outcome
-out_slsl <-
-  glm(
-    formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + 
-      parentalEdu_w1_sc + familyStruct_w1",
-    data = data,
-    weights = iptw_sl
-  )
-
-# Model: FE PS & SL Mediation/Outcome
-out_fesl <-
-  glm(
-    "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + 
-      parentalEdu_w1_sc + familyStruct_w1",
-    data = data,
-    weights = iptw_fe
-  )
-
-# Model: RE PS & SL Mediation/Outcome
-out_resl <-
-  glm(
-    "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + 
-      parentalEdu_w1_sc + familyStruct_w1",
-    data = data,
-    weights = iptw_re
-  )
-
-#### Fixed-Effect (FE) Models ------------------------------------------------
-
-# Model: SL PS & FE Mediation/Outcome
-out_slfe <- glm(formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + 
-      parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
-      data = data, 
-      weights = iptw_sl)
-
-# Model: FE PS & FE Mediation/Outcome
-out_fefe <- glm(formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + 
-      parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
-      data = data, 
-      weights = iptw_fe)
-
-# Model: RE PS & FE Mediation/Outcome
-out_refe <- glm(formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + 
-      parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
-      data = data,
-      weights = iptw_re
+# Random-effect mediator model with PS weights from single-level PS model.
+med_slre <- WeMix::mix(
+  formula = selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
+    white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
+  data = data,
+  weights = c("iptw_sl", "L2weight")
 )
 
-#### Random-Effect (RE) Models ------------------------------------------------
-
-# Prepare data for Random-Effect Models: Add a column for level-2 weights
-data <- cbind(data, L2weight = rep(1, nrow(data)))
-
-# Model: SL PS & RE Mediation/Outcome
-out_slre <-
-  WeMix::mix(
-    formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + 
-      parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
-    data = data,
-    weights = c("iptw_sl", "L2weight")
-  )
-
-# Model: FE PS & RE Mediation/Outcome
-out_fere <- 
-  WeMix::mix(
-    formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + 
-      parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
-    data = data,
-    weights = c("iptw_fe", "L2weight")
-  )
-
-# Model: RE PS & RE Mediation/Outcome
-out_rere <- 
-  WeMix::mix(
-    formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + 
-      parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
-    data = data,
-    weights = c("iptw_re", "L2weight")
-  )
-
-
-
-## Outcome Models (PNDE & TNIE) --------------------------------------------
-
-#### Single-Level (SL) Models ------------------------------------------------
-
-# Model: SL PS & SL Mediation/Outcome
-out_slsl_interac <-
-  glm(
-    formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + 
-    selfEst_w3_sc:sportPartic_w1",
-    data = data,
-    weights = iptw_sl
-  )
-
-# Model: FE PS & SL Mediation/Outcome
-out_fesl_interac <-
-  glm(
-    "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + 
-    selfEst_w3_sc:sportPartic_w1",
-    data = data,
-    weights = iptw_fe
-  )
-
-# Model: RE PS & SL Mediation/Outcome
-out_resl_interac <-
-  glm(
-    "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + 
-    selfEst_w3_sc:sportPartic_w1",
-    data = data,
-    weights = iptw_re
-  )
-
-#### Fixed-Effect (FE) Models ------------------------------------------------
-
-# Model: SL PS & FE Mediation/Outcome
-out_slfe_interac <- glm(formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + 
-      selfEst_w3_sc:sportPartic_w1 + as.factor(CLUSTER2)", 
-      data = data, 
-      weights = iptw_sl)
-
-# Model: FE PS & FE Mediation/Outcome
-out_fefe_interac <- glm(formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + 
-      selfEst_w3_sc:sportPartic_w1 + as.factor(CLUSTER2)", 
-      data = data, 
-      weights = iptw_fe)
-
-# Model: RE PS & FE Mediation/Outcome
-out_refe_interac <- glm(formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + 
-      selfEst_w3_sc:sportPartic_w1 + as.factor(CLUSTER2)", 
-      data = data,
-      weights = iptw_re
+# Random-effect mediator model with PS weights from fixed-effect PS model.
+med_fere <- WeMix::mix(
+  formula = selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
+    white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
+  data = data,
+  weights = c("iptw_fe", "L2weight")
 )
 
-#### Random-Effect (RE) Models ------------------------------------------------
+# Random-effect mediator model with PS weights from random-effect PS model.
+med_rere <- WeMix::mix(
+  formula = selfEst_w3 ~ sportPartic_w1 + age_w1_sc + sex_w1 + 
+    white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
+  data = data,
+  weights = c("iptw_re", "L2weight")
+)
 
-# Prepare data for Random-Effect Models: Add a column for level-2 weights
-data <- cbind(data, L2weight = rep(1, nrow(data)))
+### Random-Effect with Cluster Means (RE-Mean) ---------------------------------
+# Calculate the cluster mean of the treatment (sportPartic_w1) and mediator (selfEst_w3_sc)
+data <- data %>%
+  group_by(CLUSTER2) %>%
+  mutate(
+    cluster_mean_sportPartic_w1 = mean(sportPartic_w1, na.rm = TRUE),
+    cluster_mean_selfEst_w3_sc = mean(selfEst_w3_sc, na.rm = TRUE)
+  ) %>%
+  ungroup()
 
-# Model: SL PS & RE Mediation/Outcome
-out_slre_interac <-
-  WeMix::mix(
-    formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + 
-      selfEst_w3_sc:sportPartic_w1 + (1 | CLUSTER2),
-    data = data,
-    weights = c("iptw_sl", "L2weight")
-  )
+# Random-effect mediator model with cluster means and PS weights from single-level PS model.
+med_slre_cm <- WeMix::mix(
+  formula = selfEst_w3 ~ sportPartic_w1 + cluster_mean_sportPartic_w1 + 
+    age_w1_sc + sex_w1 + white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
+  data = data,
+  weights = c("iptw_sl", "L2weight")
+)
 
-# Model: FE PS & RE Mediation/Outcome
-out_fere_interac <- 
-  WeMix::mix(
-    formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + 
-      selfEst_w3_sc:sportPartic_w1 + (1 | CLUSTER2),
-    data = data,
-    weights = c("iptw_fe", "L2weight")
-  )
+# Random-effect mediator model with cluster means and PS weights from fixed-effect PS model.
+med_fere_cm <- WeMix::mix(
+  formula = selfEst_w3 ~ sportPartic_w1 + cluster_mean_sportPartic_w1 + 
+    age_w1_sc + sex_w1 + white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
+  data = data,
+  weights = c("iptw_fe", "L2weight")
+)
 
-# Model: RE PS & RE Mediation/Outcome
-out_rere_interac <- 
-  WeMix::mix(
-    formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
-      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + 
-      selfEst_w3_sc:sportPartic_w1 + (1 | CLUSTER2),
-    data = data,
-    weights = c("iptw_re", "L2weight")
-  )
+# Random-effect mediator model with cluster means and PS weights from random-effect PS model.
+med_rere_cm <- WeMix::mix(
+  formula = selfEst_w3 ~ sportPartic_w1 + cluster_mean_sportPartic_w1 + 
+    age_w1_sc + sex_w1 + white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
+  data = data,
+  weights = c("iptw_re", "L2weight")
+)
+
+
+## Outcome Models (TNDE & PNIE) --------------------------------------
+
+### Single-Level (SL) ------------------------------------------
+# Single-level outcome model with PS weights from single-level PS model.
+out_slsl <- glm(
+  formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1",
+  data = data,
+  weights = iptw_sl
+)
+
+# Single-level outcome model with PS weights from fixed-effect PS model.
+out_fesl <- glm(
+  formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1",
+  data = data,
+  weights = iptw_fe
+)
+
+# Single-level outcome model with PS weights from random-effect PS model.
+out_resl <- glm(
+  formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1",
+  data = data,
+  weights = iptw_re
+)
+
+### Fixed-Effect (FE) ------------------------------------------
+# Fixed-effect outcome model with PS weights from single-level PS model.
+out_slfe <- glm(
+  formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
+  data = data, 
+  weights = iptw_sl
+)
+
+# Fixed-effect outcome model with PS weights from fixed-effect PS model.
+out_fefe <- glm(
+  formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
+  data = data, 
+  weights = iptw_fe
+)
+
+# Fixed-effect outcome model with PS weights from random-effect PS model.
+out_refe <- glm(
+  formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
+  data = data,
+  weights = iptw_re
+)
+
+### Random-Effect (RE) -----------------------------------------
+# Random-effects outcome model with PS weights from single-level PS model.
+out_slre <- WeMix::mix(
+  formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
+    white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
+  data = data,
+  weights = c("iptw_sl", "L2weight")
+)
+
+# Random-effects outcome model with PS weights from fixed-effect PS model.
+out_fere <- WeMix::mix(
+  formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
+    white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
+  data = data,
+  weights = c("iptw_fe", "L2weight")
+)
+
+# Random-effects outcome model with PS weights from random-effect PS model.
+out_rere <- WeMix::mix(
+  formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + 
+    white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
+  data = data,
+  weights = c("iptw_re", "L2weight")
+)
+
+### Random-Effect with Cluster Means (RE-Mean) ---------------------------------
+# Random-effect outcome model with cluster means and PS weights from single-level PS model.
+out_slre_cm <- WeMix::mix(
+  formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + 
+    cluster_mean_sportPartic_w1 + cluster_mean_selfEst_w3_sc + 
+    age_w1_sc + sex_w1 + white_w1 + black_w1 + 
+    parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
+  data = data,
+  weights = c("iptw_sl", "L2weight")
+)
+
+# Random-effect outcome model with cluster means and PS weights from fixed-effect PS model.
+out_fere_cm <- WeMix::mix(
+  formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + 
+    cluster_mean_sportPartic_w1 + cluster_mean_selfEst_w3_sc + 
+    age_w1_sc + sex_w1 + white_w1 + black_w1 + 
+    parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
+  data = data,
+  weights = c("iptw_fe", "L2weight")
+)
+
+# Random-effect outcome model with cluster means and PS weights from random-effect PS model.
+out_rere_cm <- WeMix::mix(
+  formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + 
+    cluster_mean_sportPartic_w1 + cluster_mean_selfEst_w3_sc + 
+    age_w1_sc + sex_w1 + white_w1 + black_w1 + 
+    parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
+  data = data,
+  weights = c("iptw_re", "L2weight")
+)
+
+
+## Outcome Models (PNDE & TNIE) --------------------------------------
+
+### Single-Level (SL) ------------------------------------------
+# Single-level outcome model with interaction term and PS weights from single-level PS model.
+out_slsl_interac <- glm(
+  formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + 
+      selfEst_w3_sc:sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1",
+  data = data,
+  weights = iptw_sl
+)
+
+# Single-level outcome model with interaction term and PS weights from fixed-effect PS model.
+out_fesl_interac <- glm(
+  formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + 
+      selfEst_w3_sc:sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1",
+  data = data,
+  weights = iptw_fe
+)
+
+# Single-level outcome model with interaction term and PS weights from random-effect PS model.
+out_resl_interac <- glm(
+  formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + 
+      selfEst_w3_sc:sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1",
+  data = data,
+  weights = iptw_re
+)
+
+### Fixed-Effect (FE) ------------------------------------------
+# Fixed-effect outcome model with interaction term and PS weights from single-level PS model.
+out_slfe_interac <- glm(
+  formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + 
+      selfEst_w3_sc:sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
+  data = data, 
+  weights = iptw_sl
+)
+
+# Fixed-effect outcome model with interaction term and PS weights from fixed-effect PS model.
+out_fefe_interac <- glm(
+  formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + 
+      selfEst_w3_sc:sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
+  data = data, 
+  weights = iptw_fe
+)
+
+# Fixed-effect outcome model with interaction term and PS weights from random-effect PS model.
+out_refe_interac <- glm(
+  formula = "depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + 
+      selfEst_w3_sc:sportPartic_w1 + age_w1_sc + sex_w1 + 
+      white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)", 
+  data = data,
+  weights = iptw_re
+)
+
+### Random-Effect (RE) -----------------------------------------
+# Random-effects outcome model with interaction term and PS weights from single-level PS model.
+out_slre_interac <- WeMix::mix(
+  formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + 
+    selfEst_w3_sc:sportPartic_w1 + age_w1_sc + sex_w1 + 
+    white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
+  data = data,
+  weights = c("iptw_sl", "L2weight")
+)
+
+# Random-effects outcome model with interaction term and PS weights from fixed-effect PS model.
+out_fere_interac <- WeMix::mix(
+  formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + 
+    selfEst_w3_sc:sportPartic_w1 + age_w1_sc + sex_w1 + 
+    white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
+  data = data,
+  weights = c("iptw_fe", "L2weight")
+)
+
+# Random-effects outcome model with interaction term and PS weights from random-effect PS model.
+out_rere_interac <- WeMix::mix(
+  formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + 
+    selfEst_w3_sc:sportPartic_w1 + age_w1_sc + sex_w1 + 
+    white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
+  data = data,
+  weights = c("iptw_re", "L2weight")
+)
+
+### Random-Effect with Cluster Means (RE-Mean) ---------------------------------
+# Random-effect outcome model with cluster means, interaction term, and PS weights from single-level PS model.
+out_slre_cm_interac <- WeMix::mix(
+  formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + 
+    cluster_mean_sportPartic_w1 + cluster_mean_selfEst_w3_sc + 
+    selfEst_w3_sc:sportPartic_w1 + age_w1_sc + sex_w1 + 
+    white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
+  data = data,
+  weights = c("iptw_sl", "L2weight")
+)
+
+# Random-effect outcome model with cluster means, interaction term, and PS weights from fixed-effect PS model.
+out_fere_cm_interac <- WeMix::mix(
+  formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + 
+    cluster_mean_sportPartic_w1 + cluster_mean_selfEst_w3_sc + 
+    selfEst_w3_sc:sportPartic_w1 + age_w1_sc + sex_w1 + 
+    white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
+  data = data,
+  weights = c("iptw_fe", "L2weight")
+)
+
+# Random-effect outcome model with cluster means, interaction term, and PS weights from random-effect PS model.
+out_rere_cm_interac <- WeMix::mix(
+  formula = depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + 
+    cluster_mean_sportPartic_w1 + cluster_mean_selfEst_w3_sc + 
+    selfEst_w3_sc:sportPartic_w1 + age_w1_sc + sex_w1 + 
+    white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2),
+  data = data,
+  weights = c("iptw_re", "L2weight")
+)
+
+
+
+
 
 
 
 # Display Estimates -------------------------------------------------------
 
 # Define conditions
-conditions <- c("slsl", "fesl", "resl", "slfe", "fefe", "refe", "slre", "fere", "rere")
+conditions <- c("slsl", "fesl", "resl", 
+                "slfe", "fefe", "refe", 
+                "slre", "fere", "rere", 
+                "slre_cm", "fere_cm", "rere_cm")
 
 # Extract TNDE estimates
 TNDE <- sapply(conditions, function(cond) {
@@ -1332,6 +925,20 @@ results_DF
 # 7 slre -0.2208416 -0.2210517 -0.06717527 -0.0117677236
 # 8 fere -0.1946794 -0.1951001 -0.09536315 -0.0126787393
 # 9 rere -0.2171489 -0.2174313 -0.08069368  0.0039460448
+
+# cond       TNDE       PNDE        PNIE          TNIE
+# 1     slsl -0.3317336 -0.3318426 -0.01230346  0.0247090071
+# 2     fesl -0.2558156 -0.2563010 -0.09886261 -0.0261259555
+# 3     resl -0.2959685 -0.2961819 -0.06592642  0.0012385894
+# 4     slfe -0.2253132 -0.2257916 -0.08332282 -0.0341267906
+# 5     fefe -0.2439341 -0.2445695 -0.09660659  0.0126441050
+# 6     refe -0.2464966 -0.2471019 -0.08816393  0.0085269374
+# 7     slre -0.2672821 -0.2675694 -0.05197434 -0.0080550456
+# 8     fere -0.2497230 -0.2503269 -0.09700125 -0.0005990211
+# 9     rere -0.2682174 -0.2686312 -0.07559626  0.0099211596
+# 10 slre_cm -0.2203850 -0.2207466 -0.07965423 -0.0397668108
+# 11 fere_cm -0.2425750 -0.2431934 -0.10177153 -0.0098265525
+# 12 rere_cm -0.2470984 -0.2476017 -0.08812400 -0.0065533984
 
 
 
@@ -1398,7 +1005,7 @@ refe_ci_PNIE <- bootstrap_ci_paral_2(iterations = 1000,
 #### Random-Effect (RE) Med/Out Models ---------------------------------------
 # SL PS Model 
 execution_time_slre <- system.time({ # Track computation time 
-  slre_ci_PNIE <- bootstrap_ci_re_paral_2(iterations = 1500, 
+  slre_ci_PNIE <- bootstrap_ci_re_paral_2(iterations = 1750, 
                                    iptw = iptw_sl, 
                                    data = data, 
                                    cores = 6, 
@@ -1456,7 +1063,7 @@ paste0("Number of iterations with both models converged: ", fere_ci_PNIE$both_co
 
 # RE PS Model
 execution_time_rere <- system.time({ # Track computation time 
-  rere_ci_PNIE <- bootstrap_ci_re_paral_2(iterations = 1500, 
+  rere_ci_PNIE <- bootstrap_ci_re_paral_2(iterations = 1750, 
                                    iptw = iptw_re, 
                                    data = data, 
                                    cores = 6, 
@@ -1482,6 +1089,89 @@ paste0("Number of iterations with both models converged: ", rere_ci_PNIE$both_co
 # [1] "Number of converged mediator models: 1154 (76.9333333333333%)"
 # [1] "Number of converged outcome models: 1488 (99.2%)"
 # [1] "Number of iterations with both models converged: 1146 (76.4%)"
+
+#### Random-Effect with Cluster Means (RE-Mean) Med/Out Models ---------------------------------------
+# SL PS Model 
+execution_time_slre_cm <- system.time({ # Track computation time 
+  slre_cm_ci_PNIE <- bootstrap_ci_re_mean_paral(iterations = 2000, 
+                                          iptw = iptw_sl, 
+                                          data = data, 
+                                          cores = 6, 
+                                          core_seeds = c(4561:4566), 
+                                          effect_type = "PNIE")
+})
+# Print the execution time
+print(execution_time_slre_cm)
+#  
+
+# Print the elapsed time specifically
+cat("Elapsed time:", execution_time_slre_cm["elapsed"], "seconds\n")
+# 
+
+# Print convergence statistics
+paste0("Number of converged mediator models: ", slre_cm_ci_PNIE$mediator_converged_count, 
+       " (", (slre_cm_ci_PNIE$mediator_converged_count / length(slre_cm_ci_PNIE$direct_effects)) * 100, "%)")
+paste0("Number of converged outcome models: ", slre_cm_ci_PNIE$outcome_converged_count, 
+       " (", (slre_cm_ci_PNIE$outcome_converged_count / length(slre_cm_ci_PNIE$direct_effects)) * 100, "%)")
+paste0("Number of iterations with both models converged: ", slre_cm_ci_PNIE$both_converged_count, 
+       " (", (slre_cm_ci_PNIE$both_converged_count / length(slre_cm_ci_PNIE$direct_effects)) * 100, "%)")
+# 
+
+# FE PS Model
+execution_time_fere_cm <- system.time({ # Track computation time 
+  fere_cm_ci_PNIE <- bootstrap_ci_re_mean_paral(iterations = 2000, 
+                                          iptw = iptw_fe, 
+                                          data = data, 
+                                          cores = 6, 
+                                          core_seeds = c(4561:4566), 
+                                          effect_type = "PNIE")
+})
+# Print the execution time
+print(execution_time_fere_cm)
+#  
+
+# Print the elapsed time specifically
+cat("Elapsed time:", execution_time_fere_cm["elapsed"], "seconds\n")
+# 
+
+# Print convergence statistics
+paste0("Number of converged mediator models: ", fere_cm_ci_PNIE$mediator_converged_count, 
+       " (", (fere_cm_ci_PNIE$mediator_converged_count / length(fere_cm_ci_PNIE$direct_effects)) * 100, "%)")
+paste0("Number of converged outcome models: ", fere_cm_ci_PNIE$outcome_converged_count, 
+       " (", (fere_cm_ci_PNIE$outcome_converged_count / length(fere_cm_ci_PNIE$direct_effects)) * 100, "%)")
+paste0("Number of iterations with both models converged: ", fere_cm_ci_PNIE$both_converged_count, 
+       " (", (fere_cm_ci_PNIE$both_converged_count / length(fere_cm_ci_PNIE$direct_effects)) * 100, "%)")
+# 
+
+# RE PS Model
+execution_time_rere_cm <- system.time({ # Track computation time 
+  rere_cm_ci_PNIE <- bootstrap_ci_re_mean_paral(iterations = 2000, 
+                                          iptw = iptw_re, 
+                                          data = data, 
+                                          cores = 6, 
+                                          core_seeds = c(4561:4566), 
+                                          effect_type = "PNIE")
+})
+# Print the execution time
+print(execution_time_rere_cm)
+#  
+
+# Print the elapsed time specifically
+cat("Elapsed time:", execution_time_rere_cm["elapsed"], "seconds\n")
+# 
+
+# Print convergence statistics
+paste0("Number of converged mediator models: ", rere_cm_ci_PNIE$mediator_converged_count, 
+       " (", (rere_cm_ci_PNIE$mediator_converged_count / length(rere_cm_ci_PNIE$direct_effects)) * 100, "%)")
+paste0("Number of converged outcome models: ", rere_cm_ci_PNIE$outcome_converged_count, 
+       " (", (rere_cm_ci_PNIE$outcome_converged_count / length(rere_cm_ci_PNIE$direct_effects)) * 100, "%)")
+paste0("Number of iterations with both models converged: ", rere_cm_ci_PNIE$both_converged_count, 
+       " (", (rere_cm_ci_PNIE$both_converged_count / length(rere_cm_ci_PNIE$direct_effects)) * 100, "%)")
+# 
+
+
+
+
 
 
 ## PNDE & TNIE -------------------------------------------------------------
@@ -1545,7 +1235,7 @@ refe_ci_TNIE <- bootstrap_ci_paral_2(iterations = 1000,
 #### Random-Effect (RE) Med/Out Models ---------------------------------------
 # SL PS Model 
 execution_time_slre <- system.time({ # Track computation time 
-  slre_ci_TNIE <- bootstrap_ci_re_paral_2(iterations = 1500, 
+  slre_ci_TNIE <- bootstrap_ci_re_paral_2(iterations = 2000, 
                                           iptw = iptw_sl, 
                                           data = data, 
                                           cores = 6, 
@@ -1574,7 +1264,7 @@ paste0("Number of iterations with both models converged: ", slre_ci_TNIE$both_co
 
 # FE PS Model
 execution_time_fere <- system.time({ # Track computation time 
-  fere_ci_TNIE <- bootstrap_ci_re_paral_2(iterations = 1500, 
+  fere_ci_TNIE <- bootstrap_ci_re_paral_2(iterations = 2000, 
                                           iptw = iptw_fe, 
                                           data = data, 
                                           cores = 6, 
@@ -1603,7 +1293,7 @@ paste0("Number of iterations with both models converged: ", fere_ci_TNIE$both_co
 
 # RE PS Model
 execution_time_rere <- system.time({ # Track computation time 
-  rere_ci_TNIE <- bootstrap_ci_re_paral_2(iterations = 1500, 
+  rere_ci_TNIE <- bootstrap_ci_re_paral_2(iterations = 2000, 
                                           iptw = iptw_re, 
                                           data = data, 
                                           cores = 6, 
@@ -1630,6 +1320,99 @@ paste0("Number of iterations with both models converged: ", rere_ci_TNIE$both_co
 # [1] "Number of converged outcome models: 1488 (99.2%)"
 # [1] "Number of iterations with both models converged: 1144 (76.2666666666667%)"
 
+#### Random-Effect with Cluster Means (RE-Mean) Med/Out Models ---------------------------------------
+# SL PS Model 
+execution_time_slre_cm <- system.time({ # Track computation time 
+  slre_cm_ci_TNIE <- bootstrap_ci_re_mean_paral(iterations = 2000, 
+                                          iptw = iptw_sl, 
+                                          data = data, 
+                                          cores = 6, 
+                                          core_seeds = c(4561:4566), 
+                                          effect_type = "TNIE")
+})
+# Print the execution time
+print(execution_time_slre_cm)
+#  
+
+# Print the elapsed time specifically
+cat("Elapsed time:", execution_time_slre_cm["elapsed"], "seconds\n")
+# 
+
+# Print convergence statistics
+paste0("Number of converged mediator models: ", slre_cm_ci_TNIE$mediator_converged_count, 
+       " (", (slre_cm_ci_TNIE$mediator_converged_count / length(slre_cm_ci_TNIE$direct_effects)) * 100, "%)")
+paste0("Number of converged outcome models: ", slre_cm_ci_TNIE$outcome_converged_count, 
+       " (", (slre_cm_ci_TNIE$outcome_converged_count / length(slre_cm_ci_TNIE$direct_effects)) * 100, "%)")
+paste0("Number of iterations with both models converged: ", slre_cm_ci_TNIE$both_converged_count, 
+       " (", (slre_cm_ci_TNIE$both_converged_count / length(slre_cm_ci_TNIE$direct_effects)) * 100, "%)")
+# 
+
+# FE PS Model
+execution_time_fere_cm <- system.time({ # Track computation time 
+  fere_cm_ci_TNIE <- bootstrap_ci_re_mean_paral(iterations = 2000, 
+                                          iptw = iptw_fe, 
+                                          data = data, 
+                                          cores = 6, 
+                                          core_seeds = c(4561:4566), 
+                                          effect_type = "TNIE")
+})
+# Print the execution time
+print(execution_time_fere_cm)
+# 
+
+# Print the elapsed time specifically
+cat("Elapsed time:", execution_time_fere_cm["elapsed"], "seconds\n")
+# 
+
+# Print convergence statistics
+paste0("Number of converged mediator models: ", fere_cm_ci_TNIE$mediator_converged_count, 
+       " (", (fere_cm_ci_TNIE$mediator_converged_count / length(fere_cm_ci_TNIE$direct_effects)) * 100, "%)")
+paste0("Number of converged outcome models: ", fere_cm_ci_TNIE$outcome_converged_count, 
+       " (", (fere_cm_ci_TNIE$outcome_converged_count / length(fere_cm_ci_TNIE$direct_effects)) * 100, "%)")
+paste0("Number of iterations with both models converged: ", fere_cm_ci_TNIE$both_converged_count, 
+       " (", (fere_cm_ci_TNIE$both_converged_count / length(fere_cm_ci_TNIE$direct_effects)) * 100, "%)")
+# 
+
+# RE PS Model
+execution_time_rere_cm <- system.time({ # Track computation time 
+  rere_cm_ci_TNIE <- bootstrap_ci_re_mean_paral(iterations = 2000, 
+                                          iptw = iptw_re, 
+                                          data = data, 
+                                          cores = 6, 
+                                          core_seeds = c(4561:4566), 
+                                          effect_type = "TNIE")
+})
+# Print the execution time
+print(execution_time_rere_cm)
+#  
+
+# Print the elapsed time specifically
+cat("Elapsed time:", execution_time_rere_cm["elapsed"], "seconds\n")
+# 
+
+# Print convergence statistics
+paste0("Number of converged mediator models: ", rere_cm_ci_TNIE$mediator_converged_count, 
+       " (", (rere_cm_ci_TNIE$mediator_converged_count / length(rere_cm_ci_TNIE$direct_effects)) * 100, "%)")
+paste0("Number of converged outcome models: ", rere_cm_ci_TNIE$outcome_converged_count, 
+       " (", (rere_cm_ci_TNIE$outcome_converged_count / length(rere_cm_ci_TNIE$direct_effects)) * 100, "%)")
+paste0("Number of iterations with both models converged: ", rere_cm_ci_TNIE$both_converged_count, 
+       " (", (rere_cm_ci_TNIE$both_converged_count / length(rere_cm_ci_TNIE$direct_effects)) * 100, "%)")
+# 
+
+
+
+
+
+
+################################################################################
+
+# [NEXT TO WORK ON] -------------------------------------------------------
+
+
+
+
+
+################################################################################
 
 
 # Store & Join Results ----------------------------------------------------
