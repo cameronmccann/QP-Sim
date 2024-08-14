@@ -1,7 +1,7 @@
 #---------------------------------------------------#
 # QP Project - Empirical Application 
 
-#' Bootstrap Confidence Interval Estimation for Random Effects Mediation Analysis
+#' Bootstrap Confidence Interval Estimation for Random Effects Mediation Analysis with Cluster Means
 #'
 #' `bootstrap_ci_re_mean_paral()` performs percentile bootstrap resampling to estimate confidence 
 #' intervals for direct and indirect effects in a mediation analysis using clustered 
@@ -9,7 +9,9 @@
 #' iterations. It returns the estimated confidence intervals for the direct 
 #' effect (Total Natural Direct Effect; TNDE or Pure Natural Direct Effect; PNDE) 
 #' and indirect effect (Pure Natural Indirect Effect; PNIE or Total Natural Indirect 
-#' Effect; TNIE). The function supports random effects modeling for both mediator and outcome analyses.
+#' Effect; TNIE). The function supports random effect modeling for both mediator 
+#' and outcome analyses, with the inclusion of cluster-level means of the treatment
+#' and mediator variable in the models.
 #'
 #' @param iterations Number of bootstrap iterations to perform (default is 50).
 #' @param iptw Inverse probability of treatment weights to be used in model fitting.

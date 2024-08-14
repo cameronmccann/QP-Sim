@@ -77,15 +77,18 @@ The repository is organized as follows:
     │   ├── Raw                   # Original datasets (no modifications)
     │   │   └── ICPSR_21600       # Subfolder for specific original data sources
     │   └── Cleaned               # Final clean dataset used for analysis
+    │       └── Empirical-Application-Data.rds
     ├── Functions   
     │   ├── bootstrap_ci_paral_2.R
     │   ├── bootstrap_ci_paral.R
+    │   ├── bootstrap_ci_re_mean_paral.R
     │   ├── bootstrap_ci_re_paral_2.R
     │   └── bootstrap_ci_re_paral.R
     └── Output                    # Results from the empirical analysis
         ├── Visuals               # Plots, graphs, and other visuals
-        └── Estimates
-            └── Estimates.rds
+        ├── Estimates
+        │   └── Effect-Estimates.rds
+        └── Bootstrap_Temp        # Temporary bootstrap data files
 ```
 
 

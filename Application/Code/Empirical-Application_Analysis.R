@@ -10,25 +10,18 @@
 #
 #
 # Script Description:
-#
-#
-# Last Updated: 08/13/2024 
+#   This R script performs the mediation analysis for the empirical application. 
+#   First, it calculate the Intraclass Correlation Coefficients (ICC) for the 
+#   mediator and outcome variables. Next, it computes propensity scores (PSs) and 
+#   Inverse Probability of Treatment Weight (IPTW) using the Single-Level, 
+#   Fixed-Effect, and Random-Effect PS models, with percentile bootstrap confidence 
+#   intervals. Covariate balance is visualized. Finally, it visualizes the 
+# estimated effects to facilitate interpretation of the results.
+# 
+# Last Updated: 08/14/2024 
 #
 #
 # Notes:
-#   To-Do:
-#     + Clean up code comments (especially in data cleaning sections) 
-# 
-#   Next: 
-#     + 
-# 
-#   Done: 
-# 
-#     + get weights & figure out how to incorporate them properly into the analysis 
-#     + create rough draft of code to run analyses 
-#     + 
-#     + Note. pg 14 of 21600-User_guide.pdf provides weights 
-#     + Multilevel Model sample weight example on pg 43 of 21600-User_guide.pdf
 # 
 ################################################################################
 
@@ -371,9 +364,6 @@ new_labels <- c("Race: Black", "Race: White", "Family Structure",
                 "Health Insurance \n Coverage Gap", "Age", "Sex", 
                 "Self-Esteem Score", "Feelings Scale Score", "Parental Education")
 
-
-## Visualization: Love Plot for Paper --------------------------------
-
 # Load Times New Roman font for publication-quality visuals
 # loadfonts()
 
@@ -428,7 +418,10 @@ ggsave(filename = "Application/Output/Covariate-Balance_QP-Doc.png", plot = last
 
 
 
-
+# "#BF5700", #Fixed-effect
+# "#A6CD57", #Random-effect 
+# "#333F48" #Single-level 
+# "#00A9B7" #Unweighted
 
 
 
@@ -940,487 +933,475 @@ results_DF
 # 11 fere_cm -0.2425750 -0.2431934 -0.10177153 -0.0098265525
 # 12 rere_cm -0.2470984 -0.2476017 -0.08812400 -0.0065533984
 
+## Clean Environment -------------------------------------------------------
+# Remove all objects from the environment except for 'data', 'results_DF', and functions
+rm(list = setdiff(ls(), c("data", "results_DF", lsf.str())))
 
 
-# Conduct Bootstrap Confidence Intervals (CI) ---------------------------------
+
+# Bootstrap Confidence Intervals (CI) -------------------------------------
+# This section conducts the bootstrapping for confidence intervals for each effect 
+# using each PS model (SL, FE, & RE) and mediator/outcome model (SL, FE, RE, & RE-Mean). 
+# Results are saved and convergence statistics are printed.
+
+# WARNING: Both RE and RE-Mean calculations require extended processing times.
 
 ## TNDE & PNIE -------------------------------------------------------------
+# This subsection focuses on TNDE (Total Natural Direct Effect) and PNIE (Pure Natural Indirect Effect) across different mediation/outcome models.
 
-#### Single-Level (SL) Med/Out Models  ---------------------------------------
-# SL PS Model 
-slsl_ci_PNIE <- bootstrap_ci_paral_2(iterations = 1000,
-                                iptw = iptw_sl,
-                                data = data,
-                                model = "SL",
-                                cores = 6,
-                                core_seeds = c(4561:4566), 
-                                effect_type = "PNIE")
-
-# FE PS Model 
-fesl_ci_PNIE <- bootstrap_ci_paral_2(iterations = 1000,
-                              iptw = iptw_fe,
-                              data = data,
-                              model = "SL",
-                              cores = 6,
-                              core_seeds = c(4561:4566), 
-                              effect_type = "PNIE")
-
-# RE PS Model 
-resl_ci_PNIE <- bootstrap_ci_paral_2(iterations = 1000,
-                              iptw = iptw_re,
-                              data = data,
-                              model = "SL",
-                              cores = 6,
-                              core_seeds = c(4561:4566),
-                              effect_type = "PNIE")
-
-#### Fixed-Effect (FE) Med/Out Models ----------------------------------------
-# SL PS Model 
-slfe_ci_PNIE <- bootstrap_ci_paral_2(iterations = 1000,
-                              iptw = iptw_sl,
-                              data = data,
-                              model = "FE",
-                              cores = 6,
-                              core_seeds = c(4561:4566), 
-                              effect_type = "PNIE")
-
-# FE PS Model 
-fefe_ci_PNIE <- bootstrap_ci_paral_2(iterations = 1000,
-                              iptw = iptw_fe,
-                              data = data,
-                              model = "FE",
-                              cores = 6,
-                              core_seeds = c(4561:4566), 
-                              effect_type = "PNIE")
-
-# RE PS Model 
-refe_ci_PNIE <- bootstrap_ci_paral_2(iterations = 1000,
-                              iptw = iptw_re,
-                              data = data,
-                              model = "FE",
-                              cores = 6,
-                              core_seeds = c(4561:4566), 
-                              effect_type = "PNIE")
-
-#### Random-Effect (RE) Med/Out Models ---------------------------------------
-# SL PS Model 
-execution_time_slre <- system.time({ # Track computation time 
-  slre_ci_PNIE <- bootstrap_ci_re_paral_2(iterations = 1750, 
-                                   iptw = iptw_sl, 
-                                   data = data, 
-                                   cores = 6, 
-                                   core_seeds = c(4561:4566), 
-                                   effect_type = "PNIE")
-})
-# Print the execution time
-print(execution_time_slre)
-#    user   system  elapsed 
-# 8656.601 1124.463 3393.450 
-
-# Print the elapsed time specifically
-cat("Elapsed time:", execution_time_slre["elapsed"], "seconds\n")
-# Elapsed time: 3393.45 seconds
-
-# Print convergence statistics
-paste0("Number of converged mediator models: ", slre_ci_PNIE$mediator_converged_count, 
-       " (", (slre_ci_PNIE$mediator_converged_count / length(slre_ci_PNIE$direct_effects)) * 100, "%)")
-paste0("Number of converged outcome models: ", slre_ci_PNIE$outcome_converged_count, 
-       " (", (slre_ci_PNIE$outcome_converged_count / length(slre_ci_PNIE$direct_effects)) * 100, "%)")
-paste0("Number of iterations with both models converged: ", slre_ci_PNIE$both_converged_count, 
-       " (", (slre_ci_PNIE$both_converged_count / length(slre_ci_PNIE$direct_effects)) * 100, "%)")
-# [1] "Number of converged mediator models: 1154 (76.9333333333333%)"
-# [1] "Number of converged outcome models: 1488 (99.2%)"
-# [1] "Number of iterations with both models converged: 1146 (76.4%)"
+### Single-Level (SL) Mediation/Outcome Models -----------------------------
+# SL PS Model
+slsl_ci_PNIE <- bootstrap_ci_paral_2(
+  iterations = 1000,        # Number of bootstrap iterations
+  iptw = iptw_sl,           # IPTW weights from SL PS model
+  data = data,              # Input data
+  model = "SL",             # Specify PS model 
+  cores = 6,                # Number of CPU cores for parallelization
+  core_seeds = c(4561:4566),# Seeds for reproducibility
+  effect_type = "PNIE"      # Effect type: PNIE
+)
+saveRDS(slsl_ci_PNIE, file = "Application/Output/Bootstrap_Temp/slsl_ci_PNIE.rds")
+rm(slsl_ci_PNIE)
 
 # FE PS Model
-execution_time_fere <- system.time({ # Track computation time 
-  fere_ci_PNIE <- bootstrap_ci_re_paral_2(iterations = 1500, 
-                                   iptw = iptw_fe, 
-                                   data = data, 
-                                   cores = 6, 
-                                   core_seeds = c(4561:4566), 
-                                   effect_type = "PNIE")
-})
-# Print the execution time
-print(execution_time_fere)
-#     user    system   elapsed 
-# 12087.304  1923.361  6444.097 
-
-# Print the elapsed time specifically
-cat("Elapsed time:", execution_time_fere["elapsed"], "seconds\n")
-# Elapsed time: 6444.097 seconds
-
-# Print convergence statistics
-paste0("Number of converged mediator models: ", fere_ci_PNIE$mediator_converged_count, 
-       " (", (fere_ci_PNIE$mediator_converged_count / length(fere_ci_PNIE$direct_effects)) * 100, "%)")
-paste0("Number of converged outcome models: ", fere_ci_PNIE$outcome_converged_count, 
-       " (", (fere_ci_PNIE$outcome_converged_count / length(fere_ci_PNIE$direct_effects)) * 100, "%)")
-paste0("Number of iterations with both models converged: ", fere_ci_PNIE$both_converged_count, 
-       " (", (fere_ci_PNIE$both_converged_count / length(fere_ci_PNIE$direct_effects)) * 100, "%)")
-# [1] "Number of converged mediator models: 1154 (76.9333333333333%)"
-# [1] "Number of converged outcome models: 1488 (99.2%)"
-# [1] "Number of iterations with both models converged: 1146 (76.4%)"
+fesl_ci_PNIE <- bootstrap_ci_paral_2(
+  iterations = 1000,
+  iptw = iptw_fe,
+  data = data,
+  model = "SL",
+  cores = 6,
+  core_seeds = c(4561:4566),
+  effect_type = "PNIE"
+)
+saveRDS(fesl_ci_PNIE, file = "Application/Output/Bootstrap_Temp/fesl_ci_PNIE.rds")
+rm(fesl_ci_PNIE)
 
 # RE PS Model
-execution_time_rere <- system.time({ # Track computation time 
-  rere_ci_PNIE <- bootstrap_ci_re_paral_2(iterations = 1750, 
-                                   iptw = iptw_re, 
-                                   data = data, 
-                                   cores = 6, 
-                                   core_seeds = c(4561:4566), 
-                                   effect_type = "PNIE")
-})
-# Print the execution time
-print(execution_time_rere)
-#     user    system   elapsed 
-# 10658.977  1202.641  2922.896 
+resl_ci_PNIE <- bootstrap_ci_paral_2(
+  iterations = 1000,
+  iptw = iptw_re,
+  data = data,
+  model = "SL",
+  cores = 6,
+  core_seeds = c(4561:4566),
+  effect_type = "PNIE"
+)
+saveRDS(resl_ci_PNIE, file = "Application/Output/Bootstrap_Temp/resl_ci_PNIE.rds")
+rm(resl_ci_PNIE)
 
-# Print the elapsed time specifically
-cat("Elapsed time:", execution_time_rere["elapsed"], "seconds\n")
-# Elapsed time: 2922.896 seconds
-
-# Print convergence statistics
-paste0("Number of converged mediator models: ", rere_ci_PNIE$mediator_converged_count, 
-       " (", (rere_ci_PNIE$mediator_converged_count / length(rere_ci_PNIE$direct_effects)) * 100, "%)")
-paste0("Number of converged outcome models: ", rere_ci_PNIE$outcome_converged_count, 
-       " (", (rere_ci_PNIE$outcome_converged_count / length(rere_ci_PNIE$direct_effects)) * 100, "%)")
-paste0("Number of iterations with both models converged: ", rere_ci_PNIE$both_converged_count, 
-       " (", (rere_ci_PNIE$both_converged_count / length(rere_ci_PNIE$direct_effects)) * 100, "%)")
-# [1] "Number of converged mediator models: 1154 (76.9333333333333%)"
-# [1] "Number of converged outcome models: 1488 (99.2%)"
-# [1] "Number of iterations with both models converged: 1146 (76.4%)"
-
-#### Random-Effect with Cluster Means (RE-Mean) Med/Out Models ---------------------------------------
-# SL PS Model 
-execution_time_slre_cm <- system.time({ # Track computation time 
-  slre_cm_ci_PNIE <- bootstrap_ci_re_mean_paral(iterations = 2000, 
-                                          iptw = iptw_sl, 
-                                          data = data, 
-                                          cores = 6, 
-                                          core_seeds = c(4561:4566), 
-                                          effect_type = "PNIE")
-})
-# Print the execution time
-print(execution_time_slre_cm)
-#  
-
-# Print the elapsed time specifically
-cat("Elapsed time:", execution_time_slre_cm["elapsed"], "seconds\n")
-# 
-
-# Print convergence statistics
-paste0("Number of converged mediator models: ", slre_cm_ci_PNIE$mediator_converged_count, 
-       " (", (slre_cm_ci_PNIE$mediator_converged_count / length(slre_cm_ci_PNIE$direct_effects)) * 100, "%)")
-paste0("Number of converged outcome models: ", slre_cm_ci_PNIE$outcome_converged_count, 
-       " (", (slre_cm_ci_PNIE$outcome_converged_count / length(slre_cm_ci_PNIE$direct_effects)) * 100, "%)")
-paste0("Number of iterations with both models converged: ", slre_cm_ci_PNIE$both_converged_count, 
-       " (", (slre_cm_ci_PNIE$both_converged_count / length(slre_cm_ci_PNIE$direct_effects)) * 100, "%)")
-# 
+### Fixed-Effect (FE) Mediation/Outcome Models -----------------------------
+# SL PS Model
+slfe_ci_PNIE <- bootstrap_ci_paral_2(
+  iterations = 1000,
+  iptw = iptw_sl,
+  data = data,
+  model = "FE",   
+  cores = 6,
+  core_seeds = c(4561:4566),
+  effect_type = "PNIE"
+)
+saveRDS(slfe_ci_PNIE, file = "Application/Output/Bootstrap_Temp/slfe_ci_PNIE.rds")
+rm(slfe_ci_PNIE)
 
 # FE PS Model
-execution_time_fere_cm <- system.time({ # Track computation time 
-  fere_cm_ci_PNIE <- bootstrap_ci_re_mean_paral(iterations = 2000, 
-                                          iptw = iptw_fe, 
-                                          data = data, 
-                                          cores = 6, 
-                                          core_seeds = c(4561:4566), 
-                                          effect_type = "PNIE")
-})
-# Print the execution time
-print(execution_time_fere_cm)
-#  
-
-# Print the elapsed time specifically
-cat("Elapsed time:", execution_time_fere_cm["elapsed"], "seconds\n")
-# 
-
-# Print convergence statistics
-paste0("Number of converged mediator models: ", fere_cm_ci_PNIE$mediator_converged_count, 
-       " (", (fere_cm_ci_PNIE$mediator_converged_count / length(fere_cm_ci_PNIE$direct_effects)) * 100, "%)")
-paste0("Number of converged outcome models: ", fere_cm_ci_PNIE$outcome_converged_count, 
-       " (", (fere_cm_ci_PNIE$outcome_converged_count / length(fere_cm_ci_PNIE$direct_effects)) * 100, "%)")
-paste0("Number of iterations with both models converged: ", fere_cm_ci_PNIE$both_converged_count, 
-       " (", (fere_cm_ci_PNIE$both_converged_count / length(fere_cm_ci_PNIE$direct_effects)) * 100, "%)")
-# 
+fefe_ci_PNIE <- bootstrap_ci_paral_2(
+  iterations = 1000,
+  iptw = iptw_fe,
+  data = data,
+  model = "FE",
+  cores = 6,
+  core_seeds = c(4561:4566),
+  effect_type = "PNIE"
+)
+saveRDS(fefe_ci_PNIE, file = "Application/Output/Bootstrap_Temp/fefe_ci_PNIE.rds")
+rm(fefe_ci_PNIE)
 
 # RE PS Model
-execution_time_rere_cm <- system.time({ # Track computation time 
-  rere_cm_ci_PNIE <- bootstrap_ci_re_mean_paral(iterations = 2000, 
-                                          iptw = iptw_re, 
-                                          data = data, 
-                                          cores = 6, 
-                                          core_seeds = c(4561:4566), 
-                                          effect_type = "PNIE")
+refe_ci_PNIE <- bootstrap_ci_paral_2(
+  iterations = 1000,
+  iptw = iptw_re,
+  data = data,
+  model = "FE",
+  cores = 6,
+  core_seeds = c(4561:4566),
+  effect_type = "PNIE"
+)
+saveRDS(refe_ci_PNIE, file = "Application/Output/Bootstrap_Temp/refe_ci_PNIE.rds")
+rm(refe_ci_PNIE)
+
+### Random-Effect (RE) Mediation/Outcome Models ----------------------------
+# SL PS Model
+execution_time <- system.time({ # Track computation time 
+  slre_ci_PNIE <- bootstrap_ci_re_paral_2(
+    iterations = 1750,  
+    iptw = iptw_sl,
+    data = data,
+    cores = 6,
+    core_seeds = c(4561:4566),
+    effect_type = "PNIE"
+  )
 })
-# Print the execution time
-print(execution_time_rere_cm)
-#  
+saveRDS(slre_ci_PNIE, file = "Application/Output/Bootstrap_Temp/slre_ci_PNIE.rds")
 
-# Print the elapsed time specifically
-cat("Elapsed time:", execution_time_rere_cm["elapsed"], "seconds\n")
-# 
+# Print elapsed time and convergence statistics
+cat("Elapsed time:", execution_time["elapsed"], "seconds (", round(execution_time["elapsed"]/60), "mins) \n")
+cat("Number of converged mediator models: ", slre_ci_PNIE$mediator_converged_count,
+    " (", (slre_ci_PNIE$mediator_converged_count / length(slre_ci_PNIE$direct_effects)) * 100, "%)\n")
+cat("Number of converged outcome models: ", slre_ci_PNIE$outcome_converged_count,
+    " (", (slre_ci_PNIE$outcome_converged_count / length(slre_ci_PNIE$direct_effects)) * 100, "%)\n")
+cat("Number of iterations with both models converged: ", slre_ci_PNIE$both_converged_count,
+    " (", (slre_ci_PNIE$both_converged_count / length(slre_ci_PNIE$direct_effects)) * 100, "%)\n")
+rm(slre_ci_PNIE)
 
-# Print convergence statistics
-paste0("Number of converged mediator models: ", rere_cm_ci_PNIE$mediator_converged_count, 
-       " (", (rere_cm_ci_PNIE$mediator_converged_count / length(rere_cm_ci_PNIE$direct_effects)) * 100, "%)")
-paste0("Number of converged outcome models: ", rere_cm_ci_PNIE$outcome_converged_count, 
-       " (", (rere_cm_ci_PNIE$outcome_converged_count / length(rere_cm_ci_PNIE$direct_effects)) * 100, "%)")
-paste0("Number of iterations with both models converged: ", rere_cm_ci_PNIE$both_converged_count, 
-       " (", (rere_cm_ci_PNIE$both_converged_count / length(rere_cm_ci_PNIE$direct_effects)) * 100, "%)")
-# 
+# FE PS Model
+execution_time <- system.time({ 
+  fere_ci_PNIE <- bootstrap_ci_re_paral_2(
+    iterations = 1750,
+    iptw = iptw_fe,
+    data = data,
+    cores = 6,
+    core_seeds = c(4561:4566),
+    effect_type = "PNIE"
+  )
+})
+saveRDS(fere_ci_PNIE, file = "Application/Output/Bootstrap_Temp/fere_ci_PNIE.rds")
 
+# Print elapsed time and convergence statistics
+cat("Elapsed time:", execution_time["elapsed"], "seconds (", round(execution_time["elapsed"]/60), "mins) \n")
+cat("Number of converged mediator models: ", fere_ci_PNIE$mediator_converged_count,
+    " (", (fere_ci_PNIE$mediator_converged_count / length(fere_ci_PNIE$direct_effects)) * 100, "%)\n")
+cat("Number of converged outcome models: ", fere_ci_PNIE$outcome_converged_count,
+    " (", (fere_ci_PNIE$outcome_converged_count / length(fere_ci_PNIE$direct_effects)) * 100, "%)\n")
+cat("Number of iterations with both models converged: ", fere_ci_PNIE$both_converged_count,
+    " (", (fere_ci_PNIE$both_converged_count / length(fere_ci_PNIE$direct_effects)) * 100, "%)\n")
+rm(fere_ci_PNIE)
 
+# RE PS Model
+execution_time <- system.time({ 
+  rere_ci_PNIE <- bootstrap_ci_re_paral_2(
+    iterations = 1750,
+    iptw = iptw_re,
+    data = data,
+    cores = 6,
+    core_seeds = c(4561:4566),
+    effect_type = "PNIE"
+  )
+})
+saveRDS(rere_ci_PNIE, file = "Application/Output/Bootstrap_Temp/rere_ci_PNIE.rds")
 
+# Print elapsed time and convergence statistics
+cat("Elapsed time:", execution_time["elapsed"], "seconds (", round(execution_time["elapsed"]/60), "mins) \n")
+cat("Number of converged mediator models: ", rere_ci_PNIE$mediator_converged_count,
+    " (", (rere_ci_PNIE$mediator_converged_count / length(rere_ci_PNIE$direct_effects)) * 100, "%)\n")
+cat("Number of converged outcome models: ", rere_ci_PNIE$outcome_converged_count,
+    " (", (rere_ci_PNIE$outcome_converged_count / length(rere_ci_PNIE$direct_effects)) * 100, "%)\n")
+cat("Number of iterations with both models converged: ", rere_ci_PNIE$both_converged_count,
+    " (", (rere_ci_PNIE$both_converged_count / length(rere_ci_PNIE$direct_effects)) * 100, "%)\n")
+rm(rere_ci_PNIE)
 
+### Random-Effect with Cluster Means (RE-Mean) Med/Out Models --------------
+# SL PS Model
+execution_time <- system.time({ 
+  slre_cm_ci_PNIE <- bootstrap_ci_re_mean_paral(
+    iterations = 1750, 
+    iptw = iptw_sl,
+    data = data,
+    cores = 6,
+    core_seeds = c(4561:4566),
+    effect_type = "PNIE"
+  )
+})
+saveRDS(slre_cm_ci_PNIE, file = "Application/Output/Bootstrap_Temp/slre_cm_ci_PNIE.rds")
 
+# Print elapsed time and convergence statistics
+cat("Elapsed time:", execution_time["elapsed"], "seconds (", round(execution_time["elapsed"]/60), "mins) \n")
+cat("Number of converged mediator models: ", slre_cm_ci_PNIE$mediator_converged_count,
+    " (", (slre_cm_ci_PNIE$mediator_converged_count / length(slre_cm_ci_PNIE$direct_effects)) * 100, "%)\n")
+cat("Number of converged outcome models: ", slre_cm_ci_PNIE$outcome_converged_count,
+    " (", (slre_cm_ci_PNIE$outcome_converged_count / length(slre_cm_ci_PNIE$direct_effects)) * 100, "%)\n")
+cat("Number of iterations with both models converged: ", slre_cm_ci_PNIE$both_converged_count,
+    " (", (slre_cm_ci_PNIE$both_converged_count / length(slre_cm_ci_PNIE$direct_effects)) * 100, "%)\n")
+rm(slre_cm_ci_PNIE)
+
+# FE PS Model
+execution_time <- system.time({ 
+  fere_cm_ci_PNIE <- bootstrap_ci_re_mean_paral(
+    iterations = 1750, 
+    iptw = iptw_fe,
+    data = data,
+    cores = 6,
+    core_seeds = c(4561:4566),
+    effect_type = "PNIE"
+  )
+})
+saveRDS(fere_cm_ci_PNIE, file = "Application/Output/Bootstrap_Temp/fere_cm_ci_PNIE.rds")
+
+# Print elapsed time and convergence statistics
+cat("Elapsed time:", execution_time["elapsed"], "seconds (", round(execution_time["elapsed"]/60), "mins) \n")
+cat("Number of converged mediator models: ", fere_cm_ci_PNIE$mediator_converged_count,
+    " (", (fere_cm_ci_PNIE$mediator_converged_count / length(fere_cm_ci_PNIE$direct_effects)) * 100, "%)\n")
+cat("Number of converged outcome models: ", fere_cm_ci_PNIE$outcome_converged_count,
+    " (", (fere_cm_ci_PNIE$outcome_converged_count / length(fere_cm_ci_PNIE$direct_effects)) * 100, "%)\n")
+cat("Number of iterations with both models converged: ", fere_cm_ci_PNIE$both_converged_count,
+    " (", (fere_cm_ci_PNIE$both_converged_count / length(fere_cm_ci_PNIE$direct_effects)) * 100, "%)\n")
+rm(fere_cm_ci_PNIE)
+
+# RE PS Model
+execution_time <- system.time({ 
+  rere_cm_ci_PNIE <- bootstrap_ci_re_mean_paral(
+    iterations = 1750, 
+    iptw = iptw_re,
+    data = data,
+    cores = 6,
+    core_seeds = c(4561:4566),
+    effect_type = "PNIE"
+  )
+})
+saveRDS(rere_cm_ci_PNIE, file = "Application/Output/Bootstrap_Temp/rere_cm_ci_PNIE.rds")
+
+# Print elapsed time and convergence statistics
+cat("Elapsed time:", execution_time["elapsed"], "seconds (", round(execution_time["elapsed"]/60), "mins) \n")
+cat("Number of converged mediator models: ", rere_cm_ci_PNIE$mediator_converged_count,
+    " (", (rere_cm_ci_PNIE$mediator_converged_count / length(rere_cm_ci_PNIE$direct_effects)) * 100, "%)\n")
+cat("Number of converged outcome models: ", rere_cm_ci_PNIE$outcome_converged_count,
+    " (", (rere_cm_ci_PNIE$outcome_converged_count / length(rere_cm_ci_PNIE$direct_effects)) * 100, "%)\n")
+cat("Number of iterations with both models converged: ", rere_cm_ci_PNIE$both_converged_count,
+    " (", (rere_cm_ci_PNIE$both_converged_count / length(rere_cm_ci_PNIE$direct_effects)) * 100, "%)\n")
+rm(rere_cm_ci_PNIE)
 
 ## PNDE & TNIE -------------------------------------------------------------
+# This subsection focuses on PNDE (Pure Natural Direct Effect) and TNIE (Total Natural Indirect Effect)
+# effects across different mediation/outcome models.
 
-#### Single-Level (SL) Med/Out Models  ---------------------------------------
-# SL PS Model 
-slsl_ci_TNIE <- bootstrap_ci_paral_2(iterations = 1000,
-                                     iptw = iptw_sl,
-                                     data = data,
-                                     model = "SL",
-                                     cores = 6,
-                                     core_seeds = c(4561:4566), 
-                                     effect_type = "TNIE")
-
-# FE PS Model 
-fesl_ci_TNIE <- bootstrap_ci_paral_2(iterations = 1000,
-                                     iptw = iptw_fe,
-                                     data = data,
-                                     model = "SL",
-                                     cores = 6,
-                                     core_seeds = c(4561:4566), 
-                                     effect_type = "TNIE")
-
-# RE PS Model 
-resl_ci_TNIE <- bootstrap_ci_paral_2(iterations = 1000,
-                                     iptw = iptw_re,
-                                     data = data,
-                                     model = "SL",
-                                     cores = 6,
-                                     core_seeds = c(4561:4566),
-                                     effect_type = "TNIE")
-
-#### Fixed-Effect (FE) Med/Out Models ----------------------------------------
-# SL PS Model 
-slfe_ci_TNIE <- bootstrap_ci_paral_2(iterations = 1000,
-                                     iptw = iptw_sl,
-                                     data = data,
-                                     model = "FE",
-                                     cores = 6,
-                                     core_seeds = c(4561:4566), 
-                                     effect_type = "TNIE")
-
-# FE PS Model 
-fefe_ci_TNIE <- bootstrap_ci_paral_2(iterations = 1000,
-                                     iptw = iptw_fe,
-                                     data = data,
-                                     model = "FE",
-                                     cores = 6,
-                                     core_seeds = c(4561:4566), 
-                                     effect_type = "TNIE")
-
-# RE PS Model 
-refe_ci_TNIE <- bootstrap_ci_paral_2(iterations = 1000,
-                                     iptw = iptw_re,
-                                     data = data,
-                                     model = "FE",
-                                     cores = 6,
-                                     core_seeds = c(4561:4566), 
-                                     effect_type = "TNIE")
-
-#### Random-Effect (RE) Med/Out Models ---------------------------------------
-# SL PS Model 
-execution_time_slre <- system.time({ # Track computation time 
-  slre_ci_TNIE <- bootstrap_ci_re_paral_2(iterations = 2000, 
-                                          iptw = iptw_sl, 
-                                          data = data, 
-                                          cores = 6, 
-                                          core_seeds = c(4561:4566), 
-                                          effect_type = "TNIE")
-})
-# Print the execution time
-print(execution_time_slre)
-#    user   system  elapsed 
-# 6963.170 1059.563 2095.475 
-
-# Print the elapsed time specifically
-cat("Elapsed time:", execution_time_slre["elapsed"], "seconds\n")
-# Elapsed time: 2095.475 seconds
-
-# Print convergence statistics
-paste0("Number of converged mediator models: ", slre_ci_TNIE$mediator_converged_count, 
-       " (", (slre_ci_TNIE$mediator_converged_count / length(slre_ci_TNIE$direct_effects)) * 100, "%)")
-paste0("Number of converged outcome models: ", slre_ci_TNIE$outcome_converged_count, 
-       " (", (slre_ci_TNIE$outcome_converged_count / length(slre_ci_TNIE$direct_effects)) * 100, "%)")
-paste0("Number of iterations with both models converged: ", slre_ci_TNIE$both_converged_count, 
-       " (", (slre_ci_TNIE$both_converged_count / length(slre_ci_TNIE$direct_effects)) * 100, "%)")
-# [1] "Number of converged mediator models: 1154 (76.9333333333333%)"
-# [1] "Number of converged outcome models: 1488 (99.2%)"
-# [1] "Number of iterations with both models converged: 1144 (76.2666666666667%)"
+### Single-Level (SL) Mediation/Outcome Models -----------------------------
+# SL PS Model
+slsl_ci_TNIE <- bootstrap_ci_paral_2(
+  iterations = 1000,        # Number of bootstrap iterations
+  iptw = iptw_sl,           # IPTW weights from SL PS model
+  data = data,              # Input data
+  model = "SL",             # Specify PS model 
+  cores = 6,                # Number of CPU cores for parallelization
+  core_seeds = c(4561:4566),# Seeds for reproducibility
+  effect_type = "TNIE"      # Effect type: TNIE
+)
+saveRDS(slsl_ci_TNIE, file = "Application/Output/Bootstrap_Temp/slsl_ci_TNIE.rds")
+rm(slsl_ci_TNIE)
 
 # FE PS Model
-execution_time_fere <- system.time({ # Track computation time 
-  fere_ci_TNIE <- bootstrap_ci_re_paral_2(iterations = 2000, 
-                                          iptw = iptw_fe, 
-                                          data = data, 
-                                          cores = 6, 
-                                          core_seeds = c(4561:4566), 
-                                          effect_type = "TNIE")
-})
-# Print the execution time
-print(execution_time_fere)
-#   user   system  elapsed 
-# 6804.245  544.192 3079.205 
-
-# Print the elapsed time specifically
-cat("Elapsed time:", execution_time_fere["elapsed"], "seconds\n")
-# Elapsed time: 3079.205 seconds
-
-# Print convergence statistics
-paste0("Number of converged mediator models: ", fere_ci_TNIE$mediator_converged_count, 
-       " (", (fere_ci_TNIE$mediator_converged_count / length(fere_ci_TNIE$direct_effects)) * 100, "%)")
-paste0("Number of converged outcome models: ", fere_ci_TNIE$outcome_converged_count, 
-       " (", (fere_ci_TNIE$outcome_converged_count / length(fere_ci_TNIE$direct_effects)) * 100, "%)")
-paste0("Number of iterations with both models converged: ", fere_ci_TNIE$both_converged_count, 
-       " (", (fere_ci_TNIE$both_converged_count / length(fere_ci_TNIE$direct_effects)) * 100, "%)")
-# [1] "Number of converged mediator models: 1154 (76.9333333333333%)"
-# [1] "Number of converged outcome models: 1488 (99.2%)"
-# [1] "Number of iterations with both models converged: 1144 (76.2666666666667%)"
+fesl_ci_TNIE <- bootstrap_ci_paral_2(
+  iterations = 1000,
+  iptw = iptw_fe,
+  data = data,
+  model = "SL",
+  cores = 6,
+  core_seeds = c(4561:4566),
+  effect_type = "TNIE"
+)
+saveRDS(fesl_ci_TNIE, file = "Application/Output/Bootstrap_Temp/fesl_ci_TNIE.rds")
+rm(fesl_ci_TNIE)
 
 # RE PS Model
-execution_time_rere <- system.time({ # Track computation time 
-  rere_ci_TNIE <- bootstrap_ci_re_paral_2(iterations = 2000, 
-                                          iptw = iptw_re, 
-                                          data = data, 
-                                          cores = 6, 
-                                          core_seeds = c(4561:4566), 
-                                          effect_type = "TNIE")
-})
-# Print the execution time
-print(execution_time_rere)
-#    user   system  elapsed 
-# 6713.972  607.371 1913.623 
+resl_ci_TNIE <- bootstrap_ci_paral_2(
+  iterations = 1000,
+  iptw = iptw_re,
+  data = data,
+  model = "SL",
+  cores = 6,
+  core_seeds = c(4561:4566),
+  effect_type = "TNIE"
+)
+saveRDS(resl_ci_TNIE, file = "Application/Output/Bootstrap_Temp/resl_ci_TNIE.rds")
+rm(resl_ci_TNIE)
 
-# Print the elapsed time specifically
-cat("Elapsed time:", execution_time_rere["elapsed"], "seconds\n")
-# Elapsed time: 1913.623 seconds
-
-# Print convergence statistics
-paste0("Number of converged mediator models: ", rere_ci_TNIE$mediator_converged_count, 
-       " (", (rere_ci_TNIE$mediator_converged_count / length(rere_ci_TNIE$direct_effects)) * 100, "%)")
-paste0("Number of converged outcome models: ", rere_ci_TNIE$outcome_converged_count, 
-       " (", (rere_ci_TNIE$outcome_converged_count / length(rere_ci_TNIE$direct_effects)) * 100, "%)")
-paste0("Number of iterations with both models converged: ", rere_ci_TNIE$both_converged_count, 
-       " (", (rere_ci_TNIE$both_converged_count / length(rere_ci_TNIE$direct_effects)) * 100, "%)")
-# [1] "Number of converged mediator models: 1154 (76.9333333333333%)"
-# [1] "Number of converged outcome models: 1488 (99.2%)"
-# [1] "Number of iterations with both models converged: 1144 (76.2666666666667%)"
-
-#### Random-Effect with Cluster Means (RE-Mean) Med/Out Models ---------------------------------------
-# SL PS Model 
-execution_time_slre_cm <- system.time({ # Track computation time 
-  slre_cm_ci_TNIE <- bootstrap_ci_re_mean_paral(iterations = 2000, 
-                                          iptw = iptw_sl, 
-                                          data = data, 
-                                          cores = 6, 
-                                          core_seeds = c(4561:4566), 
-                                          effect_type = "TNIE")
-})
-# Print the execution time
-print(execution_time_slre_cm)
-#  
-
-# Print the elapsed time specifically
-cat("Elapsed time:", execution_time_slre_cm["elapsed"], "seconds\n")
-# 
-
-# Print convergence statistics
-paste0("Number of converged mediator models: ", slre_cm_ci_TNIE$mediator_converged_count, 
-       " (", (slre_cm_ci_TNIE$mediator_converged_count / length(slre_cm_ci_TNIE$direct_effects)) * 100, "%)")
-paste0("Number of converged outcome models: ", slre_cm_ci_TNIE$outcome_converged_count, 
-       " (", (slre_cm_ci_TNIE$outcome_converged_count / length(slre_cm_ci_TNIE$direct_effects)) * 100, "%)")
-paste0("Number of iterations with both models converged: ", slre_cm_ci_TNIE$both_converged_count, 
-       " (", (slre_cm_ci_TNIE$both_converged_count / length(slre_cm_ci_TNIE$direct_effects)) * 100, "%)")
-# 
+### Fixed-Effect (FE) Mediation/Outcome Models -----------------------------
+# SL PS Model
+slfe_ci_TNIE <- bootstrap_ci_paral_2(
+  iterations = 1000,
+  iptw = iptw_sl,
+  data = data,
+  model = "FE",
+  cores = 6,
+  core_seeds = c(4561:4566),
+  effect_type = "TNIE"
+)
+saveRDS(slfe_ci_TNIE, file = "Application/Output/Bootstrap_Temp/slfe_ci_TNIE.rds")
+rm(slfe_ci_TNIE)
 
 # FE PS Model
-execution_time_fere_cm <- system.time({ # Track computation time 
-  fere_cm_ci_TNIE <- bootstrap_ci_re_mean_paral(iterations = 2000, 
-                                          iptw = iptw_fe, 
-                                          data = data, 
-                                          cores = 6, 
-                                          core_seeds = c(4561:4566), 
-                                          effect_type = "TNIE")
-})
-# Print the execution time
-print(execution_time_fere_cm)
-# 
-
-# Print the elapsed time specifically
-cat("Elapsed time:", execution_time_fere_cm["elapsed"], "seconds\n")
-# 
-
-# Print convergence statistics
-paste0("Number of converged mediator models: ", fere_cm_ci_TNIE$mediator_converged_count, 
-       " (", (fere_cm_ci_TNIE$mediator_converged_count / length(fere_cm_ci_TNIE$direct_effects)) * 100, "%)")
-paste0("Number of converged outcome models: ", fere_cm_ci_TNIE$outcome_converged_count, 
-       " (", (fere_cm_ci_TNIE$outcome_converged_count / length(fere_cm_ci_TNIE$direct_effects)) * 100, "%)")
-paste0("Number of iterations with both models converged: ", fere_cm_ci_TNIE$both_converged_count, 
-       " (", (fere_cm_ci_TNIE$both_converged_count / length(fere_cm_ci_TNIE$direct_effects)) * 100, "%)")
-# 
+fefe_ci_TNIE <- bootstrap_ci_paral_2(
+  iterations = 1000,
+  iptw = iptw_fe,
+  data = data,
+  model = "FE",
+  cores = 6,
+  core_seeds = c(4561:4566),
+  effect_type = "TNIE"
+)
+saveRDS(fefe_ci_TNIE, file = "Application/Output/Bootstrap_Temp/fefe_ci_TNIE.rds")
+rm(fefe_ci_TNIE)
 
 # RE PS Model
-execution_time_rere_cm <- system.time({ # Track computation time 
-  rere_cm_ci_TNIE <- bootstrap_ci_re_mean_paral(iterations = 2000, 
-                                          iptw = iptw_re, 
-                                          data = data, 
-                                          cores = 6, 
-                                          core_seeds = c(4561:4566), 
-                                          effect_type = "TNIE")
+refe_ci_TNIE <- bootstrap_ci_paral_2(
+  iterations = 1000,
+  iptw = iptw_re,
+  data = data,
+  model = "FE",
+  cores = 6,
+  core_seeds = c(4561:4566),
+  effect_type = "TNIE"
+)
+saveRDS(refe_ci_TNIE, file = "Application/Output/Bootstrap_Temp/refe_ci_TNIE.rds")
+rm(refe_ci_TNIE)
+
+### Random-Effect (RE) Mediation/Outcome Models ----------------------------
+# SL PS Model
+execution_time <- system.time({ 
+  slre_ci_TNIE <- bootstrap_ci_re_paral_2(
+    iterations = 1750,
+    iptw = iptw_sl,
+    data = data,
+    cores = 6,
+    core_seeds = c(4561:4566),
+    effect_type = "TNIE"
+  )
 })
-# Print the execution time
-print(execution_time_rere_cm)
-#  
+saveRDS(slre_ci_TNIE, file = "Application/Output/Bootstrap_Temp/slre_ci_TNIE.rds")
 
-# Print the elapsed time specifically
-cat("Elapsed time:", execution_time_rere_cm["elapsed"], "seconds\n")
-# 
+# Print elapsed time and convergence statistics
+cat("Elapsed time:", execution_time["elapsed"], "seconds (", round(execution_time["elapsed"]/60), "mins) \n")
+cat("Number of converged mediator models: ", slre_ci_TNIE$mediator_converged_count,
+    " (", (slre_ci_TNIE$mediator_converged_count / length(slre_ci_TNIE$direct_effects)) * 100, "%)\n")
+cat("Number of converged outcome models: ", slre_ci_TNIE$outcome_converged_count,
+    " (", (slre_ci_TNIE$outcome_converged_count / length(slre_ci_TNIE$direct_effects)) * 100, "%)\n")
+cat("Number of iterations with both models converged: ", slre_ci_TNIE$both_converged_count,
+    " (", (slre_ci_TNIE$both_converged_count / length(slre_ci_TNIE$direct_effects)) * 100, "%)\n")
+rm(slre_ci_TNIE)
 
-# Print convergence statistics
-paste0("Number of converged mediator models: ", rere_cm_ci_TNIE$mediator_converged_count, 
-       " (", (rere_cm_ci_TNIE$mediator_converged_count / length(rere_cm_ci_TNIE$direct_effects)) * 100, "%)")
-paste0("Number of converged outcome models: ", rere_cm_ci_TNIE$outcome_converged_count, 
-       " (", (rere_cm_ci_TNIE$outcome_converged_count / length(rere_cm_ci_TNIE$direct_effects)) * 100, "%)")
-paste0("Number of iterations with both models converged: ", rere_cm_ci_TNIE$both_converged_count, 
-       " (", (rere_cm_ci_TNIE$both_converged_count / length(rere_cm_ci_TNIE$direct_effects)) * 100, "%)")
-# 
+# FE PS Model
+execution_time <- system.time({ 
+  fere_ci_TNIE <- bootstrap_ci_re_paral_2(
+    iterations = 1750,
+    iptw = iptw_fe,
+    data = data,
+    cores = 6,
+    core_seeds = c(4561:4566),
+    effect_type = "TNIE"
+  )
+})
+saveRDS(fere_ci_TNIE, file = "Application/Output/Bootstrap_Temp/fere_ci_TNIE.rds")
 
+# Print elapsed time and convergence statistics
+cat("Elapsed time:", execution_time["elapsed"], "seconds (", round(execution_time["elapsed"]/60), "mins) \n")
+cat("Number of converged mediator models: ", fere_ci_TNIE$mediator_converged_count,
+    " (", (fere_ci_TNIE$mediator_converged_count / length(fere_ci_TNIE$direct_effects)) * 100, "%)\n")
+cat("Number of converged outcome models: ", fere_ci_TNIE$outcome_converged_count,
+    " (", (fere_ci_TNIE$outcome_converged_count / length(fere_ci_TNIE$direct_effects)) * 100, "%)\n")
+cat("Number of iterations with both models converged: ", fere_ci_TNIE$both_converged_count,
+    " (", (fere_ci_TNIE$both_converged_count / length(fere_ci_TNIE$direct_effects)) * 100, "%)\n")
+rm(fere_ci_TNIE)
 
+# RE PS Model
+execution_time <- system.time({ 
+  rere_ci_TNIE <- bootstrap_ci_re_paral_2(
+    iterations = 1750,
+    iptw = iptw_re,
+    data = data,
+    cores = 6,
+    core_seeds = c(4561:4566),
+    effect_type = "TNIE"
+  )
+})
+saveRDS(rere_ci_TNIE, file = "Application/Output/Bootstrap_Temp/rere_ci_TNIE.rds")
 
+# Print elapsed time and convergence statistics
+cat("Elapsed time:", execution_time["elapsed"], "seconds (", round(execution_time["elapsed"]/60), "mins) \n")
+cat("Number of converged mediator models: ", rere_ci_TNIE$mediator_converged_count,
+    " (", (rere_ci_TNIE$mediator_converged_count / length(rere_ci_TNIE$direct_effects)) * 100, "%)\n")
+cat("Number of converged outcome models: ", rere_ci_TNIE$outcome_converged_count,
+    " (", (rere_ci_TNIE$outcome_converged_count / length(rere_ci_TNIE$direct_effects)) * 100, "%)\n")
+cat("Number of iterations with both models converged: ", rere_ci_TNIE$both_converged_count,
+    " (", (rere_ci_TNIE$both_converged_count / length(rere_ci_TNIE$direct_effects)) * 100, "%)\n")
+rm(rere_ci_TNIE)
 
+### Random-Effect with Cluster Means (RE-Mean) Med/Out Models --------------
+# SL PS Model
+execution_time <- system.time({ 
+  slre_cm_ci_TNIE <- bootstrap_ci_re_mean_paral(
+    iterations = 1750,
+    iptw = iptw_sl,
+    data = data,
+    cores = 6,
+    core_seeds = c(4561:4566),
+    effect_type = "TNIE"
+  )
+})
+saveRDS(slre_cm_ci_TNIE, file = "Application/Output/Bootstrap_Temp/slre_cm_ci_TNIE.rds")
 
+# Print elapsed time and convergence statistics
+cat("Elapsed time:", execution_time["elapsed"], "seconds (", round(execution_time["elapsed"]/60), "mins) \n")
+cat("Number of converged mediator models: ", slre_cm_ci_TNIE$mediator_converged_count,
+    " (", (slre_cm_ci_TNIE$mediator_converged_count / length(slre_cm_ci_TNIE$direct_effects)) * 100, "%)\n")
+cat("Number of converged outcome models: ", slre_cm_ci_TNIE$outcome_converged_count,
+    " (", (slre_cm_ci_TNIE$outcome_converged_count / length(slre_cm_ci_TNIE$direct_effects)) * 100, "%)\n")
+cat("Number of iterations with both models converged: ", slre_cm_ci_TNIE$both_converged_count,
+    " (", (slre_cm_ci_TNIE$both_converged_count / length(slre_cm_ci_TNIE$direct_effects)) * 100, "%)\n")
+rm(slre_cm_ci_TNIE)
 
-################################################################################
+# FE PS Model
+execution_time <- system.time({ 
+  fere_cm_ci_TNIE <- bootstrap_ci_re_mean_paral(
+    iterations = 1750,
+    iptw = iptw_fe,
+    data = data,
+    cores = 6,
+    core_seeds = c(4561:4566),
+    effect_type = "TNIE"
+  )
+})
+saveRDS(fere_cm_ci_TNIE, file = "Application/Output/Bootstrap_Temp/fere_cm_ci_TNIE.rds")
 
-# [NEXT TO WORK ON] -------------------------------------------------------
+# Print elapsed time and convergence statistics
+cat("Elapsed time:", execution_time["elapsed"], "seconds (", round(execution_time["elapsed"]/60), "mins) \n")
+cat("Number of converged mediator models: ", fere_cm_ci_TNIE$mediator_converged_count,
+    " (", (fere_cm_ci_TNIE$mediator_converged_count / length(fere_cm_ci_TNIE$direct_effects)) * 100, "%)\n")
+cat("Number of converged outcome models: ", fere_cm_ci_TNIE$outcome_converged_count,
+    " (", (fere_cm_ci_TNIE$outcome_converged_count / length(fere_cm_ci_TNIE$direct_effects)) * 100, "%)\n")
+cat("Number of iterations with both models converged: ", fere_cm_ci_TNIE$both_converged_count,
+    " (", (fere_cm_ci_TNIE$both_converged_count / length(fere_cm_ci_TNIE$direct_effects)) * 100, "%)\n")
+rm(fere_cm_ci_TNIE)
 
+# RE PS Model
+execution_time <- system.time({ 
+  rere_cm_ci_TNIE <- bootstrap_ci_re_mean_paral(
+    iterations = 1750,
+    iptw = iptw_re,
+    data = data,
+    cores = 6,
+    core_seeds = c(4561:4566),
+    effect_type = "TNIE"
+  )
+})
+saveRDS(rere_cm_ci_TNIE, file = "Application/Output/Bootstrap_Temp/rere_cm_ci_TNIE.rds")
 
+# Print elapsed time and convergence statistics
+cat("Elapsed time:", execution_time["elapsed"], "seconds (", round(execution_time["elapsed"]/60), "mins) \n")
+cat("Number of converged mediator models: ", rere_cm_ci_TNIE$mediator_converged_count,
+    " (", (rere_cm_ci_TNIE$mediator_converged_count / length(rere_cm_ci_TNIE$direct_effects)) * 100, "%)\n")
+cat("Number of converged outcome models: ", rere_cm_ci_TNIE$outcome_converged_count,
+    " (", (rere_cm_ci_TNIE$outcome_converged_count / length(rere_cm_ci_TNIE$direct_effects)) * 100, "%)\n")
+cat("Number of iterations with both models converged: ", rere_cm_ci_TNIE$both_converged_count,
+    " (", (rere_cm_ci_TNIE$both_converged_count / length(rere_cm_ci_TNIE$direct_effects)) * 100, "%)\n")
+rm(rere_cm_ci_TNIE)
 
-
-
-################################################################################
 
 
 # Store & Join Results ----------------------------------------------------
+# This section handles the calculation and storage of confidence intervals (CIs). 
 
 #### RE Mediator/Outcome Models CI -----------------------------------------
+# This subsection focuses on obtaining CIs for RE & RE-Mean models and merging them with effect estimates.
 
 ###### Obtain 1,000 completed iterations -----------------------------------
-
 # Function to get non-NA pairs (i.e., first 1,000 completed iterations)
 get_non_na_pairs <- function(direct, indirect, n = 1000) {
   combined <- data.frame(direct = direct, indirect = indirect)  # Combine vectors into a dataframe
@@ -1428,38 +1409,79 @@ get_non_na_pairs <- function(direct, indirect, n = 1000) {
   return(head(combined, n))  # Return the first n rows (or all if less than n)
 }
 
-# Apply the function to our data
-slre_ci_PNIE_DF <- get_non_na_pairs(slre_ci_PNIE$direct_effects, slre_ci_PNIE$indirect_effects) 
-fere_ci_PNIE_DF <- get_non_na_pairs(fere_ci_PNIE$direct_effects, fere_ci_PNIE$indirect_effects)
-rere_ci_PNIE_DF <- get_non_na_pairs(rere_ci_PNIE$direct_effects, rere_ci_PNIE$indirect_effects)
+# Define the file paths for the RE models
+files <- list(
+  "Application/Output/Bootstrap_Temp/slre_ci_PNIE.rds",
+  "Application/Output/Bootstrap_Temp/fere_ci_PNIE.rds",
+  "Application/Output/Bootstrap_Temp/rere_ci_PNIE.rds",
+  
+  "Application/Output/Bootstrap_Temp/slre_cm_ci_PNIE.rds",
+  "Application/Output/Bootstrap_Temp/fere_cm_ci_PNIE.rds",
+  "Application/Output/Bootstrap_Temp/rere_cm_ci_PNIE.rds",
+  
+  "Application/Output/Bootstrap_Temp/slre_ci_TNIE.rds",
+  "Application/Output/Bootstrap_Temp/fere_ci_TNIE.rds",
+  "Application/Output/Bootstrap_Temp/rere_ci_TNIE.rds",
+  
+  "Application/Output/Bootstrap_Temp/slre_cm_ci_TNIE.rds",
+  "Application/Output/Bootstrap_Temp/fere_cm_ci_TNIE.rds",
+  "Application/Output/Bootstrap_Temp/rere_cm_ci_TNIE.rds"
+)
 
-slre_ci_TNIE_DF <- get_non_na_pairs(slre_ci_TNIE$direct_effects, slre_ci_TNIE$indirect_effects) 
-fere_ci_TNIE_DF <- get_non_na_pairs(fere_ci_TNIE$direct_effects, fere_ci_TNIE$indirect_effects)
-rere_ci_TNIE_DF <- get_non_na_pairs(rere_ci_TNIE$direct_effects, rere_ci_TNIE$indirect_effects)
+# Function to process each file, apply get_non_na_pairs, and remove the original data
+process_file <- function(file_path, n = 1000) {
+  data <- readRDS(file_path)  # Load the RDS file
+  result <- get_non_na_pairs(data$direct_effects, data$indirect_effects, n = n)  # Apply function
+  rm(data)  # Remove the original data to free up space
+  return(result)  # Return the processed data
+}
 
+# Process each file and store results in corresponding dataframes
+slre_ci_PNIE_DF <- process_file(files[[1]])
+fere_ci_PNIE_DF <- process_file(files[[2]])
+rere_ci_PNIE_DF <- process_file(files[[3]])
+
+slre_cm_ci_PNIE_DF <- process_file(files[[4]])
+fere_cm_ci_PNIE_DF <- process_file(files[[5]])
+rere_cm_ci_PNIE_DF <- process_file(files[[6]])
+
+slre_ci_TNIE_DF <- process_file(files[[7]])
+fere_ci_TNIE_DF <- process_file(files[[8]])
+rere_ci_TNIE_DF <- process_file(files[[9]])
+
+slre_cm_ci_TNIE_DF <- process_file(files[[10]])
+fere_cm_ci_TNIE_DF <- process_file(files[[11]])
+rere_cm_ci_TNIE_DF <- process_file(files[[12]])
+
+# Optional: remove 'files' vector to save space if no longer needed
+rm(files)
 
 ###### Store RE Med/Outcome Model CIs --------------------------------------
+# This block stores the calculated CIs for RE models in a structured dataframe.
 
-# Create the results dataframe
+# Create an empty dataframe to store the results
 results_DF_RE <- data.frame(
-  cond = c("slre", "fere", "rere"),
-  PNIE_LL = numeric(3),
-  PNIE_UL = numeric(3),
-  TNDE_LL = numeric(3),
-  TNDE_UL = numeric(3),
-  TNIE_LL = numeric(3),
-  TNIE_UL = numeric(3),
-  PNDE_LL = numeric(3),
-  PNDE_UL = numeric(3),
+  cond = c("slre", "fere", "rere", 
+           "slre_cm", "fere_cm", "rere_cm"),
+  PNIE_LL = numeric(6),
+  PNIE_UL = numeric(6),
+  TNDE_LL = numeric(6),
+  TNDE_UL = numeric(6),
+  TNIE_LL = numeric(6),
+  TNIE_UL = numeric(6),
+  PNDE_LL = numeric(6),
+  PNDE_UL = numeric(6),
   stringsAsFactors = FALSE
 )
 
-# List of dataframes to process
-df_list_PNIE <- list(slre_ci_PNIE_DF, fere_ci_PNIE_DF, rere_ci_PNIE_DF)
-df_list_TNIE <- list(slre_ci_TNIE_DF, fere_ci_TNIE_DF, rere_ci_TNIE_DF)
+# Lists of processed dataframes
+df_list_PNIE <- list(slre_ci_PNIE_DF, fere_ci_PNIE_DF, rere_ci_PNIE_DF, 
+                     slre_cm_ci_PNIE_DF, fere_cm_ci_PNIE_DF, rere_cm_ci_PNIE_DF)
+df_list_TNIE <- list(slre_ci_TNIE_DF, fere_ci_TNIE_DF, rere_ci_TNIE_DF, 
+                     slre_cm_ci_TNIE_DF, fere_cm_ci_TNIE_DF, rere_cm_ci_TNIE_DF)
 
 # Calculate CIs and fill the dataframe
-for (i in 1:3) {
+for (i in 1:6) {
   results_DF_RE[i, c("PNIE_LL", "PNIE_UL")] <- quantile(df_list_PNIE[[i]]$indirect, probs = c(0.025, 0.975))
   results_DF_RE[i, c("TNDE_LL", "TNDE_UL")] <- quantile(df_list_PNIE[[i]]$direct, probs = c(0.025, 0.975))
   
@@ -1467,106 +1489,97 @@ for (i in 1:3) {
   results_DF_RE[i, c("PNDE_LL", "PNDE_UL")] <- quantile(df_list_TNIE[[i]]$indirect, probs = c(0.025, 0.975))
 }
 
-# results_DF_RE
-
+# Display the RE model results
+results_DF_RE
 
 ###### Join CI & point estimates for RE med/outcome ------------------------
+# This step merges the calculated RE model CIs with existing data.
 
-# Merge results with existing data
-results_DF_RE <- merge(results_DF[results_DF$cond %in% c("slre", "fere", "rere"), ], 
+# Merge RE results with existing results dataframe
+results_DF_RE <- merge(results_DF[results_DF$cond %in% c("slre", "fere", "rere", "slre_cm", "fere_cm", "rere_cm"), ], 
                        results_DF_RE)
 
-# Clean up environment (drop functions & objects from this section that are no longer needed)
-rm(get_non_na_pairs, slre_ci_PNIE_DF, slre_ci_TNIE_DF, fere_ci_PNIE_DF, fere_ci_TNIE_DF, rere_ci_PNIE_DF, rere_ci_TNIE_DF)
-
+# Clean up environment (Remove all objects except 'data', 'results_DF', 'results_DF_RE', and functions)
+rm(list = setdiff(ls(), c("data", "results_DF", "results_DF_RE", lsf.str())))
 
 #### SL & FE Mediator/Outcome Models CI ------------------------------------
+# This section focuses on the calculation and joining of CIs for SL & FE models.
 
 ###### Join CI & point estimates for SL & FE med/outcome -------------------
+# This block imports data for SL and FE models, calculates CIs, and combines results.
 
-# List of your lists
+# Define the list of file names
 list_names <- c("slsl_ci_TNIE", "slsl_ci_PNIE", 
                 "fesl_ci_TNIE", "fesl_ci_PNIE",
                 "resl_ci_TNIE", "resl_ci_PNIE", 
                 "slfe_ci_TNIE", "slfe_ci_PNIE", 
                 "fefe_ci_TNIE", "fefe_ci_PNIE",
                 "refe_ci_TNIE", "refe_ci_PNIE")
-lists <- list(slsl_ci_TNIE, slsl_ci_PNIE, 
-              fesl_ci_TNIE, fesl_ci_PNIE, 
-              resl_ci_TNIE, resl_ci_PNIE, 
-              slfe_ci_TNIE, slfe_ci_PNIE, 
-              fefe_ci_TNIE, fefe_ci_PNIE, 
-              refe_ci_TNIE, refe_ci_PNIE)
 
-# Extracting 'indirect_ci'
+# Import RDS files and store them in a list of lists
+lists <- lapply(list_names, function(name) {
+  readRDS(paste0("Application/Output/Bootstrap_Temp/", name, ".rds"))
+})
+
+# Name the elements of the list for easier access
+names(lists) <- list_names
+
+# Extract 'indirect_ci' and store in dataframe
 indirect_df <- do.call(rbind, lapply(seq_along(lists), function(i) {
   ci_values <- lists[[i]]$indirect_ci
   data.frame(
     list_name = list_names[i],
-    indirect_ci_LL = ci_values[1],  # First value
-    indirect_ci_UL = ci_values[2],  # Second value
+    indirect_ci_LL = ci_values[1],  # Lower bound
+    indirect_ci_UL = ci_values[2],  # Upper bound
     stringsAsFactors = FALSE
   )
 }))
 
-# Extracting 'direct_ci'
+# Extract 'direct_ci' and store in dataframe
 direct_df <- do.call(rbind, lapply(seq_along(lists), function(i) {
   ci_values <- lists[[i]]$direct_ci
   data.frame(
     list_name = list_names[i],
-    direct_ci_LL = ci_values[1],  # First value
-    direct_ci_UL = ci_values[2],  # Second value
+    direct_ci_LL = ci_values[1],  # Lower bound
+    direct_ci_UL = ci_values[2],  # Upper bound
     stringsAsFactors = FALSE
   )
 }))
 
-# Combine both into a single data frame
+# Combine both 'indirect' and 'direct' CIs into a single dataframe
 combined_df <- merge(indirect_df, direct_df, by = "list_name")
 
-# Create the 'effect' column & modify 'list_name' to keep only the first 4 characters
+# Modify dataframe: extract effect and cond labels, and reshape to wide format
 combined_df <- combined_df %>%
-  mutate(effect = substr(list_name, nchar(list_name) - 3, nchar(list_name))) %>% 
-  mutate(list_name = substr(list_name, 1, 4))
-
-# Pivot the dataframe to wide format
-combined_df_wide <- combined_df %>%
+  mutate(effect = substr(list_name, nchar(list_name) - 3, nchar(list_name))) %>%  # Extract effect label
+  mutate(list_name = substr(list_name, 1, 4)) %>%  # Extract cond label
   pivot_longer(cols = c(indirect_ci_LL, indirect_ci_UL, direct_ci_LL, direct_ci_UL), 
                names_to = "variable", values_to = "value") %>%
   unite("variable", effect, variable, sep = "_") %>%
-  pivot_wider(names_from = variable, values_from = value) %>% 
+  pivot_wider(names_from = variable, values_from = value) %>%
   as.data.frame()
 
-# Change column names 
-colnames(combined_df_wide) <- c("cond", 
-                                "PNIE_LL", "PNIE_UL", "TNDE_LL", "TNDE_UL", 
-                                "TNIE_LL", "TNIE_UL", "PNDE_LL", "PNDE_UL")
+# Update column names for clarity
+colnames(combined_df) <- c("cond", 
+                           "PNIE_LL", "PNIE_UL", "TNDE_LL", "TNDE_UL", 
+                           "TNIE_LL", "TNIE_UL", "PNDE_LL", "PNDE_UL")
 
-# Merge with existing results
-results_DF_noRE <- merge(results_DF[1:6, ], combined_df_wide, by = "cond")
+# Merge the SL & FE results with the existing results dataframe
+results_DF_noRE <- merge(results_DF[1:6, ], combined_df, by = "cond")
 
-# Clean up environment (drop objects from this section that are no longer needed)
-rm(lists, list_names, direct_df, indirect_df, combined_df, combined_df_wide)
-
+# Clean up environment (Remove all objects except 'data', 'results_DF', 'results_DF_RE', 'results_DF_noRE', and functions)
+rm(list = setdiff(ls(), c("data", "results_DF", "results_DF_RE", "results_DF_noRE", lsf.str())))
 
 #### Create dataframe of final estimates -----------------------------------
+# This final step combines the RE and non-RE results and exports/saves the final estimates.
 
 # Combine RE and non-RE results
 results_DF <- rbind(results_DF_noRE, results_DF_RE)
 
-# View the results
+# Display the combined results
 print(results_DF)
-#   cond       TNDE       PNDE        PNIE          TNIE    PNIE_LL    PNIE_UL    TNDE_LL      TNDE_UL    TNIE_LL    TNIE_UL    PNDE_LL     PNDE_UL
-# 1 fefe -0.1889825 -0.1894340 -0.09570423 -0.0002112213 -0.2966453 0.10177927 -0.4418273  0.059211894 -0.3019212 0.10584214 -0.4397014  0.06128061
-# 2 fesl -0.1973009 -0.1976276 -0.09752048 -0.0367624900 -0.2846837 0.09221394 -0.4424248  0.046017498 -0.2909517 0.09654751 -0.4436347  0.04782185
-# 3 refe -0.1958658 -0.1963458 -0.09240229  0.0030725382 -0.2852170 0.09831936 -0.4478837  0.046145304 -0.2902472 0.10347047 -0.4487281  0.04482294
-# 4 resl -0.2400019 -0.2401109 -0.07276088 -0.0045414414 -0.2526444 0.10399138 -0.4826027 -0.004350140 -0.2584021 0.10995042 -0.4826292 -0.00266291
-# 5 slfe -0.1804319 -0.1808842 -0.09704172 -0.0363361536 -0.2882729 0.09692833 -0.4341171  0.062637519 -0.2928385 0.10242150 -0.4350416  0.06349128
-# 6 slsl -0.2764533 -0.2764801 -0.03027051  0.0180582390 -0.2159972 0.15090354 -0.5105975 -0.029469066 -0.2171044 0.15043562 -0.5132218 -0.03095103
-# 7 fere -0.1946794 -0.1951001 -0.09536315 -0.0126787393 -0.3103216 0.09548134 -0.4548479  0.045418542 -0.3232379 0.09920591 -0.3232379  0.09920591
-# 8 rere -0.2171489 -0.2174313 -0.08069368  0.0039460448 -0.2753214 0.10296388 -0.4714517  0.012829715 -0.2980896 0.10930377 -0.2980896  0.10930377
-# 9 slre -0.2208416 -0.2210517 -0.06717527 -0.0117677236 -0.2650267 0.11912664 -0.4662056 -0.001344533 -0.2763510 0.12138392 -0.2763510  0.12138392
 
-# Add PS model & Mediator/Outcome model labels 
+# Add labels for PS model & Mediator/Outcome model
 results_DF <- results_DF %>%
   mutate(
     PS = case_when(
@@ -1579,32 +1592,37 @@ results_DF <- results_DF %>%
       endsWith(cond, "fe") ~ "Fixed-Effect",
       endsWith(cond, "sl") ~ "Single-Level",
       endsWith(cond, "re") ~ "Random-Effect",
+      endsWith(cond, "re_cm") ~ "Random-Effect with Cluster Means",
       TRUE ~ NA_character_  # Default case
     )
   )
 
-# Print the modified dataframe
+# Display the final dataframe with PS model & Mediator/Outcome labels
 print(results_DF)
-#   cond       TNDE       PNDE        PNIE          TNIE    PNIE_LL    PNIE_UL    TNDE_LL      TNDE_UL    TNIE_LL    TNIE_UL    PNDE_LL     PNDE_UL            PS         Model
-# 1 fefe -0.1889825 -0.1894340 -0.09570423 -0.0002112213 -0.2966453 0.10177927 -0.4418273  0.059211894 -0.3019212 0.10584214 -0.4397014  0.06128061  Fixed-Effect  Fixed-Effect
-# 2 fesl -0.1973009 -0.1976276 -0.09752048 -0.0367624900 -0.2846837 0.09221394 -0.4424248  0.046017498 -0.2909517 0.09654751 -0.4436347  0.04782185  Fixed-Effect  Single-Level
-# 3 refe -0.1958658 -0.1963458 -0.09240229  0.0030725382 -0.2852170 0.09831936 -0.4478837  0.046145304 -0.2902472 0.10347047 -0.4487281  0.04482294 Random-Effect  Fixed-Effect
-# 4 resl -0.2400019 -0.2401109 -0.07276088 -0.0045414414 -0.2526444 0.10399138 -0.4826027 -0.004350140 -0.2584021 0.10995042 -0.4826292 -0.00266291 Random-Effect  Single-Level
-# 5 slfe -0.1804319 -0.1808842 -0.09704172 -0.0363361536 -0.2882729 0.09692833 -0.4341171  0.062637519 -0.2928385 0.10242150 -0.4350416  0.06349128  Single-Level  Fixed-Effect
-# 6 slsl -0.2764533 -0.2764801 -0.03027051  0.0180582390 -0.2159972 0.15090354 -0.5105975 -0.029469066 -0.2171044 0.15043562 -0.5132218 -0.03095103  Single-Level  Single-Level
-# 7 fere -0.1946794 -0.1951001 -0.09536315 -0.0126787393 -0.3103216 0.09548134 -0.4548479  0.045418542 -0.3232379 0.09920591 -0.3232379  0.09920591  Fixed-Effect Random-Effect
-# 8 rere -0.2171489 -0.2174313 -0.08069368  0.0039460448 -0.2753214 0.10296388 -0.4714517  0.012829715 -0.2980896 0.10930377 -0.2980896  0.10930377 Random-Effect Random-Effect
-# 9 slre -0.2208416 -0.2210517 -0.06717527 -0.0117677236 -0.2650267 0.11912664 -0.4662056 -0.001344533 -0.2763510 0.12138392 -0.2763510  0.12138392  Single-Level Random-Effect
+# cond       TNDE       PNDE        PNIE          TNIE    PNIE_LL    PNIE_UL    TNDE_LL      TNDE_UL    TNIE_LL    TNIE_UL    PNDE_LL      PNDE_UL            PS                            Model
+# 1     fefe -0.2439341 -0.2445695 -0.09660659  0.0126441050 -0.3007998 0.09570006 -0.5084805  0.004777044 -0.3077056 0.10218566 -0.5085235  0.006911447  Fixed-Effect                     Fixed-Effect
+# 2     fesl -0.2558156 -0.2563010 -0.09886261 -0.0261259555 -0.2921923 0.08181015 -0.5118420 -0.010035295 -0.2961822 0.08569538 -0.5117962 -0.011418954  Fixed-Effect                     Single-Level
+# 3     refe -0.2464966 -0.2471019 -0.08816393  0.0085269374 -0.2797301 0.09890207 -0.5069342 -0.000239732 -0.2829443 0.10403690 -0.5077968  0.002558890 Random-Effect                     Fixed-Effect
+# 4     resl -0.2959685 -0.2961819 -0.06592642  0.0012385894 -0.2334787 0.10900586 -0.5444086 -0.064872212 -0.2386974 0.11433888 -0.5457297 -0.064180945 Random-Effect                     Single-Level
+# 5     slfe -0.2253132 -0.2257916 -0.08332282 -0.0341267906 -0.2637974 0.10503455 -0.4788932  0.010653283 -0.2650747 0.10698408 -0.4789265  0.014197515  Single-Level                     Fixed-Effect
+# 6     slsl -0.3317336 -0.3318426 -0.01230346  0.0247090071 -0.1747149 0.16068737 -0.5693915 -0.084157900 -0.1768113 0.16116459 -0.5715905 -0.083434503  Single-Level                     Single-Level
+# 7     fere -0.2497230 -0.2503269 -0.09700125 -0.0005990211 -0.2085683 0.08858699 -0.4557747 -0.056602999 -0.2109185 0.08640429 -0.2109185  0.086404291  Fixed-Effect                    Random-Effect
+# 8  fere_cm -0.2425750 -0.2431934 -0.10177153 -0.0098265525 -0.2152659 0.09351496 -0.4507971 -0.052890056 -0.2170470 0.09090707 -0.2170470  0.090907070  Fixed-Effect Random-Effect with Cluster Means
+# 9     rere -0.2682174 -0.2686312 -0.07559626  0.0099211596 -0.1793626 0.07638754 -0.4685013 -0.068042001 -0.1797642 0.07447732 -0.1797642  0.074477318 Random-Effect                    Random-Effect
+# 10 rere_cm -0.2470984 -0.2476017 -0.08812400 -0.0065533984 -0.2000955 0.09115424 -0.4541760 -0.049560677 -0.2000563 0.08860541 -0.2000563  0.088605409 Random-Effect Random-Effect with Cluster Means
+# 11    slre -0.2672821 -0.2675694 -0.05197434 -0.0080550456 -0.1447742 0.05371807 -0.4678075 -0.057324199 -0.1421163 0.05192853 -0.1421163  0.051928533  Single-Level                    Random-Effect
+# 12 slre_cm -0.2203850 -0.2207466 -0.07965423 -0.0397668108 -0.1935482 0.07892558 -0.4289900 -0.009848546 -0.1896172 0.07609671 -0.1896172  0.076096713  Single-Level Random-Effect with Cluster Means
 
-# Save dataframe of results 
-write_rds(results_DF, file = "Application/Output/Estimates.rds")
+# Save the final dataframe of results
+write_rds(results_DF, file = "Application/Output/Estimates/Effect-Estimates.rds")
+
 
 
 # Result visuals ----------------------------------------------------------
 
 # TNDE 
 ## Save visual 
-pdf("Application/Output/TNDE-Estimates.pdf")
+pdf("Application/Output/Visuals/TNDE-Estimates.pdf")
 ## Visual 
 results_DF %>% 
   mutate(
@@ -1627,12 +1645,12 @@ results_DF %>%
 ## 
 dev.off()
 # Save visual 
-ggsave(filename = "Application/Output/TNDE-Estimates.png", plot = last_plot())
+ggsave(filename = "Application/Output/Visuals/TNDE-Estimates.png", plot = last_plot())
 
 
 # PNDE 
 ## Save visual 
-pdf("Application/Output/PNDE-Estimates.pdf")
+pdf("Application/Output/Visuals/PNDE-Estimates.pdf")
 ## Visual 
 results_DF %>% 
   mutate(
@@ -1655,14 +1673,14 @@ results_DF %>%
 ## 
 dev.off()
 # Save visual 
-ggsave(filename = "Application/Output/PNDE-Estimates.png", plot = last_plot())
+ggsave(filename = "Application/Output/Visuals/PNDE-Estimates.png", plot = last_plot())
 
 
 
 
 # TNIE 
 ## Save visual 
-pdf("Application/Output/TNIE-Estimates.pdf")
+pdf("Application/Output/Visuals/TNIE-Estimates.pdf")
 ## Visual 
 results_DF %>% 
   mutate(
@@ -1685,12 +1703,12 @@ results_DF %>%
 ## 
 dev.off()
 # Save visual 
-ggsave(filename = "Application/Output/TNIE-Estimates.png", plot = last_plot())
+ggsave(filename = "Application/Output/Visuals/TNIE-Estimates.png", plot = last_plot())
 
 
 # PNIE 
 ## Save visual 
-pdf("Application/Output/PNIE-Estimates.pdf")
+pdf("Application/Output/Visuals/PNIE-Estimates.pdf")
 ## Visual 
 results_DF %>% 
   mutate(
@@ -1713,7 +1731,7 @@ results_DF %>%
 ## 
 dev.off()
 # Save visual 
-ggsave(filename = "Application/Output/PNIE-Estimates.png", plot = last_plot())
+ggsave(filename = "Application/Output/Visuals/PNIE-Estimates.png", plot = last_plot())
 
 
 
