@@ -368,7 +368,7 @@ new_labels <- c("Race: Black", "Race: White", "Family Structure",
 # loadfonts()
 
 # Save the Love Plot visualization for the paper as a PDF
-pdf("Application/Output/Covariate-Balance_QP-Doc.pdf")
+pdf("Application/Output/Visuals/Covariate-Balance_QP-Doc.pdf")
 
 # Create and customize the Love Plot for the paper, using Times New Roman font
 ggplot(smd_combined, aes(x = ASMD, y = factor(covariate, levels = custom_order), color = type, shape = type)) +
@@ -387,11 +387,16 @@ ggplot(smd_combined, aes(x = ASMD, y = factor(covariate, levels = custom_order),
         # plot.title = element_text(size = 16, face = "bold"),  # Bold title for emphasis
         # plot.subtitle = element_text(size = 14),  # Increase subtitle size for readability
         legend.position = "top") +  # Position legend at the top for easy reference
-  scale_color_manual(values = c("Unweighted" = "#1f77b4",  # Blue for unweighted
-                                "Single-Level" = "#2ca02c",  # Green for single-level weighting
-                                "Fixed-Effect" = "#ff7f0e",  # Orange for fixed-effect weighting
-                                "Random-Effect" = "#9467bd"),  # Purple for random-effect weighting
+  scale_color_manual(values = c("Unweighted" = "#00A9B7",  # Teal for unweighted
+                                "Single-Level" = "#333F48",  # Gray for single-level weighting
+                                "Fixed-Effect" = "#BF5700",  # Orange for fixed-effect weighting
+                                "Random-Effect" = "#A6CD57"),  # Green for random-effect weighting
                      name = NULL) +
+  # scale_color_manual(values = c("Unweighted" = "#1f77b4",  # Blue for unweighted
+  #                               "Single-Level" = "#2ca02c",  # Green for single-level weighting
+  #                               "Fixed-Effect" = "#ff7f0e",  # Orange for fixed-effect weighting
+  #                               "Random-Effect" = "#9467bd"),  # Purple for random-effect weighting
+  #                    name = NULL) +
   scale_shape_manual(values = c("Unweighted" = 16,  # Circle shape for unweighted
                                 "Single-Level" = 17,  # Triangle shape for single-level
                                 "Fixed-Effect" = 15,  # Square shape for fixed-effect
@@ -403,25 +408,15 @@ ggplot(smd_combined, aes(x = ASMD, y = factor(covariate, levels = custom_order),
 dev.off()
 
 # Save the Love Plot visualization for the paper as a PNG
-ggsave(filename = "Application/Output/Covariate-Balance_QP-Doc.pdf", 
+ggsave(filename = "Application/Output/Visuals/Covariate-Balance_QP-Doc.pdf", 
        plot = last_plot(), 
        width = 6, 
        height = 7, 
        units = "in", 
        dpi = 300)
 
-ggsave(filename = "Application/Output/Covariate-Balance_QP-Doc.png", plot = last_plot())
+ggsave(filename = "Application/Output/Visuals/Covariate-Balance_QP-Doc.png", plot = last_plot())
 
-
-
-
-
-
-
-# "#BF5700", #Fixed-effect
-# "#A6CD57", #Random-effect 
-# "#333F48" #Single-level 
-# "#00A9B7" #Unweighted
 
 
 
