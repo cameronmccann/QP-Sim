@@ -18,7 +18,7 @@
 #   intervals. Covariate balance is visualized. Finally, it visualizes the 
 # estimated effects to facilitate interpretation of the results.
 # 
-# Last Updated: 08/14/2024 
+# Last Updated: 08/15/2024 
 #
 #
 # Notes:
@@ -111,10 +111,6 @@ out_icc # Display the ICC (with 121 schools, ICC ~ 0.018)
 # data.frame(lme4::VarCorr(white_uncond))[1, 4] / 
 #   (data.frame(lme4::VarCorr(white_uncond))[1, 4] + data.frame(lme4::VarCorr(white_uncond))[2, 4])
 
-# Propensity Score (PS) & Inverse Probability of Treatment Weight (IPTW) Calculation ------
-# This section calculates propensity scores and IPTW using three different models: 
-# Standard Logistic (SL), Fixed Effects (FE), and Random Effects (RE).
-
 
 
 # PS & IPTW Calculation ---------------------------------------------------------------
@@ -125,7 +121,7 @@ out_icc # Display the ICC (with 121 schools, ICC ~ 0.018)
 # Single-level logistic regression model for propensity score estimation
 psmod_sl <- glm(
   formula = "sportPartic_w1 ~ feelings_w1_sc + sex_w1 + age_w1_sc + 
-                        white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 + selfEst_w1_sc",
+                        white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + selfEst_w1_sc",
   family = "binomial", 
   data = data
 )
@@ -141,7 +137,7 @@ data <- cbind(data, iptw_sl = with(data, (sportPartic_w1 / ps_sl) + (1 - sportPa
 # Fixed-effect logistic regression model for propensity score estimation.
 psmod_fe <- glm(
   formula = "sportPartic_w1 ~ feelings_w1_sc + sex_w1 + age_w1_sc + 
-                        white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 + selfEst_w1_sc +
+                        white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + selfEst_w1_sc +
                 as.factor(CLUSTER2)",
   family = "binomial", 
   data = data
@@ -158,7 +154,7 @@ data <- cbind(data, iptw_fe = with(data, (sportPartic_w1 / ps_fe) + (1 - sportPa
 # Random-effect logistic regression model for propensity score estimation.
 psmod_re <- lme4::glmer(
   formula = "sportPartic_w1 ~ feelings_w1_sc + sex_w1 + age_w1_sc + 
-                        white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + healthInsur_w1 + selfEst_w1_sc + 
+                        white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + selfEst_w1_sc + 
                         (1 | CLUSTER2)",
   family = "binomial", 
   data = data
@@ -179,6 +175,7 @@ data <- cbind(data, iptw_re = with(data, (sportPartic_w1 / ps_re) + (1 - sportPa
 # Identify and count instances of extreme PS values
 paste0("Number of PSs < 0.01: ", sum(I(data$ps_sl < 0.01)), 
        "; Number of PSs > 0.99: ", sum(I(data$ps_sl > 0.99)))
+# [1] "Number of PSs < 0.01: 0; Number of PSs > 0.99: 0"
 
 # Determine the 1st and 99th percentiles of the IPTW distribution for the SL model.
 # Cases below the 1st percentile or above the 99th percentile are considered outliers.
@@ -192,6 +189,7 @@ paste0(
   "; Number of cases > 99th percentile of IPTW (", ninety_ninth_percentile, 
   "): ", sum(I(data$iptw_sl > ninety_ninth_percentile))
 )
+# [1] "Number of cases < 1st percentile of IPTW (1.25675888749596): 32; Number of cases > 99th percentile of IPTW (4.31652336904921): 32"
 
 # Adjust IPTW values to the 1st and 99th percentile thresholds
 data <- data %>% 
@@ -203,6 +201,7 @@ data <- data %>%
 # Identify and count instances of extreme PS values
 paste0("Number of PSs < 0.01: ", sum(I(data$ps_fe < 0.01)), 
        "; Number of PSs > 0.99: ", sum(I(data$ps_fe > 0.99)))
+# [1] "Number of PSs < 0.01: 0; Number of PSs > 0.99: 11"
 
 # Determine the 1st and 99th percentiles of the IPTW distribution for the FE model.
 first_percentile <- quantile(data$iptw_fe, probs = 0.01)
@@ -215,6 +214,7 @@ paste0(
   "; Number of cases > 99th percentile of IPTW (", ninety_ninth_percentile, 
   "): ", sum(I(data$iptw_fe > ninety_ninth_percentile))
 )
+# [1] "Number of cases < 1st percentile of IPTW (1.02483454975511): 32; Number of cases > 99th percentile of IPTW (6.61712855938224): 32"
 
 # Adjust IPTW values to the 1st and 99th percentile thresholds 
 data <- data %>% 
@@ -226,6 +226,7 @@ data <- data %>%
 # Identify and count instances of extreme PS values
 paste0("Number of PSs < 0.01: ", sum(I(data$ps_re < 0.01)), 
        "; Number of PSs > 0.99: ", sum(I(data$ps_re > 0.99)))
+# [1] "Number of PSs < 0.01: 0; Number of PSs > 0.99: 0"
 
 # Determine the 1st and 99th percentiles of the IPTW distribution for the RE model.
 first_percentile <- quantile(data$iptw_re, probs = 0.01)
@@ -238,6 +239,7 @@ paste0(
   "; Number of cases > 99th percentile of IPTW (", ninety_ninth_percentile, 
   "): ", sum(I(data$iptw_re > ninety_ninth_percentile))
 )
+# [1] "Number of cases < 1st percentile of IPTW (1.10193371886911): 32; Number of cases > 99th percentile of IPTW (4.95620683646533): 32"
 
 # Adjust IPTW values to the 1st and 99th percentile thresholds 
 data <- data %>% 
@@ -327,7 +329,7 @@ calculate_weighted_smd <- function(data, treatment, covariate, weights_col) {
 # Define the covariates to be assessed for balance
 covariates <- c("feelings_w1_sc", "sex_w1", "age_w1_sc", "white_w1", 
                 "black_w1", "parentalEdu_w1_sc", "familyStruct_w1", 
-                "healthInsur_w1", "selfEst_w1_sc")
+                "selfEst_w1_sc")
 
 # Calculate the SMD for each covariate before applying weights (unweighted)
 smd_before <- sapply(covariates, function(cov) calculate_smd(data, "sportPartic_w1", cov))
@@ -356,12 +358,12 @@ smd_combined$ASMD <- abs(smd_combined$SMD)
 
 # Define a custom order for the covariates on the y-axis in the plot
 custom_order <- c("black_w1", "white_w1", "familyStruct_w1", 
-                  "healthInsur_w1", "age_w1_sc", "sex_w1", 
+                  "age_w1_sc", "sex_w1", 
                   "selfEst_w1_sc", "feelings_w1_sc", "parentalEdu_w1_sc")
 
 # Define new labels for the y-axis to improve readability
 new_labels <- c("Race: Black", "Race: White", "Family Structure", 
-                "Health Insurance \n Coverage Gap", "Age", "Sex", 
+                "Age", "Sex", 
                 "Self-Esteem Score", "Feelings Scale Score", "Parental Education")
 
 # Load Times New Roman font for publication-quality visuals
@@ -416,89 +418,6 @@ ggsave(filename = "Application/Output/Visuals/Covariate-Balance_QP-Doc.pdf",
        dpi = 300)
 
 ggsave(filename = "Application/Output/Visuals/Covariate-Balance_QP-Doc.png", plot = last_plot())
-
-
-
-
-
-
-
-# 
-# # ADD VISUALS TO SHOW HISTOGRAM OR DENSITY OVERLAP 
-# # ADD VISUAL SHOWING DOT PLOT ACROSS MODELS ON EACH COVARIATE OF SAMPLE BALANCE (SMD LIKE LOVEPLOT)
-# 
-# colnames(data)
-# ## THIS IS BEFORE TRUNCATION 
-# # SL 
-# data %>% 
-#   mutate(sportPartic_w1 = as.factor(sportPartic_w1)) %>% 
-#   ggplot(aes(x = ps_sl, 
-#              group = sportPartic_w1, 
-#              fill = sportPartic_w1)) +
-#   geom_histogram(position = "identity",
-#                  alpha = 0.5,
-#                  binwidth = 0.01) +
-#   geom_density(aes(y = ..count.. * 0.01, 
-#                    color = sportPartic_w1),  
-#                size = 0.5,        
-#                alpha = 0, 
-#                trim = TRUE, 
-#                show.legend = FALSE) +      # Set alpha to 1 (no transparency)
-#   scale_fill_manual(values = c("blue", "darkorange")) +
-#   scale_color_manual(values = c("blue", "darkorange")) +
-#   theme_minimal() +
-#   labs(# title = "Histogram of ps_sl_logit by sportPartic_w1",
-#     y = "count",
-#     fill = "trt (Sport Participation)") +
-#   theme(legend.position = "bottom")
-# 
-# # FE 
-# data %>% 
-#   mutate(sportPartic_w1 = as.factor(sportPartic_w1)) %>% 
-#   ggplot(aes(x = ps_fe, 
-#              group = sportPartic_w1, 
-#              fill = sportPartic_w1)) +
-#   geom_histogram(position = "identity",
-#                  alpha = 0.5,
-#                  binwidth = 0.01) +
-#   geom_density(aes(y = ..count.. * 0.01, 
-#                    color = sportPartic_w1),  
-#                size = 0.5,        
-#                alpha = 0, 
-#                trim = TRUE, 
-#                show.legend = FALSE) +      # Set alpha to 1 (no transparency)
-#   scale_fill_manual(values = c("blue", "darkorange")) +
-#   scale_color_manual(values = c("blue", "darkorange")) +
-#   theme_minimal() +
-#   labs(# title = "Histogram of ps_sl_logit by sportPartic_w1",
-#     y = "count",
-#     fill = "trt (Sport Participation)") +
-#   theme(legend.position = "bottom")
-# 
-# # RE 
-# data %>% 
-#   mutate(sportPartic_w1 = as.factor(sportPartic_w1)) %>% 
-#   ggplot(aes(x = ps_re, 
-#              group = sportPartic_w1, 
-#              fill = sportPartic_w1)) +
-#   geom_histogram(position = "identity",
-#                  alpha = 0.5,
-#                  binwidth = 0.01) +
-#   geom_density(aes(y = ..count.. * 0.01, 
-#                    color = sportPartic_w1),  
-#                size = 0.5,        
-#                alpha = 0, 
-#                trim = TRUE, 
-#                show.legend = FALSE) +      # Set alpha to 1 (no transparency)
-#   scale_fill_manual(values = c("blue", "darkorange")) +
-#   scale_color_manual(values = c("blue", "darkorange")) +
-#   theme_minimal() +
-#   labs(# title = "Histogram of ps_sl_logit by sportPartic_w1",
-#     y = "count",
-#     fill = "trt (Sport Participation)") +
-#   theme(legend.position = "bottom")
-#   
-
 
 
 
@@ -847,10 +766,6 @@ out_rere_cm_interac <- WeMix::mix(
 
 
 
-
-
-
-
 # Display Estimates -------------------------------------------------------
 
 # Define conditions
@@ -888,9 +803,6 @@ TNIE <- sapply(conditions, function(cond) {
     summary(get(out_model_name))$coef["selfEst_w3_sc:sportPartic_w1", "Estimate"]
 })
 
-
-
-
 # Create results DataFrame
 results_DF <- data.frame(
   cond = conditions,
@@ -903,30 +815,19 @@ results_DF <- data.frame(
 # Display results
 rownames(results_DF) <- NULL
 results_DF
-#   cond       TNDE       PNDE        PNIE          TNIE
-# 1 slsl -0.2764533 -0.2764801 -0.03027051  0.0180582390
-# 2 fesl -0.1973009 -0.1976276 -0.09752048 -0.0367624900
-# 3 resl -0.2400019 -0.2401109 -0.07276088 -0.0045414414
-# 4 slfe -0.1804319 -0.1808842 -0.09704172 -0.0363361536
-# 5 fefe -0.1889825 -0.1894340 -0.09570423 -0.0002112213
-# 6 refe -0.1958658 -0.1963458 -0.09240229  0.0030725382
-# 7 slre -0.2208416 -0.2210517 -0.06717527 -0.0117677236
-# 8 fere -0.1946794 -0.1951001 -0.09536315 -0.0126787393
-# 9 rere -0.2171489 -0.2174313 -0.08069368  0.0039460448
-
-# cond       TNDE       PNDE        PNIE          TNIE
-# 1     slsl -0.3317336 -0.3318426 -0.01230346  0.0247090071
-# 2     fesl -0.2558156 -0.2563010 -0.09886261 -0.0261259555
-# 3     resl -0.2959685 -0.2961819 -0.06592642  0.0012385894
-# 4     slfe -0.2253132 -0.2257916 -0.08332282 -0.0341267906
-# 5     fefe -0.2439341 -0.2445695 -0.09660659  0.0126441050
-# 6     refe -0.2464966 -0.2471019 -0.08816393  0.0085269374
-# 7     slre -0.2672821 -0.2675694 -0.05197434 -0.0080550456
-# 8     fere -0.2497230 -0.2503269 -0.09700125 -0.0005990211
-# 9     rere -0.2682174 -0.2686312 -0.07559626  0.0099211596
-# 10 slre_cm -0.2203850 -0.2207466 -0.07965423 -0.0397668108
-# 11 fere_cm -0.2425750 -0.2431934 -0.10177153 -0.0098265525
-# 12 rere_cm -0.2470984 -0.2476017 -0.08812400 -0.0065533984
+#       cond       TNDE       PNDE        PNIE        TNIE
+# 1     slsl -0.3259836 -0.3259562 -0.04471103 -0.01584023
+# 2     fesl -0.2588860 -0.2591964 -0.12127187 -0.05814495
+# 3     resl -0.2987412 -0.2987693 -0.09161688 -0.03054913
+# 4     slfe -0.2325015 -0.2327627 -0.11816059 -0.08187151
+# 5     fefe -0.2510769 -0.2514684 -0.11950564 -0.02166266
+# 6     refe -0.2562645 -0.2566047 -0.11588065 -0.02853428
+# 7     slre -0.2719431 -0.2720481 -0.08421877 -0.05117338
+# 8     fere -0.2562957 -0.2566773 -0.11918980 -0.03342662
+# 9     rere -0.2765615 -0.2767321 -0.10180340 -0.02434469
+# 10 slre_cm -0.2243275 -0.2245039 -0.11099540 -0.08241447
+# 11 fere_cm -0.2490276 -0.2494285 -0.12421280 -0.04336970
+# 12 rere_cm -0.2557420 -0.2560127 -0.11442310 -0.04131232
 
 ## Clean Environment -------------------------------------------------------
 # Remove all objects from the environment except for 'data', 'results_DF', and functions
@@ -1028,7 +929,7 @@ rm(refe_ci_PNIE)
 # SL PS Model
 execution_time <- system.time({ # Track computation time 
   slre_ci_PNIE <- bootstrap_ci_re_paral_2(
-    iterations = 1750,  
+    iterations = 1700,  
     iptw = iptw_sl,
     data = data,
     cores = 6,
@@ -1047,11 +948,15 @@ cat("Number of converged outcome models: ", slre_ci_PNIE$outcome_converged_count
 cat("Number of iterations with both models converged: ", slre_ci_PNIE$both_converged_count,
     " (", (slre_ci_PNIE$both_converged_count / length(slre_ci_PNIE$direct_effects)) * 100, "%)\n")
 rm(slre_ci_PNIE)
+# Elapsed time: 4099.748 seconds ( 68 mins) 
+# Number of converged mediator models:  1285  ( 73.42857 %)
+# Number of converged outcome models:  1742  ( 99.54286 %)
+# Number of iterations with both models converged:  1281  ( 73.2 %)
 
 # FE PS Model
 execution_time <- system.time({ 
   fere_ci_PNIE <- bootstrap_ci_re_paral_2(
-    iterations = 1750,
+    iterations = 1700,
     iptw = iptw_fe,
     data = data,
     cores = 6,
@@ -1070,11 +975,15 @@ cat("Number of converged outcome models: ", fere_ci_PNIE$outcome_converged_count
 cat("Number of iterations with both models converged: ", fere_ci_PNIE$both_converged_count,
     " (", (fere_ci_PNIE$both_converged_count / length(fere_ci_PNIE$direct_effects)) * 100, "%)\n")
 rm(fere_ci_PNIE)
+# Elapsed time: 3647.954 seconds ( 61 mins) 
+# Number of converged mediator models:  1285  ( 73.42857 %)
+# Number of converged outcome models:  1742  ( 99.54286 %)
+# Number of iterations with both models converged:  1281  ( 73.2 %)
 
 # RE PS Model
 execution_time <- system.time({ 
   rere_ci_PNIE <- bootstrap_ci_re_paral_2(
-    iterations = 1750,
+    iterations = 1700,
     iptw = iptw_re,
     data = data,
     cores = 6,
@@ -1093,6 +1002,10 @@ cat("Number of converged outcome models: ", rere_ci_PNIE$outcome_converged_count
 cat("Number of iterations with both models converged: ", rere_ci_PNIE$both_converged_count,
     " (", (rere_ci_PNIE$both_converged_count / length(rere_ci_PNIE$direct_effects)) * 100, "%)\n")
 rm(rere_ci_PNIE)
+# Elapsed time: 4079.088 seconds ( 68 mins) 
+# Number of converged mediator models:  1285  ( 73.42857 %)
+# Number of converged outcome models:  1742  ( 99.54286 %)
+# Number of iterations with both models converged:  1281  ( 73.2 %)
 
 ### Random-Effect with Cluster Means (RE-Mean) Med/Out Models --------------
 # SL PS Model
@@ -1117,6 +1030,10 @@ cat("Number of converged outcome models: ", slre_cm_ci_PNIE$outcome_converged_co
 cat("Number of iterations with both models converged: ", slre_cm_ci_PNIE$both_converged_count,
     " (", (slre_cm_ci_PNIE$both_converged_count / length(slre_cm_ci_PNIE$direct_effects)) * 100, "%)\n")
 rm(slre_cm_ci_PNIE)
+# Elapsed time: 2520.295 seconds ( 42 mins) 
+# Number of converged mediator models:  1219  ( 69.65714 %)
+# Number of converged outcome models:  1722  ( 98.4 %)
+# Number of iterations with both models converged:  1209  ( 69.08571 %)
 
 # FE PS Model
 execution_time <- system.time({ 
@@ -1140,6 +1057,10 @@ cat("Number of converged outcome models: ", fere_cm_ci_PNIE$outcome_converged_co
 cat("Number of iterations with both models converged: ", fere_cm_ci_PNIE$both_converged_count,
     " (", (fere_cm_ci_PNIE$both_converged_count / length(fere_cm_ci_PNIE$direct_effects)) * 100, "%)\n")
 rm(fere_cm_ci_PNIE)
+# Elapsed time: 2608.635 seconds ( 43 mins) 
+# Number of converged mediator models:  1219  ( 69.65714 %)
+# Number of converged outcome models:  1722  ( 98.4 %)
+# Number of iterations with both models converged:  1209  ( 69.08571 %)
 
 # RE PS Model
 execution_time <- system.time({ 
@@ -1163,6 +1084,10 @@ cat("Number of converged outcome models: ", rere_cm_ci_PNIE$outcome_converged_co
 cat("Number of iterations with both models converged: ", rere_cm_ci_PNIE$both_converged_count,
     " (", (rere_cm_ci_PNIE$both_converged_count / length(rere_cm_ci_PNIE$direct_effects)) * 100, "%)\n")
 rm(rere_cm_ci_PNIE)
+# Elapsed time: 2300.913 seconds ( 38 mins) 
+# Number of converged mediator models:  1219  ( 69.65714 %)
+# Number of converged outcome models:  1722  ( 98.4 %)
+# Number of iterations with both models converged:  1209  ( 69.08571 %)
 
 ## PNDE & TNIE -------------------------------------------------------------
 # This subsection focuses on PNDE (Pure Natural Direct Effect) and TNIE (Total Natural Indirect Effect)
@@ -1252,7 +1177,7 @@ rm(refe_ci_TNIE)
 # SL PS Model
 execution_time <- system.time({ 
   slre_ci_TNIE <- bootstrap_ci_re_paral_2(
-    iterations = 1750,
+    iterations = 1700,
     iptw = iptw_sl,
     data = data,
     cores = 6,
@@ -1271,11 +1196,15 @@ cat("Number of converged outcome models: ", slre_ci_TNIE$outcome_converged_count
 cat("Number of iterations with both models converged: ", slre_ci_TNIE$both_converged_count,
     " (", (slre_ci_TNIE$both_converged_count / length(slre_ci_TNIE$direct_effects)) * 100, "%)\n")
 rm(slre_ci_TNIE)
+# Elapsed time: 3008.028 seconds ( 50 mins) 
+# Number of converged mediator models:  1285  ( 73.42857 %)
+# Number of converged outcome models:  1744  ( 99.65714 %)
+# Number of iterations with both models converged:  1283  ( 73.31429 %)
 
 # FE PS Model
 execution_time <- system.time({ 
   fere_ci_TNIE <- bootstrap_ci_re_paral_2(
-    iterations = 1750,
+    iterations = 1700,
     iptw = iptw_fe,
     data = data,
     cores = 6,
@@ -1294,11 +1223,15 @@ cat("Number of converged outcome models: ", fere_ci_TNIE$outcome_converged_count
 cat("Number of iterations with both models converged: ", fere_ci_TNIE$both_converged_count,
     " (", (fere_ci_TNIE$both_converged_count / length(fere_ci_TNIE$direct_effects)) * 100, "%)\n")
 rm(fere_ci_TNIE)
+# Elapsed time: 2708.672 seconds ( 45 mins) 
+# Number of converged mediator models:  1285  ( 73.42857 %)
+# Number of converged outcome models:  1744  ( 99.65714 %)
+# Number of iterations with both models converged:  1283  ( 73.31429 %)
 
 # RE PS Model
 execution_time <- system.time({ 
   rere_ci_TNIE <- bootstrap_ci_re_paral_2(
-    iterations = 1750,
+    iterations = 1700,
     iptw = iptw_re,
     data = data,
     cores = 6,
@@ -1317,12 +1250,16 @@ cat("Number of converged outcome models: ", rere_ci_TNIE$outcome_converged_count
 cat("Number of iterations with both models converged: ", rere_ci_TNIE$both_converged_count,
     " (", (rere_ci_TNIE$both_converged_count / length(rere_ci_TNIE$direct_effects)) * 100, "%)\n")
 rm(rere_ci_TNIE)
+# Elapsed time: 2575.112 seconds ( 43 mins) 
+# Number of converged mediator models:  1285  ( 73.42857 %)
+# Number of converged outcome models:  1744  ( 99.65714 %)
+# Number of iterations with both models converged:  1283  ( 73.31429 %)
 
 ### Random-Effect with Cluster Means (RE-Mean) Med/Out Models --------------
 # SL PS Model
 execution_time <- system.time({ 
   slre_cm_ci_TNIE <- bootstrap_ci_re_mean_paral(
-    iterations = 1750,
+    iterations = 1700,
     iptw = iptw_sl,
     data = data,
     cores = 6,
@@ -1341,11 +1278,15 @@ cat("Number of converged outcome models: ", slre_cm_ci_TNIE$outcome_converged_co
 cat("Number of iterations with both models converged: ", slre_cm_ci_TNIE$both_converged_count,
     " (", (slre_cm_ci_TNIE$both_converged_count / length(slre_cm_ci_TNIE$direct_effects)) * 100, "%)\n")
 rm(slre_cm_ci_TNIE)
+# Elapsed time: 4365.37 seconds ( 73 mins) 
+# Number of converged mediator models:  1219  ( 69.65714 %)
+# Number of converged outcome models:  1722  ( 98.4 %)
+# Number of iterations with both models converged:  1209  ( 69.08571 %)
 
 # FE PS Model
 execution_time <- system.time({ 
   fere_cm_ci_TNIE <- bootstrap_ci_re_mean_paral(
-    iterations = 1750,
+    iterations = 1700,
     iptw = iptw_fe,
     data = data,
     cores = 6,
@@ -1364,11 +1305,15 @@ cat("Number of converged outcome models: ", fere_cm_ci_TNIE$outcome_converged_co
 cat("Number of iterations with both models converged: ", fere_cm_ci_TNIE$both_converged_count,
     " (", (fere_cm_ci_TNIE$both_converged_count / length(fere_cm_ci_TNIE$direct_effects)) * 100, "%)\n")
 rm(fere_cm_ci_TNIE)
+# Elapsed time: 3742.066 seconds ( 62 mins) 
+# Number of converged mediator models:  1219  ( 69.65714 %)
+# Number of converged outcome models:  1722  ( 98.4 %)
+# Number of iterations with both models converged:  1209  ( 69.08571 %)
 
 # RE PS Model
 execution_time <- system.time({ 
   rere_cm_ci_TNIE <- bootstrap_ci_re_mean_paral(
-    iterations = 1750,
+    iterations = 1700,
     iptw = iptw_re,
     data = data,
     cores = 6,
@@ -1387,6 +1332,10 @@ cat("Number of converged outcome models: ", rere_cm_ci_TNIE$outcome_converged_co
 cat("Number of iterations with both models converged: ", rere_cm_ci_TNIE$both_converged_count,
     " (", (rere_cm_ci_TNIE$both_converged_count / length(rere_cm_ci_TNIE$direct_effects)) * 100, "%)\n")
 rm(rere_cm_ci_TNIE)
+# Elapsed time: 3800.283 seconds ( 63 mins) 
+# Number of converged mediator models:  1219  ( 69.65714 %)
+# Number of converged outcome models:  1722  ( 98.4 %)
+# Number of iterations with both models converged:  1209  ( 69.08571 %)
 
 
 
@@ -1448,7 +1397,7 @@ slre_cm_ci_TNIE_DF <- process_file(files[[10]])
 fere_cm_ci_TNIE_DF <- process_file(files[[11]])
 rere_cm_ci_TNIE_DF <- process_file(files[[12]])
 
-# Optional: remove 'files' vector to save space if no longer needed
+# Remove 'files' vector to save space 
 rm(files)
 
 ###### Store RE Med/Outcome Model CIs --------------------------------------
@@ -1481,11 +1430,18 @@ for (i in 1:6) {
   results_DF_RE[i, c("TNDE_LL", "TNDE_UL")] <- quantile(df_list_PNIE[[i]]$direct, probs = c(0.025, 0.975))
   
   results_DF_RE[i, c("TNIE_LL", "TNIE_UL")] <- quantile(df_list_TNIE[[i]]$indirect, probs = c(0.025, 0.975))
-  results_DF_RE[i, c("PNDE_LL", "PNDE_UL")] <- quantile(df_list_TNIE[[i]]$indirect, probs = c(0.025, 0.975))
+  results_DF_RE[i, c("PNDE_LL", "PNDE_UL")] <- quantile(df_list_TNIE[[i]]$direct, probs = c(0.025, 0.975))
 }
 
 # Display the RE model results
 results_DF_RE
+#       cond    PNIE_LL    PNIE_UL    TNDE_LL      TNDE_UL    TNIE_LL    TNIE_UL    PNDE_LL      PNDE_UL
+# 1    slre -0.2450241 0.12480705 -0.5120571 -0.043267219 -0.2486733 0.12991754 -0.5121780 -0.044027732
+# 2    fere -0.3119372 0.08752047 -0.5126724 -0.003286732 -0.3304645 0.09003744 -0.5126628 -0.001785989
+# 3    rere -0.2724058 0.09636612 -0.5241173 -0.035136923 -0.2862409 0.09841429 -0.5246142 -0.034812727
+# 4 slre_cm -0.2777162 0.10351657 -0.4686721 -0.003627143 -0.2800797 0.10432471 -0.4688228 -0.004395259
+# 5 fere_cm -0.3116530 0.08420532 -0.5122988 -0.004824141 -0.3299738 0.08873388 -0.5117886 -0.010775095
+# 6 rere_cm -0.2902577 0.09149804 -0.5107439 -0.015202755 -0.2981107 0.09332165 -0.5094409 -0.014537828
 
 ###### Join CI & point estimates for RE med/outcome ------------------------
 # This step merges the calculated RE model CIs with existing data.
@@ -1572,7 +1528,7 @@ rm(list = setdiff(ls(), c("data", "results_DF", "results_DF_RE", "results_DF_noR
 results_DF <- rbind(results_DF_noRE, results_DF_RE)
 
 # Display the combined results
-print(results_DF)
+# print(results_DF)
 
 # Add labels for PS model & Mediator/Outcome model
 results_DF <- results_DF %>%
@@ -1594,19 +1550,33 @@ results_DF <- results_DF %>%
 
 # Display the final dataframe with PS model & Mediator/Outcome labels
 print(results_DF)
-# cond       TNDE       PNDE        PNIE          TNIE    PNIE_LL    PNIE_UL    TNDE_LL      TNDE_UL    TNIE_LL    TNIE_UL    PNDE_LL      PNDE_UL            PS                            Model
+#       cond       TNDE       PNDE        PNIE          TNIE    PNIE_LL    PNIE_UL    TNDE_LL      TNDE_UL    TNIE_LL    TNIE_UL    PNDE_LL      PNDE_UL            PS                            Model
 # 1     fefe -0.2439341 -0.2445695 -0.09660659  0.0126441050 -0.3007998 0.09570006 -0.5084805  0.004777044 -0.3077056 0.10218566 -0.5085235  0.006911447  Fixed-Effect                     Fixed-Effect
 # 2     fesl -0.2558156 -0.2563010 -0.09886261 -0.0261259555 -0.2921923 0.08181015 -0.5118420 -0.010035295 -0.2961822 0.08569538 -0.5117962 -0.011418954  Fixed-Effect                     Single-Level
 # 3     refe -0.2464966 -0.2471019 -0.08816393  0.0085269374 -0.2797301 0.09890207 -0.5069342 -0.000239732 -0.2829443 0.10403690 -0.5077968  0.002558890 Random-Effect                     Fixed-Effect
 # 4     resl -0.2959685 -0.2961819 -0.06592642  0.0012385894 -0.2334787 0.10900586 -0.5444086 -0.064872212 -0.2386974 0.11433888 -0.5457297 -0.064180945 Random-Effect                     Single-Level
 # 5     slfe -0.2253132 -0.2257916 -0.08332282 -0.0341267906 -0.2637974 0.10503455 -0.4788932  0.010653283 -0.2650747 0.10698408 -0.4789265  0.014197515  Single-Level                     Fixed-Effect
 # 6     slsl -0.3317336 -0.3318426 -0.01230346  0.0247090071 -0.1747149 0.16068737 -0.5693915 -0.084157900 -0.1768113 0.16116459 -0.5715905 -0.083434503  Single-Level                     Single-Level
-# 7     fere -0.2497230 -0.2503269 -0.09700125 -0.0005990211 -0.2085683 0.08858699 -0.4557747 -0.056602999 -0.2109185 0.08640429 -0.2109185  0.086404291  Fixed-Effect                    Random-Effect
-# 8  fere_cm -0.2425750 -0.2431934 -0.10177153 -0.0098265525 -0.2152659 0.09351496 -0.4507971 -0.052890056 -0.2170470 0.09090707 -0.2170470  0.090907070  Fixed-Effect Random-Effect with Cluster Means
-# 9     rere -0.2682174 -0.2686312 -0.07559626  0.0099211596 -0.1793626 0.07638754 -0.4685013 -0.068042001 -0.1797642 0.07447732 -0.1797642  0.074477318 Random-Effect                    Random-Effect
-# 10 rere_cm -0.2470984 -0.2476017 -0.08812400 -0.0065533984 -0.2000955 0.09115424 -0.4541760 -0.049560677 -0.2000563 0.08860541 -0.2000563  0.088605409 Random-Effect Random-Effect with Cluster Means
-# 11    slre -0.2672821 -0.2675694 -0.05197434 -0.0080550456 -0.1447742 0.05371807 -0.4678075 -0.057324199 -0.1421163 0.05192853 -0.1421163  0.051928533  Single-Level                    Random-Effect
-# 12 slre_cm -0.2203850 -0.2207466 -0.07965423 -0.0397668108 -0.1935482 0.07892558 -0.4289900 -0.009848546 -0.1896172 0.07609671 -0.1896172  0.076096713  Single-Level Random-Effect with Cluster Means
+# 7     fere -0.2497230 -0.2503269 -0.09700125 -0.0005990211 -0.3119372 0.08752047 -0.5126724 -0.003286732 -0.3304645 0.09003744 -0.5126628 -0.001785989  Fixed-Effect                    Random-Effect
+# 8  fere_cm -0.2425750 -0.2431934 -0.10177153 -0.0098265525 -0.3116530 0.08420532 -0.5122988 -0.004824141 -0.3299738 0.08873388 -0.5117886 -0.010775095  Fixed-Effect Random-Effect with Cluster Means
+# 9     rere -0.2682174 -0.2686312 -0.07559626  0.0099211596 -0.2724058 0.09636612 -0.5241173 -0.035136923 -0.2862409 0.09841429 -0.5246142 -0.034812727 Random-Effect                    Random-Effect
+# 10 rere_cm -0.2470984 -0.2476017 -0.08812400 -0.0065533984 -0.2902577 0.09149804 -0.5107439 -0.015202755 -0.2981107 0.09332165 -0.5094409 -0.014537828 Random-Effect Random-Effect with Cluster Means
+# 11    slre -0.2672821 -0.2675694 -0.05197434 -0.0080550456 -0.2450241 0.12480705 -0.5120571 -0.043267219 -0.2486733 0.12991754 -0.5121780 -0.044027732  Single-Level                    Random-Effect
+# 12 slre_cm -0.2203850 -0.2207466 -0.07965423 -0.0397668108 -0.2777162 0.10351657 -0.4686721 -0.003627143 -0.2800797 0.10432471 -0.4688228 -0.004395259  Single-Level Random-Effect with Cluster Means
+
+#       cond       TNDE       PNDE        PNIE        TNIE    PNIE_LL    PNIE_UL    TNDE_LL      TNDE_UL    TNIE_LL    TNIE_UL    PNDE_LL       PNDE_UL            PS                            Model
+# 1     fefe -0.2510769 -0.2514684 -0.11950564 -0.02166266 -0.3255577 0.07700916 -0.5060783 -0.005091589 -0.3352327 0.08488664 -0.5072594 -0.0063891720  Fixed-Effect                     Fixed-Effect
+# 2     fesl -0.2588860 -0.2591964 -0.12127187 -0.05814495 -0.3246048 0.07121469 -0.5103306 -0.003194003 -0.3211064 0.07322311 -0.5112406  0.0009317933  Fixed-Effect                     Single-Level
+# 3     refe -0.2562645 -0.2566047 -0.11588065 -0.02853428 -0.3126527 0.07480969 -0.5032962 -0.012264249 -0.3184659 0.07940688 -0.5031124 -0.0093673542 Random-Effect                     Fixed-Effect
+# 4     resl -0.2987412 -0.2987693 -0.09161688 -0.03054913 -0.2646908 0.08650299 -0.5280205 -0.062530159 -0.2778580 0.09129741 -0.5305844 -0.0650180918 Random-Effect                     Single-Level
+# 5     slfe -0.2325015 -0.2327627 -0.11816059 -0.08187151 -0.3050444 0.07659792 -0.4810479  0.006200502 -0.3079430 0.07819370 -0.4822922  0.0065073266  Single-Level                     Fixed-Effect
+# 6     slsl -0.3259836 -0.3259562 -0.04471103 -0.01584023 -0.2067034 0.13493934 -0.5633203 -0.085134771 -0.2155183 0.13529510 -0.5648185 -0.0870138644  Single-Level                     Single-Level
+# 7     fere -0.2562957 -0.2566773 -0.11918980 -0.03342662 -0.3119372 0.08752047 -0.5126724 -0.003286732 -0.3304645 0.09003744 -0.5126628 -0.0017859895  Fixed-Effect                    Random-Effect
+# 8  fere_cm -0.2490276 -0.2494285 -0.12421280 -0.04336970 -0.3116530 0.08420532 -0.5122988 -0.004824141 -0.3299738 0.08873388 -0.5117886 -0.0107750952  Fixed-Effect Random-Effect with Cluster Means
+# 9     rere -0.2765615 -0.2767321 -0.10180340 -0.02434469 -0.2724058 0.09636612 -0.5241173 -0.035136923 -0.2862409 0.09841429 -0.5246142 -0.0348127272 Random-Effect                    Random-Effect
+# 10 rere_cm -0.2557420 -0.2560127 -0.11442310 -0.04131232 -0.2902577 0.09149804 -0.5107439 -0.015202755 -0.2981107 0.09332165 -0.5094409 -0.0145378283 Random-Effect Random-Effect with Cluster Means
+# 11    slre -0.2719431 -0.2720481 -0.08421877 -0.05117338 -0.2450241 0.12480705 -0.5120571 -0.043267219 -0.2486733 0.12991754 -0.5121780 -0.0440277319  Single-Level                    Random-Effect
+# 12 slre_cm -0.2243275 -0.2245039 -0.11099540 -0.08241447 -0.2777162 0.10351657 -0.4686721 -0.003627143 -0.2800797 0.10432471 -0.4688228 -0.0043952591  Single-Level Random-Effect with Cluster Means
 
 # Save the final dataframe of results
 write_rds(results_DF, file = "Application/Output/Estimates/Effect-Estimates.rds")

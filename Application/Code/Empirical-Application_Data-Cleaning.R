@@ -19,7 +19,7 @@
 # ultimately exports a cleaned dataset ("/Data/Cleaned/Empirical-Application-Data.rds").
 #
 #
-# Last Updated: 08/13/2024 
+# Last Updated: 08/15/2024 
 #
 #
 # Notes:
@@ -106,11 +106,16 @@ data$parentalEdu <- apply(data[, c("momEdu", "dadEdu")], 1, function(x) {
 data$familyStruct <- data$S11 + data$S17
 data$familyStruct <- ifelse(data$familyStruct == 10, NA, data$familyStruct) # Change "multiple response" to missing
 
-## Recode Health Insurance Gap ---------------------------------------------
-# Recode health insurance gap (PC22: In the past 12 months, has there been a time when {NAME} had no health insurance?)
-data <- data %>%
-  rename(healthInsur = PC22) %>%
-  mutate(healthInsur = ifelse(healthInsur >= 98, NA, healthInsur)) # 98=don't know; 99=not applicable
+# ## Recode Health Insurance Gap ---------------------------------------------
+# # Recode health insurance gap (PC22: In the past 12 months, has there been a time when {NAME} had no health insurance?)
+# data <- data %>%
+#   rename(healthInsur = PC22) %>%
+#   mutate(healthInsur = ifelse(healthInsur >= 3, NA, healthInsur)) # 6=Respondent refused to answer; 23=don't know; 99=not applicable
+
+## Recode Sex  -------------------------------------------------------------
+# Recode Sex 
+data <- data %>% 
+  mutate(sex = ifelse(sex >= 3, NA, sex))
 
 ## Calculate Sports Participation ------------------------------------------
 # Calculate sports participation (H1NF12B)
@@ -144,7 +149,8 @@ data <- data %>%
   select(AID, CLUSTER2, everything()) %>%
   select("AID", "CLUSTER2", "age", "sex",
          "white", "black", 
-         "healthInsur", "parentalEdu", "familyStruct", "sport", "sportPartic", "feelings", "selfEst")
+         # "healthInsur", 
+         "parentalEdu", "familyStruct", "sport", "sportPartic", "feelings", "selfEst")
 
 colnames(data)[-c(1:2)] <- paste0(colnames(data)[-c(1:2)], "_w1")
 
@@ -212,7 +218,7 @@ w4 <- readr::read_tsv(file = "Application/Data/Raw/ICPSR_21600/DS0022/21600-0022
 # Drop variables in Wave IV student data
 w4 <- w4 %>% 
   select("AID":"BIO_SEX4", 
-         "H4MH18":"H4MH27") # CES-D-10 scale [NOTE: DOUBLE CHECK THESE ARE CORRECT ITEMS]
+         "H4MH18":"H4MH27") # CES-D-10 scale 
 
 ## CES-D-10 Scale ----------------------------------------------------
 
@@ -293,7 +299,8 @@ data %>%
 # Check proportions of categorical variables & summary of scale variables
 summary(data[, c(
   "sex_w1", "white_w1", "black_w1", 
-  "healthInsur_w1", "parentalEdu_w1", "familyStruct_w1", 
+  # "healthInsur_w1", 
+  "parentalEdu_w1", "familyStruct_w1", 
   "sport_w1", "sportPartic_w1", "feelings_w1", "depress_w4"
 )])   # Consider collapsing "asian", "nativeAmerican", and "raceOther" due to low proportions
 
@@ -312,14 +319,14 @@ data <- data %>%
 t <- data %>% 
   select(c("sex_w1", "white_w1", "black_w1", 
            "sportPartic_w1", "selfEst_w3", "depress_w4", 
-           "familyStruct_w1", "parentalEdu_w1_sc", "healthInsur_w1", 
+           "familyStruct_w1", "parentalEdu_w1_sc", #"healthInsur_w1",
            "age_w1_sc", "feelings_w1_sc", "selfEst_w1_sc"))
 
 # Examine missing data pattern
 md.pattern(t, rotate.names = TRUE)
 
 # Impute missing data using MICE
-imp <- mice(t, m = 1, seed = 875421)
+imp <- mice(t, m = 1, seed = 87542) 
 
 # Compare original and imputed data
 # Example with stripplot
@@ -342,7 +349,8 @@ data <- data %>%
 # Check proportions of categorical variables & summary after imputing values
 summary(data[, c(
   "sex_w1", "white_w1", "black_w1", 
-  "healthInsur_w1", "parentalEdu_w1_sc", "familyStruct_w1", 
+  # "healthInsur_w1", 
+  "parentalEdu_w1_sc", "familyStruct_w1", 
   "sport_w1", "sportPartic_w1", "feelings_w1_sc", 
   "selfEst_w3_sc", "depress_w4"
 )])
