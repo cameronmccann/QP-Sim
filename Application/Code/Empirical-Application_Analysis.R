@@ -948,10 +948,10 @@ cat("Number of converged outcome models: ", slre_ci_PNIE$outcome_converged_count
 cat("Number of iterations with both models converged: ", slre_ci_PNIE$both_converged_count,
     " (", (slre_ci_PNIE$both_converged_count / length(slre_ci_PNIE$direct_effects)) * 100, "%)\n")
 rm(slre_ci_PNIE)
-# Elapsed time: 4099.748 seconds ( 68 mins) 
-# Number of converged mediator models:  1285  ( 73.42857 %)
-# Number of converged outcome models:  1742  ( 99.54286 %)
-# Number of iterations with both models converged:  1281  ( 73.2 %)
+# Elapsed time: 6652.806 seconds ( 111 mins) 
+# Number of converged mediator models:  1235  ( 72.64706 %)
+# Number of converged outcome models:  1692  ( 99.52941 %)
+# Number of iterations with both models converged:  1231  ( 72.41176 %)
 
 # FE PS Model
 execution_time <- system.time({ 
@@ -975,10 +975,10 @@ cat("Number of converged outcome models: ", fere_ci_PNIE$outcome_converged_count
 cat("Number of iterations with both models converged: ", fere_ci_PNIE$both_converged_count,
     " (", (fere_ci_PNIE$both_converged_count / length(fere_ci_PNIE$direct_effects)) * 100, "%)\n")
 rm(fere_ci_PNIE)
-# Elapsed time: 3647.954 seconds ( 61 mins) 
-# Number of converged mediator models:  1285  ( 73.42857 %)
-# Number of converged outcome models:  1742  ( 99.54286 %)
-# Number of iterations with both models converged:  1281  ( 73.2 %)
+# Elapsed time: 7617.093 seconds ( 127 mins) 
+# Number of converged mediator models:  1235  ( 72.64706 %)
+# Number of converged outcome models:  1692  ( 99.52941 %)
+# Number of iterations with both models converged:  1231  ( 72.41176 %)
 
 # RE PS Model
 execution_time <- system.time({ 
@@ -1002,10 +1002,10 @@ cat("Number of converged outcome models: ", rere_ci_PNIE$outcome_converged_count
 cat("Number of iterations with both models converged: ", rere_ci_PNIE$both_converged_count,
     " (", (rere_ci_PNIE$both_converged_count / length(rere_ci_PNIE$direct_effects)) * 100, "%)\n")
 rm(rere_ci_PNIE)
-# Elapsed time: 4079.088 seconds ( 68 mins) 
-# Number of converged mediator models:  1285  ( 73.42857 %)
-# Number of converged outcome models:  1742  ( 99.54286 %)
-# Number of iterations with both models converged:  1281  ( 73.2 %)
+# Elapsed time: 10816.36 seconds ( 180 mins) 
+# Number of converged mediator models:  1235  ( 72.64706 %)
+# Number of converged outcome models:  1692  ( 99.52941 %)
+# Number of iterations with both models converged:  1231  ( 72.41176 %)
 
 ### Random-Effect with Cluster Means (RE-Mean) Med/Out Models --------------
 # SL PS Model
@@ -1030,10 +1030,10 @@ cat("Number of converged outcome models: ", slre_cm_ci_PNIE$outcome_converged_co
 cat("Number of iterations with both models converged: ", slre_cm_ci_PNIE$both_converged_count,
     " (", (slre_cm_ci_PNIE$both_converged_count / length(slre_cm_ci_PNIE$direct_effects)) * 100, "%)\n")
 rm(slre_cm_ci_PNIE)
-# Elapsed time: 2520.295 seconds ( 42 mins) 
-# Number of converged mediator models:  1219  ( 69.65714 %)
-# Number of converged outcome models:  1722  ( 98.4 %)
-# Number of iterations with both models converged:  1209  ( 69.08571 %)
+# Elapsed time: 6615.656 seconds ( 110 mins) 
+# Number of converged mediator models:  1215  ( 69.42857 %)
+# Number of converged outcome models:  1718  ( 98.17143 %)
+# Number of iterations with both models converged:  1197  ( 68.4 %)
 
 # FE PS Model
 execution_time <- system.time({ 
@@ -1057,10 +1057,10 @@ cat("Number of converged outcome models: ", fere_cm_ci_PNIE$outcome_converged_co
 cat("Number of iterations with both models converged: ", fere_cm_ci_PNIE$both_converged_count,
     " (", (fere_cm_ci_PNIE$both_converged_count / length(fere_cm_ci_PNIE$direct_effects)) * 100, "%)\n")
 rm(fere_cm_ci_PNIE)
-# Elapsed time: 2608.635 seconds ( 43 mins) 
-# Number of converged mediator models:  1219  ( 69.65714 %)
-# Number of converged outcome models:  1722  ( 98.4 %)
-# Number of iterations with both models converged:  1209  ( 69.08571 %)
+# Elapsed time: 6152.866 seconds ( 103 mins) 
+# Number of converged mediator models:  1215  ( 69.42857 %)
+# Number of converged outcome models:  1718  ( 98.17143 %)
+# Number of iterations with both models converged:  1197  ( 68.4 %)
 
 # RE PS Model
 execution_time <- system.time({ 
@@ -1084,10 +1084,10 @@ cat("Number of converged outcome models: ", rere_cm_ci_PNIE$outcome_converged_co
 cat("Number of iterations with both models converged: ", rere_cm_ci_PNIE$both_converged_count,
     " (", (rere_cm_ci_PNIE$both_converged_count / length(rere_cm_ci_PNIE$direct_effects)) * 100, "%)\n")
 rm(rere_cm_ci_PNIE)
-# Elapsed time: 2300.913 seconds ( 38 mins) 
-# Number of converged mediator models:  1219  ( 69.65714 %)
-# Number of converged outcome models:  1722  ( 98.4 %)
-# Number of iterations with both models converged:  1209  ( 69.08571 %)
+# Elapsed time: 5956.323 seconds ( 99 mins) 
+# Number of converged mediator models:  1215  ( 69.42857 %)
+# Number of converged outcome models:  1718  ( 98.17143 %)
+# Number of iterations with both models converged:  1197  ( 68.4 %)
 
 ## PNDE & TNIE -------------------------------------------------------------
 # This subsection focuses on PNDE (Pure Natural Direct Effect) and TNIE (Total Natural Indirect Effect)
@@ -1196,10 +1196,10 @@ cat("Number of converged outcome models: ", slre_ci_TNIE$outcome_converged_count
 cat("Number of iterations with both models converged: ", slre_ci_TNIE$both_converged_count,
     " (", (slre_ci_TNIE$both_converged_count / length(slre_ci_TNIE$direct_effects)) * 100, "%)\n")
 rm(slre_ci_TNIE)
-# Elapsed time: 3008.028 seconds ( 50 mins) 
-# Number of converged mediator models:  1285  ( 73.42857 %)
-# Number of converged outcome models:  1744  ( 99.65714 %)
-# Number of iterations with both models converged:  1283  ( 73.31429 %)
+# Elapsed time: 6310.98 seconds ( 105 mins) 
+# Number of converged mediator models:  1235  ( 72.64706 %)
+# Number of converged outcome models:  1690  ( 99.41176 %)
+# Number of iterations with both models converged:  1229  ( 72.29412 %)
 
 # FE PS Model
 execution_time <- system.time({ 
@@ -1223,10 +1223,10 @@ cat("Number of converged outcome models: ", fere_ci_TNIE$outcome_converged_count
 cat("Number of iterations with both models converged: ", fere_ci_TNIE$both_converged_count,
     " (", (fere_ci_TNIE$both_converged_count / length(fere_ci_TNIE$direct_effects)) * 100, "%)\n")
 rm(fere_ci_TNIE)
-# Elapsed time: 2708.672 seconds ( 45 mins) 
-# Number of converged mediator models:  1285  ( 73.42857 %)
-# Number of converged outcome models:  1744  ( 99.65714 %)
-# Number of iterations with both models converged:  1283  ( 73.31429 %)
+# Elapsed time: 6343.685 seconds ( 106 mins) 
+# Number of converged mediator models:  1235  ( 72.64706 %)
+# Number of converged outcome models:  1690  ( 99.41176 %)
+# Number of iterations with both models converged:  1229  ( 72.29412 %)
 
 # RE PS Model
 execution_time <- system.time({ 
@@ -1250,10 +1250,10 @@ cat("Number of converged outcome models: ", rere_ci_TNIE$outcome_converged_count
 cat("Number of iterations with both models converged: ", rere_ci_TNIE$both_converged_count,
     " (", (rere_ci_TNIE$both_converged_count / length(rere_ci_TNIE$direct_effects)) * 100, "%)\n")
 rm(rere_ci_TNIE)
-# Elapsed time: 2575.112 seconds ( 43 mins) 
-# Number of converged mediator models:  1285  ( 73.42857 %)
-# Number of converged outcome models:  1744  ( 99.65714 %)
-# Number of iterations with both models converged:  1283  ( 73.31429 %)
+# Elapsed time: 10578.82 seconds ( 176 mins) 
+# Number of converged mediator models:  1235  ( 72.64706 %)
+# Number of converged outcome models:  1690  ( 99.41176 %)
+# Number of iterations with both models converged:  1229  ( 72.29412 %)
 
 ### Random-Effect with Cluster Means (RE-Mean) Med/Out Models --------------
 # SL PS Model
@@ -1278,6 +1278,12 @@ cat("Number of converged outcome models: ", slre_cm_ci_TNIE$outcome_converged_co
 cat("Number of iterations with both models converged: ", slre_cm_ci_TNIE$both_converged_count,
     " (", (slre_cm_ci_TNIE$both_converged_count / length(slre_cm_ci_TNIE$direct_effects)) * 100, "%)\n")
 rm(slre_cm_ci_TNIE)
+# Elapsed time: 9869.804 seconds ( 164 mins) 
+# Number of converged mediator models:  1181  ( 69.47059 %)
+# Number of converged outcome models:  1664  ( 97.88235 %)
+# Number of iterations with both models converged:  1161  ( 68.29412 %)
+
+# OLD:
 # Elapsed time: 4365.37 seconds ( 73 mins) 
 # Number of converged mediator models:  1219  ( 69.65714 %)
 # Number of converged outcome models:  1722  ( 98.4 %)
@@ -1305,6 +1311,12 @@ cat("Number of converged outcome models: ", fere_cm_ci_TNIE$outcome_converged_co
 cat("Number of iterations with both models converged: ", fere_cm_ci_TNIE$both_converged_count,
     " (", (fere_cm_ci_TNIE$both_converged_count / length(fere_cm_ci_TNIE$direct_effects)) * 100, "%)\n")
 rm(fere_cm_ci_TNIE)
+# Elapsed time: 5830.462 seconds ( 97 mins) 
+# Number of converged mediator models:  1181  ( 69.47059 %)
+# Number of converged outcome models:  1664  ( 97.88235 %)
+# Number of iterations with both models converged:  1161  ( 68.29412 %)
+
+# OLD: 
 # Elapsed time: 3742.066 seconds ( 62 mins) 
 # Number of converged mediator models:  1219  ( 69.65714 %)
 # Number of converged outcome models:  1722  ( 98.4 %)
@@ -1332,6 +1344,12 @@ cat("Number of converged outcome models: ", rere_cm_ci_TNIE$outcome_converged_co
 cat("Number of iterations with both models converged: ", rere_cm_ci_TNIE$both_converged_count,
     " (", (rere_cm_ci_TNIE$both_converged_count / length(rere_cm_ci_TNIE$direct_effects)) * 100, "%)\n")
 rm(rere_cm_ci_TNIE)
+# Elapsed time: 7174.466 seconds ( 120 mins) 
+# Number of converged mediator models:  1181  ( 69.47059 %)
+# Number of converged outcome models:  1664  ( 97.88235 %)
+# Number of iterations with both models converged:  1161  ( 68.29412 %)
+
+# OLD: 
 # Elapsed time: 3800.283 seconds ( 63 mins) 
 # Number of converged mediator models:  1219  ( 69.65714 %)
 # Number of converged outcome models:  1722  ( 98.4 %)
@@ -1435,6 +1453,15 @@ for (i in 1:6) {
 
 # Display the RE model results
 results_DF_RE
+#       cond    PNIE_LL    PNIE_UL    TNDE_LL      TNDE_UL    TNIE_LL    TNIE_UL    PNDE_LL      PNDE_UL
+# 1    slre -0.2792701 0.09994341 -0.5000102 -0.055682131 -0.2819150 0.10238444 -0.5027937 -0.053682580
+# 2    fere -0.3426149 0.07165350 -0.5128617 -0.019704421 -0.3590603 0.07522094 -0.5137532 -0.020466528
+# 3    rere -0.3106561 0.08389139 -0.5176295 -0.050033639 -0.3216423 0.09003098 -0.5162965 -0.049349202
+# 4 slre_cm -0.3235201 0.08291188 -0.4695924  0.003501834 -0.3145743 0.08801792 -0.4681990  0.003553328
+# 5 fere_cm -0.3494602 0.07261279 -0.5102075 -0.008612200 -0.3630953 0.07850820 -0.5110733 -0.010316405
+# 6 rere_cm -0.3300292 0.08252020 -0.5048648 -0.026267544 -0.3388155 0.08482095 -0.5054298 -0.026664633
+
+# OLD: 
 #       cond    PNIE_LL    PNIE_UL    TNDE_LL      TNDE_UL    TNIE_LL    TNIE_UL    PNDE_LL      PNDE_UL
 # 1    slre -0.2450241 0.12480705 -0.5120571 -0.043267219 -0.2486733 0.12991754 -0.5121780 -0.044027732
 # 2    fere -0.3119372 0.08752047 -0.5126724 -0.003286732 -0.3304645 0.09003744 -0.5126628 -0.001785989
@@ -1550,6 +1577,21 @@ results_DF <- results_DF %>%
 
 # Display the final dataframe with PS model & Mediator/Outcome labels
 print(results_DF)
+#       cond       TNDE       PNDE        PNIE        TNIE    PNIE_LL    PNIE_UL    TNDE_LL      TNDE_UL    TNIE_LL    TNIE_UL    PNDE_LL       PNDE_UL            PS                            Model
+# 1     fefe -0.2510769 -0.2514684 -0.11950564 -0.02166266 -0.3255577 0.07700916 -0.5060783 -0.005091589 -0.3352327 0.08488664 -0.5072594 -0.0063891720  Fixed-Effect                     Fixed-Effect
+# 2     fesl -0.2588860 -0.2591964 -0.12127187 -0.05814495 -0.3246048 0.07121469 -0.5103306 -0.003194003 -0.3211064 0.07322311 -0.5112406  0.0009317933  Fixed-Effect                     Single-Level
+# 3     refe -0.2562645 -0.2566047 -0.11588065 -0.02853428 -0.3126527 0.07480969 -0.5032962 -0.012264249 -0.3184659 0.07940688 -0.5031124 -0.0093673542 Random-Effect                     Fixed-Effect
+# 4     resl -0.2987412 -0.2987693 -0.09161688 -0.03054913 -0.2646908 0.08650299 -0.5280205 -0.062530159 -0.2778580 0.09129741 -0.5305844 -0.0650180918 Random-Effect                     Single-Level
+# 5     slfe -0.2325015 -0.2327627 -0.11816059 -0.08187151 -0.3050444 0.07659792 -0.4810479  0.006200502 -0.3079430 0.07819370 -0.4822922  0.0065073266  Single-Level                     Fixed-Effect
+# 6     slsl -0.3259836 -0.3259562 -0.04471103 -0.01584023 -0.2067034 0.13493934 -0.5633203 -0.085134771 -0.2155183 0.13529510 -0.5648185 -0.0870138644  Single-Level                     Single-Level
+# 7     fere -0.2562957 -0.2566773 -0.11918980 -0.03342662 -0.3426149 0.07165350 -0.5128617 -0.019704421 -0.3590603 0.07522094 -0.5137532 -0.0204665279  Fixed-Effect                    Random-Effect
+# 8  fere_cm -0.2490276 -0.2494285 -0.12421280 -0.04336970 -0.3494602 0.07261279 -0.5102075 -0.008612200 -0.3630953 0.07850820 -0.5110733 -0.0103164046  Fixed-Effect Random-Effect with Cluster Means
+# 9     rere -0.2765615 -0.2767321 -0.10180340 -0.02434469 -0.3106561 0.08389139 -0.5176295 -0.050033639 -0.3216423 0.09003098 -0.5162965 -0.0493492021 Random-Effect                    Random-Effect
+# 10 rere_cm -0.2557420 -0.2560127 -0.11442310 -0.04131232 -0.3300292 0.08252020 -0.5048648 -0.026267544 -0.3388155 0.08482095 -0.5054298 -0.0266646326 Random-Effect Random-Effect with Cluster Means
+# 11    slre -0.2719431 -0.2720481 -0.08421877 -0.05117338 -0.2792701 0.09994341 -0.5000102 -0.055682131 -0.2819150 0.10238444 -0.5027937 -0.0536825803  Single-Level                    Random-Effect
+# 12 slre_cm -0.2243275 -0.2245039 -0.11099540 -0.08241447 -0.3235201 0.08291188 -0.4695924  0.003501834 -0.3145743 0.08801792 -0.4681990  0.0035533282  Single-Level Random-Effect with Cluster Means
+
+# OLD: 
 #       cond       TNDE       PNDE        PNIE          TNIE    PNIE_LL    PNIE_UL    TNDE_LL      TNDE_UL    TNIE_LL    TNIE_UL    PNDE_LL      PNDE_UL            PS                            Model
 # 1     fefe -0.2439341 -0.2445695 -0.09660659  0.0126441050 -0.3007998 0.09570006 -0.5084805  0.004777044 -0.3077056 0.10218566 -0.5085235  0.006911447  Fixed-Effect                     Fixed-Effect
 # 2     fesl -0.2558156 -0.2563010 -0.09886261 -0.0261259555 -0.2921923 0.08181015 -0.5118420 -0.010035295 -0.2961822 0.08569538 -0.5117962 -0.011418954  Fixed-Effect                     Single-Level
