@@ -106,12 +106,6 @@ data$parentalEdu <- apply(data[, c("momEdu", "dadEdu")], 1, function(x) {
 data$familyStruct <- data$S11 + data$S17
 data$familyStruct <- ifelse(data$familyStruct == 10, NA, data$familyStruct) # Change "multiple response" to missing
 
-# ## Recode Health Insurance Gap ---------------------------------------------
-# # Recode health insurance gap (PC22: In the past 12 months, has there been a time when {NAME} had no health insurance?)
-# data <- data %>%
-#   rename(healthInsur = PC22) %>%
-#   mutate(healthInsur = ifelse(healthInsur >= 3, NA, healthInsur)) # 6=Respondent refused to answer; 23=don't know; 99=not applicable
-
 ## Recode Sex  -------------------------------------------------------------
 # Recode Sex 
 data <- data %>% 
@@ -149,7 +143,6 @@ data <- data %>%
   select(AID, CLUSTER2, everything()) %>%
   select("AID", "CLUSTER2", "age", "sex",
          "white", "black", 
-         # "healthInsur", 
          "parentalEdu", "familyStruct", "sport", "sportPartic", "feelings", "selfEst")
 
 colnames(data)[-c(1:2)] <- paste0(colnames(data)[-c(1:2)], "_w1")
@@ -299,7 +292,6 @@ data %>%
 # Check proportions of categorical variables & summary of scale variables
 summary(data[, c(
   "sex_w1", "white_w1", "black_w1", 
-  # "healthInsur_w1", 
   "parentalEdu_w1", "familyStruct_w1", 
   "sport_w1", "sportPartic_w1", "feelings_w1", "depress_w4"
 )])   # Consider collapsing "asian", "nativeAmerican", and "raceOther" due to low proportions
@@ -319,7 +311,7 @@ data <- data %>%
 t <- data %>% 
   select(c("sex_w1", "white_w1", "black_w1", 
            "sportPartic_w1", "selfEst_w3", "depress_w4", 
-           "familyStruct_w1", "parentalEdu_w1_sc", #"healthInsur_w1",
+           "familyStruct_w1", "parentalEdu_w1_sc", 
            "age_w1_sc", "feelings_w1_sc", "selfEst_w1_sc"))
 
 # Examine missing data pattern
@@ -349,7 +341,6 @@ data <- data %>%
 # Check proportions of categorical variables & summary after imputing values
 summary(data[, c(
   "sex_w1", "white_w1", "black_w1", 
-  # "healthInsur_w1", 
   "parentalEdu_w1_sc", "familyStruct_w1", 
   "sport_w1", "sportPartic_w1", "feelings_w1_sc", 
   "selfEst_w3_sc", "depress_w4"
