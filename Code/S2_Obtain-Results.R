@@ -150,7 +150,7 @@ relBias_Tbl <- pivot_wider(
   values_from = c("TNDE_relBias", "PNIE_relBias")
 )
 
-# drop common peice of column names 
+# drop common piece of column names 
 colnames(relBias_Tbl) <-
   stringr::str_remove(string = colnames(relBias_Tbl),
                       pattern = "_relBias")
@@ -281,5 +281,69 @@ as_hux(rmse_PNIE_Table) %>%
     col = -c(1:2),
     value = 3
   )
+
+
+# TNDE Relative Bias Visual -----------------------------------------------
+
+# set values 
+treat_m <- 1 # trt on med   
+treat_y <- 1.3 # trt on outcome
+med_y <- 1 # med on outcome  
+TNDE <- treat_y
+PNIE <- treat_m * med_y
+
+# visual settings
+gglayer_theme <- list(theme_bw(),
+                      scale_fill_manual(values = c("#BF5700", #Fixed-effect
+                                                   "#A6CD57", #Random-effect 
+                                                   "#333F48")), #Single-level 
+                      #"#9CADB7" <-- light gray 
+                      # Used following website with university colors: https://projects.susielu.com/viz-palette?
+                      theme(text = element_text(family = "Times New Roman", size = 12), 
+                            axis.title = element_text(size = 12),  # Adjust axis title size
+                            axis.text = element_text(size = 10),  # Adjust axis text size
+                            legend.title = element_text(size = 12),  # Legend title size
+                            legend.text = element_text(size = 10),  # Legend text size
+                            strip.text = element_text(size = 12),  # Facet labels
+                            line = element_line(linewidth = 0.5),  # APA recommends thin lines
+                            legend.position = "top"  
+                      )) 
+
+# Labels 
+gglayer_labs <- list(
+  labs(
+    x = "\n Absolute Relative Bias",
+    y = "Mediator and Outcome Model \n",
+    color = "PS Model",
+    linetype = "PS Model",
+    shape = "PS Model"
+  ),
+  guides(y.sec = guide_none("Cluster Size"),
+         x.sec = guide_none("Residual ICC"))
+)
+
+pdf("Output/S2_Results/Figures/TNDE-Relative-Bias-Boxplot.pdf")
+readRDS(file = "Output/S2_Results/Data/S2_Simulation-Data.rds") |>
+  # rename PS models 
+  mutate(`PS Model` = ifelse(PS == "FE", "Fixed-Effect", 
+                             ifelse(PS == "RE", "Random-Effect", 
+                                    ifelse(PS == "SL", "Single-Level", 
+                                           "ERROR")))) %>% 
+  
+  # visual 
+  ggplot(aes(x = abs((TNDE_est / TNDE) - 1), y = outModel, fill = `PS Model`)) +
+  geom_vline(xintercept = 0) +
+  geom_vline(xintercept = 0.10, color = "red", alpha = 0.4) +
+  geom_boxplot(position = position_dodge(width = 0.75), alpha = 0.8, 
+               linewidth = 0.25, 
+               outlier.size = 0.5, 
+               outlier.alpha = 0.5) +
+  facet_grid(ICC ~ clust_size) +
+  gglayer_labs +
+  gglayer_theme 
+
+dev.off()
+# Save visual 
+ggsave(filename = "Output/S2_Results/Figures/TNDE-Relative-Bias-Boxplot.png", plot = last_plot())
 
 

@@ -14,7 +14,7 @@
 #                       This is stored in the relevant Results folder.
 #
 #
-# Last Updated: 05/23/2024
+# Last Updated: 08/27/2024
 #
 #
 # Notes:
@@ -281,3 +281,65 @@ as_hux(rmse_PNIE_Table) %>%
 
 
 
+# PNIE Relative Bias Visual -----------------------------------------------
+
+# set direct & indirect effects 
+treat_m <- 1.17 # trt on med   
+treat_y <- 1.35 # trt on outcome
+med_y <- 1.2 # med on outcome  
+TNDE <- treat_y
+PNIE <- treat_m * med_y
+
+# visual settings
+gglayer_theme <- list(theme_bw(),
+                      scale_fill_manual(values = c("#BF5700", #Fixed-effect
+                                                   "#A6CD57", #Random-effect 
+                                                   "#333F48")), #Single-level 
+                      #"#9CADB7" <-- light gray 
+                      # Used following website with university colors: https://projects.susielu.com/viz-palette?
+                      theme(text = element_text(family = "Times New Roman", size = 12), 
+                            axis.title = element_text(size = 12),  # Adjust axis title size
+                            axis.text = element_text(size = 10),  # Adjust axis text size
+                            legend.title = element_text(size = 12),  # Legend title size
+                            legend.text = element_text(size = 10),  # Legend text size
+                            strip.text = element_text(size = 12),  # Facet labels
+                            line = element_line(linewidth = 0.5),  # APA recommends thin lines
+                            legend.position = "top"  
+                            )) 
+
+# Labels 
+gglayer_labs <- list(
+  labs(
+    x = "\n Absolute Relative Bias",
+    y = "Mediator and Outcome Model \n",
+    color = "PS Model",
+    linetype = "PS Model",
+    shape = "PS Model"
+  ),
+  guides(y.sec = guide_none("Cluster Size"),
+         x.sec = guide_none("Residual ICC"))
+)
+
+# Boxplot 
+pdf("Output/S1_Results/Figures/PNIE-Relative-Bias-Boxplot.pdf")
+readRDS(file = "Output/S1_Results/Data/S1_Simulation-Data.rds") |>
+  # rename PS models 
+  mutate(`PS Model` = ifelse(PS == "FE", "Fixed-Effect", 
+                             ifelse(PS == "RE", "Random-Effect", 
+                                    ifelse(PS == "SL", "Single-Level", 
+                                           "ERROR")))) %>% 
+  # visual 
+  ggplot(aes(x = abs((PNIE_est / PNIE) - 1), y = outModel, fill = `PS Model`)) +
+  geom_vline(xintercept = 0, linewidth = 0.5) +
+  geom_vline(xintercept = 0.10, color = "red", alpha = 0.6, linewidth = 0.5) +
+  geom_boxplot(position = position_dodge(width = 0.75), alpha = 0.8, 
+               linewidth = 0.3, 
+               outlier.size = 0.5, 
+               outlier.alpha = 0.6) +
+  facet_grid(clust_size ~ ICC) +
+  gglayer_labs +
+  gglayer_theme 
+
+dev.off()
+# Save visual 
+ggsave(filename = "Output/S1_Results/Figures/PNIE-Relative-Bias-Boxplot.png", plot = last_plot())
