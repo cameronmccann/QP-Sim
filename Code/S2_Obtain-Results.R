@@ -338,7 +338,7 @@ readRDS(file = "Output/S2_Results/Data/S2_Simulation-Data.rds") |>
                linewidth = 0.25, 
                outlier.size = 0.5, 
                outlier.alpha = 0.5) +
-  facet_grid(ICC ~ clust_size) +
+  facet_grid(clust_size ~ ICC) +
   gglayer_labs +
   gglayer_theme 
 
