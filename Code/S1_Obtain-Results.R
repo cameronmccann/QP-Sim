@@ -44,6 +44,244 @@ pacman::p_load(
 
 
 
+# Simulation 1 Explained Variance Table -----------------------------------
+
+# Set simulation parameters
+num_x = 3
+# Coefficients for X variables' effects
+a_x <- 0.25  # Effect of X on treatment (trt), corresponding R^2 = 0.02798
+b_x <- 0.3   # Effect of X on mediator (med), corresponding R^2 = 0.02994
+c_x <- 0.35  # Effect of X on outcome, corresponding R^2 = 0.03030
+
+# Coefficients for Z variable's effects
+a_z <- 1.03  # Effect of Z on treatment, corresponding R^2 = 0.19790
+b_z <- 1.21  # Effect of Z on mediator, corresponding R^2 = 0.20292
+c_z <- 1.4   # Effect of Z on outcome, corresponding R^2 = 0.20201
+
+# Coefficients for treatment effects
+treat_m <- 1.17  # Effect of treatment on mediator, corresponding R^2 = 0.15178
+treat_y <- 1.35  # Effect of treatment on outcome, corresponding R^2 = 0.15027
+med_y <- 1.2     # Effect of mediator on outcome, corresponding R^2 = 0.11873
+
+
+# Create an empty data frame to store explained variance (R^2) values for different ICC levels
+design_values_DF <- data.frame(cbind(
+  var_expl = c("trt_x", "med_x", "out_x", 
+               "trt_z", "med_z", "out_z", 
+               "med_trt", "out_trt", "out_med"), 
+  icc_0.05 = NA, 
+  icc_0.2 = NA, 
+  icc_0.5 = NA 
+))
+
+# Loop through ICC values and calculate the explained variance (R^2) for each variable
+for (icc in c(0.05, 0.2, 0.5)) {
+  # Variance explained by X variables (trt_x, med_x, out_x)
+  design_values_DF[design_values_DF$var_expl == "trt_x", paste0("icc_", icc)] <-
+    ((a_x^2)*num_x * (1 - icc)) / ((a_x^2)*num_x + a_z^2 + (pi^2/3)/4 + (pi^2/3))
+  
+  design_values_DF[design_values_DF$var_expl == "med_x", paste0("icc_", icc)] <-
+    ((b_x^2)*num_x * (1 - icc)) / ((b_x^2)*num_x + b_z^2 + treat_m^2 + (pi^2/3)/4 + (pi^2/3)) 
+  
+  design_values_DF[design_values_DF$var_expl == "out_x", paste0("icc_", icc)] <-
+    ((c_x^2)*num_x * (1 - icc)) / (c_z^2 + treat_y^2 + (c_x^2)*num_x + med_y^2 + (pi^2/3)/4 + (pi^2/3)) 
+  
+  # Variance explained by Z variable (trt_z, med_z, out_z)
+  design_values_DF[design_values_DF$var_expl == "trt_z", paste0("icc_", icc)] <-
+    (a_z^2) / ((a_x^2)*num_x + a_z^2 + (pi^2/3)/4 + (pi^2/3)) 
+  
+  design_values_DF[design_values_DF$var_expl == "med_z", paste0("icc_", icc)] <-
+    (b_z^2) / ((b_x^2)*num_x + b_z^2 + treat_m^2 + (pi^2/3)/4 + (pi^2/3)) 
+  
+  design_values_DF[design_values_DF$var_expl == "out_z", paste0("icc_", icc)] <-
+    (c_z^2) / (c_z^2 + treat_y^2 + (c_x^2)*num_x + med_y^2 + (pi^2/3)/4 + (pi^2/3)) 
+  
+  # Variance explained by treatment (med_trt, out_trt) and mediator (out_med)
+  design_values_DF[design_values_DF$var_expl == "med_trt", paste0("icc_", icc)] <-
+    (treat_m^2 * (1 - icc)) / (b_z^2 + treat_m^2 + (b_x^2)*num_x + (pi^2/3)/4 + (pi^2/3)) 
+  
+  design_values_DF[design_values_DF$var_expl == "out_trt", paste0("icc_", icc)] <-
+    (treat_y^2 * (1 - icc)) / (c_z^2 + treat_y^2 + (c_x^2)*num_x + med_y^2 + (pi^2/3)/4 + (pi^2/3))
+  
+  design_values_DF[design_values_DF$var_expl == "out_med", paste0("icc_", icc)] <-
+    (med_y^2 * (1 - icc)) / (c_z^2 + treat_y^2 + (c_x^2)*num_x + med_y^2 + (pi^2/3)/4 + (pi^2/3))  
+}
+
+# Round the R^2 values for readability
+design_values_DF <- design_values_DF %>% 
+  mutate_at(.vars = c("icc_0.05", "icc_0.2", "icc_0.5"), 
+            .funs = as.numeric) %>% 
+  mutate_at(.vars = c("icc_0.05", "icc_0.2", "icc_0.5"), 
+            .funs = round, 2)
+
+# Remove rows related to Z variable as these are not needed for the final table
+design_values_DF <- design_values_DF[!endsWith(design_values_DF$var_expl, suffix = "_z"), ]
+
+# Create final table summarizing the explained variance for different factors
+explained_var_table <- data.frame(
+  cbind(
+    Factor = c(
+      "Total variance in the treatment explained by all X variables", 
+      "Total variance in the mediator explained by all X variables", 
+      "Total variance in the outcome explained by all X variables",
+      
+      "Total variance in the mediator explained by the treatment", 
+      "Total variance in the outcome explained by the treatment", 
+      "Total variance in the outcome explained by the mediator"
+    ),
+    "0.05" = design_values_DF$icc_0.05,
+    "0.2" = design_values_DF$icc_0.2,
+    "0.5" = design_values_DF$icc_0.5
+  )
+)
+
+explained_var_table
+
+
+
+# Simulation 1 Directed Acyclic Graph (DAG) Visualization -----------------
+
+# Define the DAG structure and coordinates for each variable
+dag1 <- dagify(
+  Z ~ 1,              # Latent variable Z (no parent)
+  x1 ~ 1, x2 ~ 1, x3 ~ 1,  # Independent variables x1, x2, x3 (no parents)
+  T ~ 1,              # Treatment variable T (no parent)
+  M ~ 1,              # Mediator variable M (no parent)
+  Y ~ 1,              # Outcome variable Y (no parent)
+  exposure = "T",     # Define T as the exposure
+  outcome = "Y",      # Define Y as the outcome
+  latent = "Z",       # Define Z as a latent variable
+  coords = list(      # Coordinates for plotting the DAG nodes
+    x = c(T = 1.5, M = 3.5, Y = 5.5, Z = 1, x1 = 2.75, x2 = 3.5, x3 = 4.25),
+    y = c(T = 2, M = 3.5, Y = 2, Z = 6.5, x1 = 5, x2 = 5, x3 = 5)
+  )
+)
+
+
+# Create DAG visualization
+p1 <- ggdag_classic(dag1, size = 4) +
+  
+  # Set plot limits to ensure all elements fit well within the plot area
+  xlim(0, 6) +
+  ylim(1, 7) +
+  coord_fixed() +  # Maintain fixed aspect ratio
+  
+  #----------------------
+  # Z Section (Latent Variable Z)
+  #----------------------
+  
+  # Add Z (latent variable) as a circle at specified coordinates
+  ggforce::stat_circle(aes(x0 = 1, y0 = 6.5, r = 0.3)) +
+  
+  # Add dashed arrows from Z to T, M, and Y
+  geom_curve(x = 0.65, y = 6.3, 
+             xend = 1.25, yend = 2.3, 
+             linetype = "dashed", 
+             arrow = arrow(length = unit(0.2, "cm"), 
+                           ends = "last", 
+                           type = "closed"), 
+             curvature = 0.4) + # Z -> T
+  geom_curve(x = 1, y = 6.1, 
+             xend = 3.2, yend = 3.5, 
+             linetype = "dashed", 
+             arrow = arrow(length = unit(0.2, "cm"), 
+                           ends = "last", 
+                           type = "closed"), 
+             curvature = 0.4) + # Z -> M
+  geom_curve(x = 1.3, y = 6.75, 
+             xend = 5.65, yend = 2.3, 
+             linetype = "dashed", 
+             arrow = arrow(length = unit(0.2, "cm"), 
+                           ends = "last", 
+                           type = "closed"), 
+             curvature = -0.65) + # Z -> Y
+  
+  #----------------------
+  # T-M-Y Section (Treatment, Mediator, and Outcome)
+  #----------------------
+
+  # Draw rectangular boxes around T, M, and Y nodes
+
+  # T: Treatment variable, with a box drawn around its coordinates
+  geom_rect(aes(xmin = 1.25, ymin = 1.75, 
+                xmax = 1.75, ymax = 2.25), 
+            fill = "transparent", color = "black", linewidth = 0.4, size = 1) +
+  # M: Mediator variable, represented with a box at its defined coordinates
+  geom_rect(aes(xmin = 3.25, ymin = 3.25, 
+                xmax = 3.75, ymax = 3.75), 
+            fill = "transparent", color = "black", linewidth = 0.4, size = 1) +
+  # Y: Outcome variable, drawn as a box at the Y-node coordinates
+  geom_rect(aes(xmin = 5.25, ymin = 1.75, 
+                xmax = 5.75, ymax = 2.25), 
+            fill = "transparent", color = "black", linewidth = 0.4, size = 1) + 
+  
+  # Draw the causal paths between T, M, and Y
+  
+  # Solid arrow from T (Treatment) to M (Mediator)
+  geom_segment(aes(x = 1.8, y = 2.1, 
+                   xend = 3.2, yend = 3.3), 
+               linewidth = 0.4, linetype = "solid", color = "black", 
+               arrow = arrow(length = unit(0.2, "cm"), ends = "last", type = "closed")) +
+  # Solid arrow from M (Mediator) to Y (Outcome)
+  geom_segment(aes(x = 3.8, y = 3.3, 
+                   xend = 5.2, yend = 2.1), 
+               linewidth = 0.4, linetype = "solid", color = "black", 
+               arrow = arrow(length = unit(0.2, "cm"), ends = "last", type = "closed")) +
+  # Direct solid arrow from T (Treatment) to Y (Outcome)
+  geom_segment(aes(x = 1.8, y = 2, 
+                   xend = 5.2, yend = 2), 
+               linewidth = 0.4, linetype = "solid", color = "black", 
+               arrow = arrow(length = unit(0.2, "cm"), ends = "last", type = "closed")) +
+  
+  #----------------------
+  # x1-x3 Section (Independent Variables)
+  #----------------------
+  
+  # Draw rectangular boxes around x1, x2, and x3 variables
+
+  # x1 variable box
+  geom_rect(aes(xmin = 2.5, ymin = 5.25, 
+                xmax = 3, ymax = 4.75), 
+            fill = "transparent", color = "black", linewidth = 0.4, size = 1) +
+  # x2 variable box
+  geom_rect(aes(xmin = 3.25, ymin = 5.25, 
+                xmax = 3.75, ymax = 4.75), 
+            fill = "transparent", color = "black", linewidth = 0.4, size = 1) +
+  # x3 variable box
+  geom_rect(aes(xmin = 4, ymin = 5.25, 
+                xmax = 4.5, ymax = 4.75), 
+            fill = "transparent", color = "black", linewidth = 0.4, size = 1) +
+  # Draw a larger box encapsulating all three independent variables (x1-x3)
+  geom_rect(aes(xmin = 2.25, ymin = 4.6, 
+                xmax = 4.75, ymax = 5.4), 
+            fill = "transparent", color = "black", linewidth = 0.4, size = 1) +
+  
+  # Add arrows showing causal paths from x1-x3 to T, M, and Y
+  
+  # Arrow from x1-x3 to T (Treatment)
+  geom_segment(aes(x = 3.4, y = 4.55, 
+                   xend = 1.5, yend = 2.3), 
+               linewidth = 0.4, linetype = "solid", color = "black", 
+               arrow = arrow(length = unit(0.2, "cm"), ends = "last", type = "closed")) +
+  # Arrow from x1-x3 to M (Mediator)
+  geom_segment(aes(x = 3.5, y = 4.55, 
+                   xend = 3.5, yend = 3.8), 
+               linewidth = 0.4, linetype = "solid", color = "black", 
+               arrow = arrow(length = unit(0.2, "cm"), ends = "last", type = "closed")) +
+  # Arrow from x1-x3 to Y (Outcome)
+  geom_segment(aes(x = 3.6, y = 4.55, 
+                   xend = 5.5, yend = 2.3), 
+               linewidth = 0.4, linetype = "solid", color = "black", 
+               arrow = arrow(length = unit(0.2, "cm"), ends = "last", type = "closed")) +
+  
+  # Apply DAG-specific theme
+  theme_dag()
+
+# Display the DAG plot
+p1
+
+
+
 # Set Parameters & Simulation conditions  --------------------------------------------------
 
 cond <- expand.grid(num_clust = 100, 
