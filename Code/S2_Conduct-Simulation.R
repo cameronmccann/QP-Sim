@@ -1,5 +1,5 @@
 ################################################################################
-############################### QP Simulation 2B ###############################
+############################### QP Simulation 2 ###############################
 ################################################################################
 
 ############################ Script Description ################################
@@ -66,7 +66,7 @@ OverallPar_time <- NULL
 ## Set number of replications/repetitions 
 reps <- 2 #1000 
 
-## Create directory to store results 
+## Create directory to store output 
 path <- "Output/S2_Simulation-Output"
 if (!dir.exists(path)) {
   dir.create(path)
