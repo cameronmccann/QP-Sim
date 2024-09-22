@@ -2,15 +2,14 @@
 # QP Project 
 # Data Generation for Simulation 2 
 #' 
-#' `genOneData_Sim2()` generates clustered data for Simulation 2. Generated 
-#' data consisting of a level-1 treatment, 6 level-1 confounders, 
-#' a level-1 mediator, and a level-1 outcome as well as a level-2 confounder, 
-#' with control over the number of clusters, cluster size, and ICC. Specifically, 
-#' the dataframe returned from the function consists of the following variables: 
-#' observation ID (id); cluster ID (school); 3 level-1 confounders of T, M, Y relations (x1-x3); 
-#' 3 level-1 T-Y confounders (x4-x6); a level-2 T-Y confounder (z); (t_ast); 
-#' the true propensity score of an observation (ps_true); level-1 treatment assignment (t); 
-#' level-1 mediator value (m); and the level-1 outcome measure (y). 
+#' `genOneData_Sim2()` generates clustered data consisting of a level-1 treatment, 
+#' 6 level-1 confounders, a level-1 mediator, and a level-1 outcome as well as 
+#' a level-2 confounder, with control over the number of clusters, cluster size, 
+#' and ICC. Specifically, the dataframe returned from the function consists of the 
+#' following variables: observation ID (id); cluster ID (school); 
+#' 3 level-1 confounders of T, M, Y relations (x1-x3); 3 level-1 T-Y confounders (x4-x6); 
+#' a level-2 T-Y confounder (z); (t_ast); the true propensity score of an observation (ps_true); 
+#' level-1 treatment assignment (t); level-1 mediator value (m); and the level-1 outcome measure (y). 
 #' 
 #' @param num_clust Number of clusters 
 #' @param clust_size Cluster size for each cluster (i.e., number of observations per cluster) 
@@ -45,7 +44,6 @@ genOneData_Sim2 <-
     treat_m <- 1 # trt on med   
     treat_y <- 1.3 # trt on outcome 
     med_y <- 1 # med on outcome     
-    treat_med_y <- 1.15 # trt-med interaction on outcome 
     sd_logit <- 1.81 #
     
     N <- num_clust * clust_size
@@ -100,7 +98,6 @@ genOneData_Sim2 <-
       rep(yb, each = clust_size) + stats::rnorm(N, sd = sqrt(1 - iccy)) # residual (or error/epsilon term)
     data$y <- med_y * data$m +
       treat_y * data$t +
-      treat_med_y * data$t * data$m + 
       c_x * rowSums(data[, grepl(pattern = "^x\\d", colnames(data))]) + #x1-x6 
       c_z * data$z + yr
     
@@ -109,6 +106,8 @@ genOneData_Sim2 <-
   }
 
 
+
 ##################################### END ######################################
+
 
 

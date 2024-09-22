@@ -1,5 +1,5 @@
 ################################################################################
-############################### QP Simulation 2B ###############################
+############################### QP Simulation 2 ################################
 ################################################################################
 
 ############################ Script Description ################################
@@ -10,21 +10,16 @@
 #
 #
 # Script Description: This code runs the second simulation study (i.e., generates 
-#                       & analyzes data), version B (where the Total Natural 
-#                       Indirect Effect & Pure Natural Direct Effect are estimated). 
-#                       Within each simulation condition, the estimates for each 
-#                       iteration are stored in the relevant Simulation-Output folder. 
+#                       & analyzes data) and stores the estimates for each 
+#                       iteration in the relevant Simulation-Output folder. 
 #
 #
-# Last Updated: 09/21/2024 
+# Last Updated: 03/21/2024 
 #
 #
 # Notes:
 #   To-Do
-#     # Test run on small replication 
-#     # Test reporting results 
-#     # Update comments (for functions & scripts) 
-#     # Re-run full simulation 
+#
 # 
 #   Done: 
 # 
@@ -64,13 +59,12 @@ cond <- expand.grid(num_clust = 100,
 OverallPar_time <- NULL
 
 ## Set number of replications/repetitions 
-reps <- 2 #1000 
+reps <- 1000 
 
 ## Create directory to store results 
+dir.create(path = "Output/S2_Simulation-Output")
 path <- "Output/S2_Simulation-Output"
-if (!dir.exists(path)) {
-  dir.create(path)
-}
+
 
 
 # Simulation 2 ------------------------------------------------------------
@@ -82,7 +76,6 @@ for (condition in 1:nrow(cond)) {
   
   # Make/Register cores
   doParallel::registerDoParallel(parallel::detectCores() - 1)
-  
   
   # Conduct Simulation
   par_time <- system.time(
@@ -151,16 +144,15 @@ for (condition in 1:nrow(cond)) {
       "-Estimates.rds"
     )
   )
-  
+
   # Print message
   print(paste0("Condition ", condition, " Done! ", 
                "(Progress: ", condition, "/", nrow(cond), " = ", 
                round((condition/nrow(cond))*100), "% Complete)"))
-
+  
   if(condition == nrow(cond)) {
     print("~~~~~ Simulation Complete ~~~~~")
   }
-  
   
   # Log computation time 
   OverallPar_time <- rbind(OverallPar_time,
@@ -169,7 +161,7 @@ for (condition in 1:nrow(cond)) {
 }
 
 
-# Add mins to time DF & save DF 
+# Add mins to computation time log & save DF 
 OverallPar_time <- as.data.frame(OverallPar_time)
 OverallPar_time <- cbind(OverallPar_time, 
                          mins = OverallPar_time[, "elapsed"] / 60)
