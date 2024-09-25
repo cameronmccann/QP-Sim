@@ -4,7 +4,7 @@
 
 We conducted two simulation studies and an empirical application to assess the performance of three propensity score (PS) models in estimating mediation effects with clustered data when an unmeasured cluster-level confounder is present. This repository contains the code and data used at each stage of the study (i.e., Simulation Study 1, Simulation Study 2, and Empirical Application).
 
-In Simulation Study 1 and 2, there are individual-level treatment, mediator, and outcome variables. In Simulation Study 1, we assessed the PS models’ ability to accurately estimate the indirect effect when both an unmeasured cluster-level confounder and three individual-level covariates influence the treatment-mediator and mediator-outcome relationships. 
+In Simulation Study 1 and 2, there are individual-level treatment (binary), mediator (continuous), and outcome (continuous) variables. In Simulation Study 1, we assessed the PS models’ ability to accurately estimate the indirect effect when both an unmeasured cluster-level confounder and three individual-level covariates influence the treatment-mediator and mediator-outcome relationships. 
 
 In Simulation Study 2, we modified the simulation design so that the unmeasured cluster-level confounder influences only the treatment-outcome relationship. The three individual-level covariates still influence both the treatment-mediator and mediator-outcome relationships; however, an additional set of three covariates was introduced to influence only the treatment-outcome relationship. Simulation Study 2 also includes two versions of the direct and indirect effect estimates: the Total Natural Direct Effect (TNDE), the Pure Natural Direct Effect (PNDE), the Total Natural Indirect Effect (TNIE), and the Pure Natural Indirect Effect (PNIE).
 
@@ -19,8 +19,6 @@ The repository is organized into four main folders, which include the following 
 ├── Code/                          # Scripts to conduct simulations (i.e., generating & analyzing data) & obtain results (i.e., RMSE & relative bias)
 │   ├── S1_Conduct-Simulation.R   
 │   ├── S1_Obtain-Results.R       
-│   ├── S2B_Conduct-Simulation.R  
-│   ├── S2B_Obtain-Results.R      
 │   ├── S2_Conduct-Simulation.R   
 │   ├── S2_Obtain-Results.R       
 ├── Functions/                     # Helper functions for simulations (generating data & analyzing data)  
@@ -48,7 +46,7 @@ The repository is organized into four main folders, which include the following 
 This repository requires R (version 4.x or higher) and specific R packages for conducting the simulation studies and the empirical application. The scripts use the pacman package to automatically install and load missing packages, but you can manually install them if preferred. 
 
 ### Simulation Study
-#### Conducting Simulations (1, 2, and 2B)
+#### Conducting Simulations (1 and 2)
 
 The following packages are required to run the simulations:
 
@@ -56,7 +54,7 @@ The following packages are required to run the simulations:
 - `foreach`
 - `parallel`
 
-#### Obtain Simulation Results (1, 2, and 2B)
+#### Obtain Simulation Results (1 and 2)
 
 The following packages are required to analyze the simulation results:
 
@@ -90,11 +88,6 @@ The following packages are required for the empirical application:
 
 ### Running Simulations
 
-Note that different scripts estimate different effects: 
-
-- Simulation Study 1 estimates the TNDE and PNIE (`S1`). 
-- Simulation Study 2 estimates the TNDE and PNIE (`S2`) and PNDE and TNIE (`S2B`). 
-
 To conduct the simulations and obtain results, follow these steps: 
 
 1. Clone or download the repository.
@@ -102,7 +95,7 @@ To conduct the simulations and obtain results, follow these steps:
 3. Run the simulation scripts in the following order:
     - `S1_Conduct-Simulation.R`: Runs the first simulation and stores output (e.g., direct & indirect estimates) for each run under each simulation condition in the `Output/S1_Simulation-Output` folder.
     - `S1_Obtain-Results.R`: Processes output from the first simulation by computing performance metrics (e.g., relative bias) and generating visuals (stored in `Output/S1_Results`).
-    - Repeat the process for the second simulation (`S2` and `S2B`).
+    - Repeat the process for the second simulation (`S2`).
         
         
 ### Running the Empirical Application
