@@ -21,7 +21,6 @@
 #
 # Notes:
 #   To-Do
-#     # Test reporting results 
 #     # Update comments (for functions & scripts) 
 #     # Re-run full simulation 
 # 
