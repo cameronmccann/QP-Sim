@@ -21,8 +21,6 @@
 #
 # Notes:
 #   To-Do
-#     # Test run on small replication 
-#     # Test reporting results 
 #     # Update comments (for functions & scripts) 
 #     # Re-run full simulation 
 # 
