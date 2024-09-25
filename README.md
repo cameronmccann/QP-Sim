@@ -2,16 +2,13 @@
 
 ## Overview
 
-This repository contains the code and data used at each stage of the present study (i.e., Simulation Study 1, Simulation Study 2, & Empirical Applicaiton). This study assesses the performance of three propensity score (PS) models for estimating mediation effects with clustered data when an unmeasured cluster-level confounder is present. 
+We conducted two simulation studies and an empirical application to assess the performance of three propensity score (PS) models in estimating mediation effects with clustered data when an unmeasured cluster-level confounder is present. This repository contains the code and data used at each stage of the study (i.e., Simulation Study 1, Simulation Study 2, and Empirical Application).
 
-In Simulation Study 1 and 2 there are individual-level treatment, mediator, and outcome variables. In Simulation Study 1 the unmeasured cluster-level confounder and the three individual-level covariates influence both the direct and indirect pathways. In Simulation Study 2 the three individual-level covariates still influence both the direct and indirect pathways. However, the unmeasured cluster-level confounder only influences the direct path and the three additional individual-level covariates only influence the direct path. 
+In Simulation Study 1 and 2, there are individual-level treatment, mediator, and outcome variables. In Simulation Study 1, we assessed the PS models’ ability to accurately estimate the indirect effect when both an unmeasured cluster-level confounder and three individual-level covariates influence the treatment-mediator and mediator-outcome relationships. 
 
-Simulation Study 2 also includes two sets of estimates:
+In Simulation Study 2, we modified the simulation design so that the unmeasured cluster-level confounder influences only the treatment-outcome relationship. The three individual-level covariates still influence both the treatment-mediator and mediator-outcome relationships; however, an additional set of three covariates was introduced to influence only the treatment-outcome relationship. Simulation Study 2 also includes two versions of the direct and indirect effect estimates: the Total Natural Direct Effect (TNDE), the Pure Natural Direct Effect (PNDE), the Total Natural Indirect Effect (TNIE), and the Pure Natural Indirect Effect (PNIE).
 
-- **S2** estimates the **Total Natural Direct Effect (TNDE)** and the **Pure Natural Indirect Effect (PNIE)**.
-- **S2B** estimates the **Pure Natural Direct Effect (PNDE)** and the **Total Natural Indirect Effect (TNIE)**.
-
-The Empirical Application uses data from the  National Longitudinal Study of Adolescent to Adult Health (Add Health; Harris & Udry, 2008) to illustrate the application of the methods evaluated. The cleaned version of the dataset used is included in the `Application/Data/Cleaned` folder.
+The Empirical Application uses data from the National Longitudinal Study of Adolescent to Adult Health (Add Health; Harris & Udry, 2008) to illustrate the application of the methods evaluated. The cleaned version of the dataset used is included in the `Application/Data/Cleaned` folder.
 
 
 ## Folder Structure
