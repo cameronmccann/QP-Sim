@@ -16,7 +16,7 @@
 #                       This is stored in the relevant Results folder.
 #
 #
-# Last Updated: 09/22/2024
+# Last Updated: 10/02/2024
 #
 #
 # Notes:
@@ -60,11 +60,7 @@ if (!dir.exists(paste0(path, "/Figures"))) {
 if (!dir.exists(paste0(path, "/Tables"))) {
   dir.create(paste0(path, "/Tables"))
 }
-# # Create directory to store reporting of results 
-# dir.create(path = "Output/S2B_Results")
-# dir.create(path = paste0("Output/S2B_Results/Data"))
-# dir.create(path = paste0("Output/S2B_Results/Tables"))
-# dir.create(path = paste0("Output/S2B_Results/Figures"))
+
 
 # Simulation 2 Explained Variance Table -----------------------------------
 
@@ -403,7 +399,8 @@ perf_measure_DF <- sim2_data %>%
   summarize(PNDE_relBias = (mean(PNDE_est) / PNDE) - 1, 
             TNIE_relBias = (mean(TNIE_est) / TNIE) - 1, 
             
-            # b_relBias = (mean(b_path_est) / med_y) - 1,
+            # TNDE_relBias = (mean(TNDE_est) / TNDE) - 1, 
+            # PNIE_relBias = (mean(PNIE_est) / PNIE) - 1, 
             
             # PNDE_MSE = (mean(PNDE_est) - PNDE)^2 + (sd(PNDE_est)^2), 
             # TNIE_MSE = (mean(TNIE_est) - TNIE)^2 + (sd(TNIE_est)^2), 
@@ -644,6 +641,122 @@ dev.off()
 ggsave(filename = paste0(path, "/Figures/PNDE-Relative-Bias-Boxplot.png"), plot = last_plot())
 
 
+
+
+
+# Investigate strange abs bias for FE med/outcome models ------------------
+
+#----------------------
+# PNDE
+#----------------------
+readRDS(file = paste0(path, "/Data/S2_Simulation-Data.rds")) |>
+  # rename PS models 
+  mutate(`PS Model` = ifelse(PS == "FE", "Fixed-Effect", 
+                             ifelse(PS == "RE", "Random-Effect", 
+                                    ifelse(PS == "SL", "Single-Level", 
+                                           "ERROR")))) %>% 
+  
+  # visual 
+  ggplot(aes(x = (PNDE_est / PNDE) - 1, y = outModel, fill = `PS Model`)) +
+  # ggplot(aes(x = abs((PNDE_est / PNDE) - 1), y = outModel, fill = `PS Model`)) +
+  geom_vline(xintercept = 0) +
+  geom_vline(xintercept = 0.10, color = "red", alpha = 0.4) +
+  geom_boxplot(position = position_dodge(width = 0.75), alpha = 0.8, 
+               linewidth = 0.25, 
+               outlier.size = 0.5, 
+               outlier.alpha = 0.5) +
+  facet_grid(clust_size ~ ICC) 
+
+# Could it be model misspecification only for FE mediator/outcome models?
+
+# Visual with calculation from different estimators (by hand)
+readRDS(file = paste0(path, "/Data/S2_Simulation-Data.rds")) |>
+  # rename PS models 
+  mutate(`PS Model` = ifelse(PS == "FE", "Fixed-Effect", 
+                             ifelse(PS == "RE", "Random-Effect", 
+                                    ifelse(PS == "SL", "Single-Level", 
+                                           "ERROR")))) %>% 
+  
+  ggplot(aes(x = ((t_outModel_est + (tm_outModel_est * intercept_medModel_est)) / PNDE) - 1, 
+             y = outModel, fill = `PS Model`)) +
+  geom_vline(xintercept = 0) +
+  geom_vline(xintercept = 0.10, color = "red", alpha = 0.4) +
+  geom_boxplot(position = position_dodge(width = 0.75), alpha = 0.8, 
+               linewidth = 0.25, 
+               outlier.size = 0.5, 
+               outlier.alpha = 0.5) +
+  facet_grid(clust_size ~ ICC) 
+  
+
+
+
+#----------------------
+# TNDE
+#----------------------
+
+# set direct & indirect effects 
+treat_m <- 1 # trt on med   
+treat_y <- 1.3 # trt on outcome
+med_y <- 1 # med on outcome  
+treat_med_y <- 1.15 # trt-med interaction on outcome 
+PNDE <- treat_y
+TNIE <- treat_m * med_y + treat_med_y
+
+TNDE <- treat_y + treat_med_y * (0 + treat_m)
+
+# Visual for TNDE 
+readRDS(file = paste0(path, "/Data/S2_Simulation-Data.rds")) |>
+  # rename PS models 
+  mutate(`PS Model` = ifelse(PS == "FE", "Fixed-Effect", 
+                             ifelse(PS == "RE", "Random-Effect", 
+                                    ifelse(PS == "SL", "Single-Level", 
+                                           "ERROR")))) %>% 
+  
+  ggplot(aes(x = (TNDE_est / TNDE) - 1, y = outModel, fill = `PS Model`)) +
+
+  geom_vline(xintercept = 0) +
+  geom_vline(xintercept = 0.10, color = "red", alpha = 0.4) +
+  geom_boxplot(position = position_dodge(width = 0.75), alpha = 0.8, 
+               linewidth = 0.25, 
+               outlier.size = 0.5, 
+               outlier.alpha = 0.5) +
+  facet_grid(clust_size ~ ICC) 
+
+
+
+
+#----------------------
+# examine extrem PS values 
+#----------------------
+
+# Large PSs
+readRDS(file = paste0(path, "/Data/S2_Simulation-Data.rds")) |>
+  group_by(conditionNum, rep) %>% 
+  slice_head(n = 1) %>% 
+  ungroup() %>% 
+  pivot_longer(cols = c(true_ps_85pctle, true_ps_90pctle), names_to = "percentile", values_to = "value") %>% 
+  ggplot(aes(x = value, fill = percentile, alpha = 0.7)) +
+  geom_histogram(position = "identity") +
+  geom_vline(xintercept = 1) +
+  facet_grid(clust_size ~ ICC) +
+  guides(y.sec = guide_none("Cluster Size"),
+         x.sec = guide_none("Residual ICC"), 
+         alpha = "none") +
+  theme_bw() 
+# Small PSs
+readRDS(file = paste0(path, "/Data/S2_Simulation-Data.rds")) |>
+  group_by(conditionNum, rep) %>% 
+  slice_head(n = 1) %>% 
+  ungroup() %>% 
+  pivot_longer(cols = c(true_ps_15pctle, true_ps_10pctle), names_to = "percentile", values_to = "value") %>% 
+  ggplot(aes(x = value, fill = percentile, alpha = 0.7)) +
+  geom_histogram(position = "identity") +
+  geom_vline(xintercept = 0) +
+  facet_grid(clust_size ~ ICC) +
+  guides(y.sec = guide_none("Cluster Size"),
+         x.sec = guide_none("Residual ICC"), 
+         alpha = "none") +
+  theme_bw() 
 
 
 
