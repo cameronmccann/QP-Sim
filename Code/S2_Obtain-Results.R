@@ -16,7 +16,7 @@
 #                       This is stored in the relevant Results folder.
 #
 #
-# Last Updated: 10/02/2024
+# Last Updated: 11/01/2024
 #
 #
 # Notes:
@@ -355,8 +355,9 @@ treat_y <- 1.3 # trt on outcome
 med_y <- 1 # med on outcome  
 treat_med_y <- 1.15 # trt-med interaction on outcome 
 PNDE <- treat_y
-TNIE <- treat_m * med_y + treat_med_y
-
+TNDE <- treat_y + (treat_m * med_y) * (0 + treat_m)
+TNIE <- treat_m * (med_y + treat_med_y)
+PNIE <- treat_m * med_y
 
 
 # Import data  ------------------------------------------------------------
@@ -399,14 +400,17 @@ perf_measure_DF <- sim2_data %>%
   summarize(PNDE_relBias = (mean(PNDE_est) / PNDE) - 1, 
             TNIE_relBias = (mean(TNIE_est) / TNIE) - 1, 
             
-            # TNDE_relBias = (mean(TNDE_est) / TNDE) - 1, 
-            # PNIE_relBias = (mean(PNIE_est) / PNIE) - 1, 
+            TNDE_relBias = (mean(TNDE_est) / TNDE) - 1,
+            PNIE_relBias = (mean(PNIE_est) / PNIE) - 1,
             
             # PNDE_MSE = (mean(PNDE_est) - PNDE)^2 + (sd(PNDE_est)^2), 
             # TNIE_MSE = (mean(TNIE_est) - TNIE)^2 + (sd(TNIE_est)^2), 
             
             PNDE_RMSE = sqrt((mean(PNDE_est) - PNDE)^2 + (sd(PNDE_est)^2)), 
-            TNIE_RMSE = sqrt((mean(TNIE_est) - TNIE)^2 + (sd(TNIE_est)^2))
+            TNIE_RMSE = sqrt((mean(TNIE_est) - TNIE)^2 + (sd(TNIE_est)^2)), 
+            
+            TNDE_RMSE = sqrt((mean(TNDE_est) - TNDE)^2 + (sd(TNDE_est)^2)), 
+            PNIE_RMSE = sqrt((mean(PNIE_est) - PNIE)^2 + (sd(PNIE_est)^2))
   ) 
 
 
@@ -452,6 +456,43 @@ relBias_PNDE_Table <- relBias_Tbl %>%
 as_hux(relBias_PNDE_Table) %>% 
   set_number_format(row = 1:nrow(relBias_PNDE_Table) + 1, col = -c(1:2), value = 3)
 
+# Save Table 
+write_csv(relBias_PNDE_Table,
+          file = paste0(path, "/Tables/S2_PNDE-Relative-Bias.csv"))
+
+
+
+## TNDE Relative Bias Table ------------------------------------------------
+
+# Pivot wide 
+relBias_Tbl <- pivot_wider(
+  perf_measure_DF[, c("ICC",
+                      "clust_size",
+                      "analysisCond",
+                      "TNDE_relBias",
+                      "PNIE_relBias")],
+  names_from = c(ICC, clust_size),
+  names_sep = "_",
+  values_from = c("TNDE_relBias", "PNIE_relBias")
+)
+
+# drop common peice of column names 
+colnames(relBias_Tbl) <-
+  stringr::str_remove(string = colnames(relBias_Tbl),
+                      pattern = "_relBias")
+
+# Relative Bias TNDE Table   
+relBias_TNDE_Table <- relBias_Tbl %>% 
+  select(analysisCond, starts_with("TNDE_")) %>% 
+  separate(col = c("analysisCond"), into = c("PS Model", "Mediator/Outcome Model"), sep = "_") %>% 
+  arrange(`Mediator/Outcome Model`)
+
+# Save Table 
+write_csv(
+  relBias_TNDE_Table,
+  file = paste0(path, "/Tables/S2_TNDE-Relative-Bias.csv"),
+  col_names = TRUE
+)
 
 
 ## TNIE Relative Bias Table ------------------------------------------------
@@ -491,6 +532,49 @@ as_hux(relBias_TNIE_Table) %>%
     value = 3
   )
 
+# Save Table 
+write_csv(
+  relBias_TNIE_Table,
+  file = paste0(path, "/Tables/S2_TNIE-Relative-Bias.csv"),
+  col_names = TRUE
+)
+
+
+## PNIE Relative Bias Table ------------------------------------------------
+
+# Pivot wide
+relBias_Tbl <- pivot_wider(
+  perf_measure_DF[, c("ICC",
+                      "clust_size",
+                      "analysisCond",
+                      "TNDE_relBias",
+                      "PNIE_relBias")],
+  names_from = c(ICC, clust_size),
+  names_sep = "_",
+  values_from = c("TNDE_relBias", "PNIE_relBias")
+)
+
+# drop common peice of column names
+colnames(relBias_Tbl) <-
+  stringr::str_remove(string = colnames(relBias_Tbl),
+                      pattern = "_relBias")
+
+# Relative Bias PNIE Table   
+relBias_PNIE_Table <- relBias_Tbl %>%
+  select(analysisCond, starts_with("PNIE_")) %>%
+  separate(
+    col = c("analysisCond"),
+    into = c("PS Model", "Mediator/Outcome Model"),
+    sep = "_"
+  ) %>%
+  arrange(`Mediator/Outcome Model`)
+
+# Save Table 
+write_csv(
+  relBias_PNIE_Table,
+  file = paste0(path, "/Tables/S2_PNIE-Relative-Bias.csv"),
+  col_names = TRUE
+)
 
 
 # RMSE Tables -------------------------------------------------------------
@@ -532,6 +616,50 @@ as_hux(rmse_PNDE_Table) %>%
     value = 3
   )
 
+# Save Table 
+write_csv(
+  rmse_PNDE_Table,
+  file = paste0(path, "/Tables/S2_PNDE-RMSE.csv"),
+  col_names = TRUE
+)
+
+
+
+## TNDE RMSE Table ---------------------------------------------------------
+
+# Pivot wide
+rmse_Tbl <- pivot_wider(
+  perf_measure_DF[, c("ICC",
+                      "clust_size",
+                      "analysisCond",
+                      "TNDE_RMSE",
+                      "PNIE_RMSE")],
+  names_from = c(ICC, clust_size),
+  names_sep = "_",
+  values_from = c("TNDE_RMSE", "PNIE_RMSE")
+)
+
+# drop common piece of column names
+colnames(rmse_Tbl) <-
+  stringr::str_remove(string = colnames(rmse_Tbl),
+                      pattern = "_RMSE")
+
+# RMSE TNDE Table   
+rmse_TNDE_Table <- rmse_Tbl %>%
+  select(analysisCond, starts_with("TNDE_")) %>%
+  separate(
+    col = c("analysisCond"),
+    into = c("PS Model", "Mediator/Outcome Model"),
+    sep = "_"
+  ) %>%
+  arrange(`Mediator/Outcome Model`)
+
+# Save Table 
+write_csv(
+  rmse_TNDE_Table,
+  file = paste0(path, "/Tables/S2_TNDE-RMSE.csv"),
+  col_names = TRUE
+)
 
 
 ## TNIE RMSE Table ------------------------------------------------
@@ -571,6 +699,50 @@ as_hux(rmse_TNIE_Table) %>%
     value = 3
   )
 
+# Save Table 
+write_csv(
+  rmse_TNIE_Table,
+  file = paste0(path, "/Tables/S2_TNIE-RMSE.csv"),
+  col_names = TRUE
+)
+
+
+## PNIE RMSE Table ------------------------------------------------
+
+# Pivot wide
+rmse_Tbl <- pivot_wider(
+  perf_measure_DF[, c("ICC",
+                      "clust_size",
+                      "analysisCond",
+                      "TNDE_RMSE",
+                      "PNIE_RMSE")],
+  names_from = c(ICC, clust_size),
+  names_sep = "_",
+  values_from = c("TNDE_RMSE", "PNIE_RMSE")
+)
+
+# drop common piece of column names
+colnames(rmse_Tbl) <-
+  stringr::str_remove(string = colnames(rmse_Tbl),
+                      pattern = "_RMSE")
+
+# RMSE PNIE Table   
+rmse_PNIE_Table <- rmse_Tbl %>%
+  select(analysisCond, starts_with("PNIE_")) %>%
+  separate(
+    col = c("analysisCond"),
+    into = c("PS Model", "Mediator/Outcome Model"),
+    sep = "_"
+  ) %>%
+  arrange(`Mediator/Outcome Model`)
+
+# Save Table 
+write_csv(
+  rmse_PNIE_Table,
+  file = paste0(path, "/Tables/S2_PNIE-RMSE.csv"),
+  col_names = TRUE
+)
+
 
 # Visuals -----------------------------------------------------------------
 
@@ -596,6 +768,9 @@ gglayer_theme <- list(theme_bw(),
                       scale_fill_manual(values = c("#BF5700", #Fixed-effect
                                                    "#A6CD57", #Random-effect 
                                                    "#333F48")), #Single-level 
+                      scale_color_manual(values = c("#BF5700", #Fixed-effect
+                                                    "#A6CD57", #Random-effect 
+                                                    "#333F48")), #Single-level
                       #"#9CADB7" <-- light gray 
                       # Used following website with university colors: https://projects.susielu.com/viz-palette?
                       theme(text = element_text(family = "Times New Roman", size = 12), 
@@ -645,6 +820,37 @@ readRDS(file = paste0(path, "/Data/S2_Simulation-Data.rds")) |>
 dev.off()
 # Save visual 
 ggsave(filename = paste0(path, "/Figures/PNDE-Relative-Bias-Boxplot.png"), plot = last_plot())
+
+
+
+## PNDE RMSE Visual -----------------------------------------------
+
+
+perf_measure_DF |>
+  mutate(
+    PS = sub("_.*", "", analysisCond),
+    outModel = sub("^[^_]*_", "", analysisCond)
+  ) |>
+  ggplot(aes(
+    x = clust_size,
+    y = PNDE_RMSE,
+    color = PS,
+    group = PS
+  )) +
+  geom_point() +
+  geom_line() +
+  facet_grid(outModel ~ ICC) +
+  gglayer_theme +
+  labs(
+    title = "RMSE of PNDE",
+    x = "\n Cluster Size",
+    y = "RMSE \n",
+    color = "PS Model",
+    linetype = "PS Model",
+    shape = "PS Model"
+  ) +
+  guides(y.sec = guide_none("Mediator and Outcome Model"),
+         x.sec = guide_none("Residual ICC"))
 
 
 
