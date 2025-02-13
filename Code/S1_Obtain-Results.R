@@ -6,7 +6,7 @@
 #
 # Author: Cameron McCann
 # 
-# Date Created: 03/20/2024
+# Date Created: 2024-03-20
 #
 #
 # Script Description: This code summarizes and reports the results for the 
@@ -14,12 +14,12 @@
 #                       This is stored in the relevant Results folder.
 #
 #
-# Last Updated: 08/27/2024
+# Last Updated: 2025-02-12
 #
 #
 # Notes:
 #   To-Do
-#
+#       # Add coverage table & visual (started viz under "PNIE MC CI Coverage Rate Visual")
 # 
 #   Done: 
 # 
@@ -39,7 +39,8 @@ pacman::p_load(
   stringr,
   ggdag, 
   dagitty, 
-  huxtable
+  huxtable, 
+  dplyr
 )
 
 
@@ -299,29 +300,22 @@ PNIE <- treat_m * med_y
 
 # Create directory to store reporting of results 
 dir.create(path = "Output/S1_Results")
-dir.create(path = paste0("Output/S1_Results/Data"))
-dir.create(path = paste0("Output/S1_Results/Tables"))
-dir.create(path = paste0("Output/S1_Results/Figures"))
+path <- "Output/S1_Results/2025-02-10-test_200-reps"
+dir.create(path = path)
+dir.create(path = paste0(path, "/Data"))
+dir.create(path = paste0(path, "/Tables"))
+dir.create(path = paste0(path, "/Figures"))
+retrieval_path <- "Output/S1_Simulation-Output/2025-02-10-test_200-reps"
 
 
 # Import data  ------------------------------------------------------------
 
-sim1_data <- NULL
-# Loop to store in single dataframe
-for(i in 1:nrow(cond)) {
-  temp_data <-
-    readRDS(
-      paste0(
-        "Output/S1_Simulation-Output/S1_Condition-", i, "-Estimates.rds"
-      )
-    )
-  
-  sim1_data <- as.data.frame(rbind(sim1_data,
-                                   temp_data))
-  
-}
-
-rm(temp_data)
+# List all files matching the pattern.
+file_list <- list.files(path = retrieval_path,
+                        pattern = "^S1_Condition-[0-9]+-Overall_Estimates_.*\\.rds$",
+                        full.names = TRUE)
+# Read each file and combine into one data frame
+sim1_data <- do.call(rbind, lapply(file_list, readRDS))
 
 
 
@@ -335,20 +329,23 @@ sim1_data <- sim1_data %>%
                       "a_path_est", "a_path_se", "b_path_est", "b_path_se", 
                       "direct_est", "direct_se"), 
             .funs = as.numeric) %>% 
-  rename(TNDE_est = NDE_est, 
+  rename(TNDE_est = NDE_est, # change TNDE to PNDE with TNIE (default)
          PNIE_est = NIE_est)
 
 # Check 
 head(sim1_data)
 
-
+# drop ".2.5%" & ".97.5%" from column names
+names(sim1_data) <- gsub("\\.(2\\.5%|97\\.5%)", "", names(sim1_data))
 
 # Compute Performance Measures --------------------------------------------
 
 # Performance measures summary DF 
-perf_measure_DF <- sim1_data %>% 
+perf_measure_DF <- sim1_data |> 
+  mutate(if_cover_PNIE = (NIE_LCL < PNIE) & (NIE_UCL > PNIE),
+         if_cover_TNDE = (NDE_LCL < TNDE) & (NDE_UCL > TNDE)) |> 
   group_by(ICC, clust_size, 
-           conditionNum, analysisCond) %>% 
+           conditionNum, analysisCond) |> 
   summarize(TNDE_relBias = (mean(TNDE_est) / TNDE) - 1, 
             PNIE_relBias = (mean(PNIE_est) / PNIE) - 1, 
             
@@ -356,19 +353,20 @@ perf_measure_DF <- sim1_data %>%
             # PNIE_MSE = (mean(PNIE_est) - PNIE)^2 + (sd(PNIE_est)^2), 
             
             TNDE_RMSE = sqrt((mean(TNDE_est) - TNDE)^2 + (sd(TNDE_est)^2)), 
-            PNIE_RMSE = sqrt((mean(PNIE_est) - PNIE)^2 + (sd(PNIE_est)^2))
+            PNIE_RMSE = sqrt((mean(PNIE_est) - PNIE)^2 + (sd(PNIE_est)^2)), 
+            # CI Coverage Rate
+            coverage_TNDE = mean(if_cover_TNDE), 
+            coverage_PNIE = mean(if_cover_PNIE)
   ) 
-
 
 
 # Export Performance Measures & Simulation Data ---------------------------------------------
 
 write_rds(perf_measure_DF, 
-          file = paste0("Output/S1_Results/Data/", "S1_Performance-Measures.rds"))
+          file = paste0(path, "/Data/", "S1_Performance-Measures.rds"))
 
 write_rds(sim1_data, 
-          file = paste0("Output/S1_Results/Data/", "S1_Simulation-Data.rds"))
-
+          file = paste0(path, "/Data/", "S1_Simulation-Data.rds"))
 
 
 # TNDE Relative Bias Table ------------------------------------------------
@@ -392,14 +390,24 @@ colnames(relBias_Tbl) <-
 
 # Relative Bias TNDE Table   
 relBias_TNDE_Table <- relBias_Tbl %>% 
-  select(analysisCond, starts_with("TNDE_")) %>% 
-  separate(col = c("analysisCond"), into = c("PS Model", "Mediator/Outcome Model"), sep = "_") %>% 
+  dplyr::select(analysisCond, starts_with("TNDE_")) %>% 
+  separate(
+    col = c("analysisCond"),
+    into = c("PS Model","Med", "Mediator/Outcome Model"),
+    sep = "_"
+  ) %>%
   arrange(`Mediator/Outcome Model`)
+
+  # separate(col = c("analysisCond"), into = c("PS Model", "Mediator Model", "Outcome Model"), sep = "_") %>% 
+  # arrange("Outcome Model")
 
 # Display values (Copy-paste values into generate table website to obtain latex code)
 as_hux(relBias_TNDE_Table) %>% 
   set_number_format(row = 1:nrow(relBias_TNDE_Table) + 1, col = -c(1:2), value = 3)
 
+# Save csv 
+write.csv(relBias_TNDE_Table,
+          file = paste0(path, "/Tables/", "TNDE-Relative-Bias.csv"), row.names = FALSE)
 
 
 # PNIE Relative Bias Table ------------------------------------------------
@@ -423,10 +431,10 @@ colnames(relBias_Tbl) <-
 
 # Relative Bias PNIE Table   
 relBias_PNIE_Table <- relBias_Tbl %>%
-  select(analysisCond, starts_with("PNIE_")) %>%
+  dplyr::select(analysisCond, starts_with("PNIE_")) %>%
   separate(
     col = c("analysisCond"),
-    into = c("PS Model", "Mediator/Outcome Model"),
+    into = c("PS Model", "Med", "Mediator/Outcome Model"),
     sep = "_"
   ) %>%
   arrange(`Mediator/Outcome Model`)
@@ -439,6 +447,9 @@ as_hux(relBias_PNIE_Table) %>%
     value = 3
   )
 
+# Save csv 
+write.csv(relBias_PNIE_Table,
+          file = paste0(path, "/Tables/", "PNIE-Relative-Bias.csv"), row.names = FALSE)
 
 
 # TNDE RMSE Table ------------------------------------------------
@@ -462,10 +473,10 @@ colnames(rmse_Tbl) <-
 
 # RMSE TNDE Table   
 rmse_TNDE_Table <- rmse_Tbl %>%
-  select(analysisCond, starts_with("TNDE_")) %>%
+  dplyr::select(analysisCond, starts_with("TNDE_")) %>%
   separate(
     col = c("analysisCond"),
-    into = c("PS Model", "Mediator/Outcome Model"),
+    into = c("PS Model", "Med", "Mediator/Outcome Model"),
     sep = "_"
   ) %>%
   arrange(`Mediator/Outcome Model`)
@@ -477,6 +488,10 @@ as_hux(rmse_TNDE_Table) %>%
     col = -c(1:2),
     value = 3
   )
+
+# Save csv 
+write.csv(rmse_TNDE_Table,
+          file = paste0(path, "/Tables/", "TNDE-RMSE.csv"), row.names = FALSE)
 
 
 
@@ -501,10 +516,10 @@ colnames(rmse_Tbl) <-
 
 # RMSE PNIE Table   
 rmse_PNIE_Table <- rmse_Tbl %>%
-  select(analysisCond, starts_with("PNIE_")) %>%
+  dplyr::select(analysisCond, starts_with("PNIE_")) %>%
   separate(
     col = c("analysisCond"),
-    into = c("PS Model", "Mediator/Outcome Model"),
+    into = c("PS Model", "Med", "Mediator/Outcome Model"),
     sep = "_"
   ) %>%
   arrange(`Mediator/Outcome Model`)
@@ -517,6 +532,47 @@ as_hux(rmse_PNIE_Table) %>%
     value = 3
   )
 
+# Save csv 
+write.csv(rmse_PNIE_Table,
+          file = paste0(path, "/Tables/", "PNIE-RMSE.csv"), row.names = FALSE)
+
+
+# PNIE Coverage Table -----------------------------------------------------
+
+# Pivot wide
+cover_Tbl <- pivot_wider(
+  perf_measure_DF[, c("ICC",
+                      "clust_size",
+                      "analysisCond",
+                      "coverage_PNIE",
+                      "coverage_TNDE")],
+  names_from = c(ICC, clust_size),
+  names_sep = "_",
+  values_from = c("coverage_PNIE", "coverage_TNDE")
+)
+
+# drop common piece of column names
+colnames(cover_Tbl) <-
+  stringr::str_remove(string = colnames(cover_Tbl),
+                      pattern = "coverage_")
+
+# RMSE PNIE Table   
+cover_PNIE_Table <- cover_Tbl %>%
+  dplyr::select(analysisCond, starts_with("PNIE_")) %>%
+  separate(
+    col = c("analysisCond"),
+    into = c("PS Model", "Med", "Mediator/Outcome Model"),
+    sep = "_"
+  ) %>%
+  arrange(`Mediator/Outcome Model`)
+
+# Display values (Copy-paste values into generate table website to obtain latex code)
+as_hux(cover_PNIE_Table) %>%
+  set_number_format(
+    row = 1:nrow(cover_PNIE_Table) + 1,
+    col = -c(1:2),
+    value = 3
+  )
 
 
 # PNIE Relative Bias Visual -----------------------------------------------
@@ -532,7 +588,8 @@ PNIE <- treat_m * med_y
 gglayer_theme <- list(theme_bw(),
                       scale_fill_manual(values = c("#BF5700", #Fixed-effect
                                                    "#A6CD57", #Random-effect 
-                                                   "#333F48")), #Single-level 
+                                                   "#00a9b7", #Random-effect means 
+                                                   "#333F48" )),#Single-level 
                       #"#9CADB7" <-- light gray 
                       # Used following website with university colors: https://projects.susielu.com/viz-palette?
                       theme(text = element_text(family = "Times New Roman", size = 12), 
@@ -559,13 +616,15 @@ gglayer_labs <- list(
 )
 
 # Boxplot 
-pdf("Output/S1_Results/Figures/PNIE-Relative-Bias-Boxplot.pdf")
-readRDS(file = "Output/S1_Results/Data/S1_Simulation-Data.rds") |>
+# pdf("Output/S1_Results/Figures/PNIE-Relative-Bias-Boxplot.pdf")
+readRDS(file = paste0(path, "/Data/S1_Simulation-Data.rds")) |> 
+# readRDS(file = "Output/S1_Results/Data/S1_Simulation-Data.rds") |>
   # rename PS models 
   mutate(`PS Model` = ifelse(PS == "FE", "Fixed-Effect", 
                              ifelse(PS == "RE", "Random-Effect", 
                                     ifelse(PS == "SL", "Single-Level", 
-                                           "ERROR")))) %>% 
+                                           ifelse(PS == "RE-Mean", "Random-Effect Mean", 
+                                           "ERROR"))))) %>% 
   # visual 
   ggplot(aes(x = abs((PNIE_est / PNIE) - 1), y = outModel, fill = `PS Model`)) +
   geom_vline(xintercept = 0, linewidth = 0.5) +
@@ -577,7 +636,188 @@ readRDS(file = "Output/S1_Results/Data/S1_Simulation-Data.rds") |>
   facet_grid(clust_size ~ ICC) +
   gglayer_labs +
   gglayer_theme 
-
-dev.off()
+# dev.off()
 # Save visual 
-ggsave(filename = "Output/S1_Results/Figures/PNIE-Relative-Bias-Boxplot.png", plot = last_plot())
+ggsave(filename = paste0(path, "/Figures/PNIE-Relative-Bias-Boxplot.png"), plot = last_plot())
+
+
+
+
+# PNIE MC CI Coverage Rate Visual -----------------------------------------
+
+# add formatting & color scheme 
+gglayer_theme_line <- list(theme_bw(),
+                      scale_color_manual(values = c("#BF5700", #Fixed-effect
+                                                   "#A6CD57", #Random-effect 
+                                                   "#00a9b7", #Random-effect means 
+                                                   "#333F48" )),#Single-level 
+                      # Used following website with university colors: https://projects.susielu.com/viz-palette?
+                      theme(text = element_text(family = "Times New Roman", size = 12), 
+                            axis.title = element_text(size = 12),  # Adjust axis title size
+                            axis.text = element_text(size = 10),  # Adjust axis text size
+                            legend.title = element_text(size = 12),  # Legend title size
+                            legend.text = element_text(size = 10),  # Legend text size
+                            strip.text = element_text(size = 12),  # Facet labels
+                            line = element_line(linewidth = 0.5),  # APA recommends thin lines
+                            legend.position = "top"  
+                      )) 
+# Labels 
+gglayer_labs <- list(
+  labs(
+    x = "\n Absolute Relative Bias",
+    y = "Mediator and Outcome Model \n",
+    color = "PS Model",
+    linetype = "PS Model",
+    shape = "PS Model"
+  ),
+  guides(y.sec = guide_none("Cluster Size"),
+         x.sec = guide_none("Residual ICC"))
+)
+
+# separate PS & med/outcome models for labels 
+perf_measure_DF |> 
+  separate(analysisCond, sep = "_", into = c("PS", "Med", "Out")) |> 
+  ggplot(aes(x = as.factor(clust_size), y = coverage_PNIE, color = PS, linetype = PS)) +
+  geom_point() +
+  geom_line(aes(group = PS)) +
+  facet_grid(Out ~ ICC) +
+  gglayer_theme_line +
+  labs(x = "Cluster Size", 
+       y = "NIE Coverage Rate") +
+  guides(y.sec = guide_none("Mediator and Outcome Model"))
+  # gglayer_labs # NEED TO UPDATE LABELS 
+# Save plot 
+ggsave(filename = paste0(path, "/Figures/", 
+                         "PNIE-Coverage-Lineplot.png"), 
+       plot = last_plot())
+
+
+## Examining SL Outcome further --------------------------------------------
+
+readRDS(file = paste0(path, "/Data/S1_Simulation-Data.rds")) |> 
+  filter(ICC == 0.2, clust_size == 40) |> 
+  filter(PS %in% "SL", medmodel %in% "SL", outModel %in% "SL") |> 
+  mutate(across(c(rep, PNIE_est, NIE_LCL, NIE_UCL), ~ as.numeric(.))) |> 
+  ggplot(aes(x = rep, y = PNIE_est)) +
+  geom_hline(yintercept = PNIE) +
+  geom_errorbar(aes(ymin = NIE_LCL, ymax = NIE_UCL), width = 0.2, color = "darkgray") +
+  geom_point(size = 2, color = "blue") 
+# coverage is 0
+
+## Examining FE Outcome further --------------------------------------------
+
+# DF for coverage (used for text)
+coverDF <- perf_measure_DF |> 
+  separate(analysisCond, into = c("PS", "Med", "Out"), sep = "_") |> 
+  filter(ICC == 0.2, Out == "FE") |> 
+  mutate(coverage_PNIE = format(coverage_PNIE, digits = 3))
+
+# FE
+coverFEDF <- readRDS(file = paste0(path, "/Data/S1_Simulation-Data.rds")) |> 
+    filter(ICC == 0.2) |> #, clust_size == 40) |> 
+    filter(PS %in% c("FE"), medmodel %in% "FE", outModel %in% "FE") |> 
+    mutate(across(c(rep, PNIE_est, NIE_LCL, NIE_UCL), ~ as.numeric(.))) |> 
+    mutate(if_cover_PNIE = (NIE_LCL < PNIE) & (NIE_UCL > PNIE),
+           if_cover_TNDE = (NDE_LCL < TNDE) & (NDE_UCL > TNDE), 
+           error_color = ifelse(if_cover_PNIE == TRUE, "#BF5700", "darkgray")) |>
+    arrange(PNIE_est) |> 
+    group_by(clust_size) |> 
+    mutate(order = row_number())
+coverPlotFE <- coverFEDF |>
+    ggplot(aes(x = order, y = PNIE_est)) +
+    geom_hline(yintercept = PNIE) +
+    # Map error_color to the error bars
+    geom_errorbar(aes(ymin = NIE_LCL, ymax = NIE_UCL, color = error_color), width = 0.2) +
+    # Fix point color to match the “matched” color
+    geom_point(size = 0.5, color = "#BF5700") +
+    scale_color_identity() +
+    scale_x_continuous(breaks = seq(0, max(coverFEDF$order, na.rm = TRUE), by = 50)) +
+    # theme_minimal() +
+    gglayer_theme +
+    theme(axis.text.x.bottom = element_blank(), 
+          axis.ticks = element_blank()) +
+    labs(x = "", 
+         y = "") +
+    facet_grid(PS ~ clust_size) +
+    geom_text(
+      data = coverDF[coverDF$PS == "FE", ], aes(x = Inf, y = Inf, 
+                                                label = paste0("coverage = ", coverage_PNIE, "\n",
+                                                               "rel bias = ", format(round(PNIE_relBias, 5), scientific = FALSE))), 
+      hjust = 2, vjust = 1.5, size = 3, color = "black") +
+  guides(x.sec = guide_none("Cluster Size"))
+
+# RE
+coverREDF <- readRDS(file = paste0(path, "/Data/S1_Simulation-Data.rds")) |> 
+  filter(ICC == 0.2) |> #, clust_size == 40) |> 
+  filter(PS %in% c("RE"), medmodel %in% "FE", outModel %in% "FE") |> 
+  mutate(across(c(rep, PNIE_est, NIE_LCL, NIE_UCL), ~ as.numeric(.))) |> 
+  mutate(if_cover_PNIE = (NIE_LCL < PNIE) & (NIE_UCL > PNIE),
+         if_cover_TNDE = (NDE_LCL < TNDE) & (NDE_UCL > TNDE), 
+         error_color = ifelse(if_cover_PNIE == TRUE, "#A6CD57", "darkgray")) |>
+  arrange(PNIE_est) |> 
+  group_by(clust_size) |> 
+  mutate(order = row_number())
+coverPlotRE <- coverREDF |> 
+  ggplot(aes(x = order, y = PNIE_est)) +
+  geom_hline(yintercept = PNIE) +
+  # Map error_color to the error bars
+  geom_errorbar(aes(ymin = NIE_LCL, ymax = NIE_UCL, color = error_color), width = 0.2) +
+  # Fix point color to match the “matched” color
+  geom_point(size = 0.5, color = "#A6CD57") +
+  scale_color_identity() +
+  scale_x_continuous(breaks = seq(0, max(coverREDF$order, na.rm = TRUE), by = 50)) +
+  # theme_minimal() +
+  gglayer_theme +
+  theme(axis.text.x.bottom = element_blank(), 
+        axis.ticks = element_blank()) +
+  labs(x = "", 
+       y = "NIE") +
+  facet_grid(PS ~ clust_size) +
+  geom_text(
+    data = coverDF[coverDF$PS == "RE", ], aes(x = Inf, y = Inf, 
+                                              label = paste0("coverage = ", coverage_PNIE, "\n",
+                                                             "rel bias = ", format(round(PNIE_relBias, 5), scientific = FALSE))), 
+    hjust = 2, vjust = 1.5, size = 3, color = "black", inherit.aes = TRUE)  +
+  guides(y.sec = guide_none("PS Model"))
+
+# SL
+coverSLDF <- readRDS(file = paste0(path, "/Data/S1_Simulation-Data.rds")) |> 
+  filter(ICC == 0.2) |> #, clust_size == 40) |> 
+  filter(PS %in% c("SL"), medmodel %in% "FE", outModel %in% "FE") |> 
+  mutate(across(c(rep, PNIE_est, NIE_LCL, NIE_UCL), ~ as.numeric(.))) |> 
+  mutate(if_cover_PNIE = (NIE_LCL < PNIE) & (NIE_UCL > PNIE),
+         if_cover_TNDE = (NDE_LCL < TNDE) & (NDE_UCL > TNDE), 
+         error_color = ifelse(if_cover_PNIE == TRUE, "#333F48", "darkgray")) |>
+  arrange(PNIE_est) |> 
+  group_by(clust_size) |> 
+  mutate(order = row_number())
+coverPlotSL <- coverSLDF |> 
+  ggplot(aes(x = order, y = PNIE_est)) +
+  geom_hline(yintercept = PNIE) +
+  # Map error_color to the error bars
+  geom_errorbar(aes(ymin = NIE_LCL, ymax = NIE_UCL, color = error_color), width = 0.2) +
+  # Fix point color to match the “matched” color
+  geom_point(size = 0.5, color = "#333F48") +
+  scale_color_identity() +
+  scale_x_continuous(breaks = seq(0, max(coverSLDF$order, na.rm = TRUE), by = 50)) +
+  # theme_minimal() +
+  gglayer_theme +
+  # theme(axis.text.x.bottom = element_blank()) +
+  labs(x = "", 
+       y = "") +
+  facet_grid(PS ~ clust_size) +
+  geom_text(
+    data = coverDF[coverDF$PS == "SL", ], aes(x = Inf, y = Inf, 
+                                              label = paste0("coverage = ", coverage_PNIE, "\n",
+                                                             "rel bias = ", format(round(PNIE_relBias, 5), scientific = FALSE))), 
+    hjust = 2, vjust = 1.5, size = 3, color = "black", inherit.aes = TRUE) 
+
+# Plot visual 
+coverPlotFE / coverPlotRE / coverPlotSL +
+  patchwork::plot_annotation(title = "Coverage rate across replications by PS & cluster size for ICC = 0.2 and med/outcome models = FE") 
+# Save plot 
+ggsave(filename = paste0(path, "/Figures/", 
+                         "S1_coverage-per-rep-by-PS-model-and-cluster-size-for-icc-0.2-and-outcome-FE.png"), 
+       plot = last_plot())
+
+

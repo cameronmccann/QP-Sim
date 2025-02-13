@@ -1,19 +1,18 @@
 ################################################################################
-############################### QP Simulation 2 ###############################
+######################### QP Simulation 1 Supplemental #########################
 ################################################################################
 
 ############################ Script Description ################################
 #
 # Author: Cameron McCann
 # 
-# Date Created: 2024-03-17
+# Date Created: 2025-02-08
 #
 #
-# Script Description: This code runs the second simulation study (i.e., generates 
-#                       & analyzes data), version B (where the Total Natural 
-#                       Indirect Effect & Pure Natural Direct Effect are estimated). 
-#                       Within each simulation condition, the estimates for each 
-#                       iteration are stored in the relevant Simulation-Output folder. 
+# Script Description: This code runs the supplemental simulation for the 
+#                       first simulation study (i.e., generates 
+#                       & analyzes data) and stores the estimates for each 
+#                       iteration in the relevant Simulation-Output folder. 
 #
 #
 # Last Updated: 2025-02-13
@@ -21,52 +20,56 @@
 #
 # Notes:
 #   To-Do
-#     # Re-run full simulation 
-#     # Update comments (for functions & scripts) 
-# 
+#     # merge commenting from "second part" to code in "first part" 
+#
 #   Done: 
 # 
 # 
 ################################################################################
 
-# ---------------------------- Set Up (Load packages, functions, &/or data) --------------------------------------------------
+
+# first part --------------------------------------------------------------
+
+# ---------------------------- Set Up (Load packages, functions, &/or data) ----------------------------
+
 # Load Packages 
 if (!require("pacman")) install.packages("pacman")
 pacman::p_load(
-  # Packages 
   doParallel, 
   foreach,
-  parallel
+  parallel, 
+  WeMix
 )
 
 # Load Functions 
-# source("Functions/AnalysisFunc_Sim2.R")
-source("Functions/AnalysisFunc_Sim2b.R")
-source("Functions/genOneData_Sim2.R")
+# source("Functions/AnalysisFunc_Sim1.R")
+# source("Functions/AnalysisFunc_Sim1b.R")
+source("Functions/AnalysisFunc_Sim1c.R")
+source("Functions/genOneData_Sim1.R")
 
-# ----------------------------  Simulation Conditions --------------------------------------------------
+# ---------------------------- Simulation Conditions  --------------------------------------------------
+
 cond <- expand.grid(num_clust = 100,
                     clust_size = c(20, 40, 100),
-                    num_x = 6,
+                    num_x = 3,
                     icc = c(0.05, 0.2, 0.5))
 # cond <- cond[4:5, ]
 
-# ---------------------------- Set Parameters --------------------------------------------------
+# ---------------------------- Set Parameters ----------------------------------------------------------
 
-OverallPar_time <- NULL  # To log computation times
-reps <- 200 #1000 # Total number of replications per condition
-path <- "Output/S2_Simulation-Output/2025-02-11-test_200-reps"
-dir.create(path = path, showWarnings = FALSE)
-dir.create(path = paste0(path, "/interim"), showWarnings = FALSE)
+OverallPar_time <- NULL           # To log computation times
+reps <- 200 #1000                      # Total number of replications per condition
+dir.create(path = "Output/S1_Supp_Simulation-Output/2025-02-11-test_200-reps", showWarnings = FALSE)
+dir.create(path = "Output/S1_Supp_Simulation-Output/2025-02-11-test_200-reps/interim", showWarnings = FALSE)
+path <- "Output/S1_Supp_Simulation-Output/2025-02-11-test_200-reps"
 
-# ---------------------------- Simulation 2 --------------------------------------------------
+# ---------------------------- Simulation 1 ------------------------------------------------------------
 
-for (condition in 1:nrow(cond)) { 
+for (condition in 1:nrow(cond)) {
   
-  # set condition number
   cond_num <- condition
   
-  # Make/Register cores (all but one core)
+  # Register parallel backend (using all but one core)
   doParallel::registerDoParallel(parallel::detectCores() - 1)
   
   # This list will hold the results for each 100-replication block.
@@ -80,14 +83,15 @@ for (condition in 1:nrow(cond)) {
     # Run the replications in this block in parallel
     block_time <- system.time({
       block_results <- foreach::foreach(
-        i = block:block_end, 
-        .combine = rbind, 
-        .export = c("genOneData_Sim2", "AnalysisFunc_Sim2b")
+        i = block:block_end,
+        .combine = rbind,
+        .export = c("genOneData_Sim1", "AnalysisFunc_Sim1c")
       ) %dopar% {
+        # Set a seed (here using a combination of 135 and i; adjust as needed)
         set.seed(as.numeric(paste0(135, i)))
         
-        # Generate data for current rep
-        data <- genOneData_Sim2(
+        # Generate data for the current replication
+        data <- genOneData_Sim1(
           num_clust = cond[cond_num, "num_clust"],
           clust_size = cond[cond_num, "clust_size"],
           num_x = cond[cond_num, "num_x"],
@@ -96,32 +100,38 @@ for (condition in 1:nrow(cond)) {
           iccy = cond[cond_num, "icc"]
         )
         
-        # Run all models for this rep 
+        # Run all models for this replication
         full_DF <- NULL
         for (PSmod in c("SL", "FE", "RE", "RE-Mean")) {      # Propensity score models
-          for (Outmod in c("SL", "FE", "RE", "RE-Mean")) {   # Outcome/mediation models
-            temp_DF <- AnalysisFunc_Sim2b(
-              PSmodel = PSmod,
-              Medmodel = Outmod,
-              Outcomemodel = Outmod,
-              data = data,
-              condition = cond,
-              condition_num = cond_num
-            )
-            full_DF <- rbind(full_DF, temp_DF)
+          for (Medmod in c("SL", "FE", "RE", "RE-Mean")) {
+            for (Outmod in c("SL", "FE", "RE", "RE-Mean")) {   # Outcome/mediation models
+              
+              # create copy to avoid issues with creating new columns for some models
+              data_copy <- data
+              
+              temp_DF <- AnalysisFunc_Sim1c(
+                PSmodel = PSmod,
+                Medmodel = Medmod,
+                Outcomemodel = Outmod,
+                data = data_copy, #data,
+                condition = cond,
+                condition_num = cond_num
+              )
+              full_DF <- rbind(full_DF, temp_DF)
+            }
           }
         }
-        
+
         # Add extra info (seed, replication number, quantiles of ps_true) to the results
         results <- as.data.frame(cbind(
-          seed = paste0(135, i), 
+          seed = paste0(135, i),
           rep = i,
-          full_DF, 
-          true_ps_10pctle = rep(quantile(data$ps_true, probs = c(0.1)), nrow(full_DF)), 
-          true_ps_15pctle = rep(quantile(data$ps_true, probs = c(0.15)), nrow(full_DF)), 
-          true_ps_50pctle = rep(quantile(data$ps_true, probs = c(0.5)), nrow(full_DF)), 
-          true_ps_85pctle = rep(quantile(data$ps_true, probs = c(0.85)), nrow(full_DF)), 
-          true_ps_90pctle = rep(quantile(data$ps_true, probs = c(0.9)), nrow(full_DF))
+          full_DF,
+          true_ps_10pctle = rep(quantile(data$ps_true, probs = 0.1), nrow(full_DF)), 
+          true_ps_15pctle = rep(quantile(data$ps_true, probs = 0.15), nrow(full_DF)), 
+          true_ps_50pctle = rep(quantile(data$ps_true, probs = 0.5), nrow(full_DF)), 
+          true_ps_85pctle = rep(quantile(data$ps_true, probs = 0.85), nrow(full_DF)), 
+          true_ps_90pctle = rep(quantile(data$ps_true, probs = 0.9), nrow(full_DF))
         ))
         results
       }
@@ -160,7 +170,7 @@ for (condition in 1:nrow(cond)) {
   
   # Save an overall file for the condition (if desired)
   overall_file_name <- paste0(
-    path, "/S2_Condition-", condition,
+    path, "/S1_Supp_Condition-", condition,
     "-Overall_Estimates_clust_size-", cond[condition, "clust_size"],
     "_icc-", cond[condition, "icc"],
     "_num_clust-", cond[condition, "num_clust"],
@@ -191,7 +201,7 @@ OverallPar_time <- as.data.frame(OverallPar_time)
 OverallPar_time$mins <- as.numeric(OverallPar_time$elapsed) / 60
 
 # Check if the file already exists
-output_file <- paste0(path, "/S2_Computation-Time.rds")
+output_file <- paste0(path, "/S1_Supp_Computation-Time.rds")
 if (file.exists(output_file)) {
   existing_data <- readRDS(output_file)
   OverallPar_time <- rbind(existing_data, OverallPar_time)
@@ -199,7 +209,62 @@ if (file.exists(output_file)) {
 
 # Save the updated computation time log
 saveRDS(OverallPar_time, file = output_file)
-  
+
+
+
+
+
+
+# second part -------------------------------------------------------------
+
+# # Set Up (Load packages, functions, &/or data) ----------------------------
+# 
+# # Load Packages 
+# if (!require("pacman")) install.packages("pacman")
+# pacman::p_load(
+#   # Packages 
+#   doParallel, 
+#   foreach,
+#   parallel
+# )
+# 
+# # Load Functions 
+# source("Functions/AnalysisFunc_Sim1.R")
+# source("Functions/AnalysisFunc_Sim1b.R")
+# source("Functions/genOneData_Sim1.R")
+# 
+# 
+# 
+# # Simulation conditions  --------------------------------------------------
+# 
+# cond <- expand.grid(num_clust = 100,
+#                     clust_size = c(20, 40, 100),
+#                     num_x = 3,
+#                     icc = c(0.05, 0.2, 0.5))
+# 
+# # Set Parameters ----------------------------------------------------------
+# 
+# ## Initialize DF to store results 
+# OverallPar_time <- NULL
+# 
+# ## Set number of replications/repetitions 
+# reps <- 1000 
+# 
+# ## Create directory to store results & save path 
+# dir.create(path = "Output/S1_Supp_Simulation-Output")
+# path <- "Output/S1_Supp_Simulation-Output"
+# 
+# 
+# # Simulation 1 ------------------------------------------------------------
+# 
+# for (condition in 1:nrow(cond)) {
+#   
+#   # set condition number
+#   cond_num <- condition
+#   
+#   # Make/Register cores
+#   doParallel::registerDoParallel(parallel::detectCores() - 1)
+#   
 #   # Conduct Simulation
 #   par_time <- system.time(
 #     # Track computation time
@@ -207,12 +272,12 @@ saveRDS(OverallPar_time, file = output_file)
 #     cond_Results_DF <- foreach::foreach(
 #       i = 1:reps,
 #       .combine = rbind,
-#       .export = c("genOneData_Sim2", "AnalysisFunc_Sim2b")
+#       .export = c("genOneData_Sim1", "AnalysisFunc_Sim1b")
 #     ) %dopar% {
 #       set.seed(paste0(135, i))
 #       
 #       # Generate data set
-#       data <- genOneData_Sim2(
+#       data <- genOneData_Sim1(
 #         num_clust = cond[cond_num, "num_clust"],
 #         clust_size = cond[cond_num, "clust_size"],
 #         num_x = cond[cond_num, "num_x"],
@@ -228,7 +293,7 @@ saveRDS(OverallPar_time, file = output_file)
 #       for (PSmod in c("SL", "FE", "RE")) { # PS Models
 #         for (Outmod in c("SL", "FE", "RE", "RE-Mean")) { # Med/Outcome Models
 #           
-#           temp_DF <- AnalysisFunc_Sim2b(
+#           temp_DF <- AnalysisFunc_Sim1b(
 #             PSmodel = PSmod,
 #             Medmodel = Outmod,
 #             Outcomemodel = Outmod,
@@ -247,7 +312,7 @@ saveRDS(OverallPar_time, file = output_file)
 #       results <- as.data.frame(cbind(
 #         seed = rep(paste0(135, i), nrow(full_DF)),
 #         rep = rep(i, nrow(full_DF)),
-#         full_DF, 
+#         full_DF,
 #         true_ps_10pctle = rep(quantile(data$ps_true, probs = c(0.1)), nrow(full_DF)), 
 #         true_ps_15pctle = rep(quantile(data$ps_true, probs = c(0.15)), nrow(full_DF)), 
 #         true_ps_50pctle = rep(quantile(data$ps_true, probs = c(0.5)), nrow(full_DF)), 
@@ -257,12 +322,12 @@ saveRDS(OverallPar_time, file = output_file)
 #     }
 #   )
 #   
-#   # Save conditions results/simulation output 
+#   # Save conditions results
 #   saveRDS(
 #     cond_Results_DF,
 #     file = paste0(
 #       path, 
-#       "/S2_Condition-", 
+#       "/S1_Condition-", 
 #       condition, 
 #       "-Estimates.rds"
 #     )
@@ -272,11 +337,10 @@ saveRDS(OverallPar_time, file = output_file)
 #   print(paste0("Condition ", condition, " Done! ", 
 #                "(Progress: ", condition, "/", nrow(cond), " = ", 
 #                round((condition/nrow(cond))*100), "% Complete)"))
-# 
+#   
 #   if(condition == nrow(cond)) {
 #     print("~~~~~ Simulation Complete ~~~~~")
 #   }
-#   
 #   
 #   # Log computation time 
 #   OverallPar_time <- rbind(OverallPar_time,
@@ -285,14 +349,19 @@ saveRDS(OverallPar_time, file = output_file)
 # }
 # 
 # 
-# # Add mins to time DF & save DF 
+# # Add mins to computation time log & save DF 
 # OverallPar_time <- as.data.frame(OverallPar_time)
 # OverallPar_time <- cbind(OverallPar_time, 
 #                          mins = OverallPar_time[, "elapsed"] / 60)
 # 
 # saveRDS(OverallPar_time,
-#         file = paste0(path, "/S2_Computation-Time.rds"))
+#         file = paste0(path, "/S1_Computation-Time.rds"))
+# 
+# 
 
 
 
-##################################### END ######################################
+
+
+
+
