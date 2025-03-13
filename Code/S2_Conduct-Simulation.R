@@ -16,7 +16,7 @@
 #                       iteration are stored in the relevant Simulation-Output folder. 
 #
 #
-# Last Updated: 2025-02-13
+# Last Updated: 2025-02-27
 #
 #
 # Notes:
@@ -45,23 +45,23 @@ source("Functions/AnalysisFunc_Sim2b.R")
 source("Functions/genOneData_Sim2.R")
 
 # ----------------------------  Simulation Conditions --------------------------------------------------
-cond <- expand.grid(num_clust = 100,
+cond <- expand.grid(num_clust = c(70, 100),
                     clust_size = c(20, 40, 100),
                     num_x = 6,
                     icc = c(0.05, 0.2, 0.5))
-# cond <- cond[4:5, ]
+# cond <- cond[1:5, ]
 
 # ---------------------------- Set Parameters --------------------------------------------------
 
 OverallPar_time <- NULL  # To log computation times
-reps <- 200 #1000 # Total number of replications per condition
-path <- "Output/S2_Simulation-Output/2025-02-11-test_200-reps"
+reps <- 1000 # Total number of replications per condition
+path <- "Output/S2_Simulation-Output/2025-02-27_1000-reps"
 dir.create(path = path, showWarnings = FALSE)
 dir.create(path = paste0(path, "/interim"), showWarnings = FALSE)
 
 # ---------------------------- Simulation 2 --------------------------------------------------
 
-for (condition in 1:nrow(cond)) { 
+for (condition in 1:nrow(cond)) {#1:nrow(cond)) { 
   
   # set condition number
   cond_num <- condition
@@ -139,7 +139,7 @@ for (condition in 1:nrow(cond)) {
     # - The condition parameters (clust_size, icc, num_clust, num_x)
     # - The replication range for this block (e.g., reps-1-100)
     file_name <- paste0(
-      path, "/interim/", "/S1_Condition-", condition,
+      path, "/interim/", "/S2_Condition-", condition,
       "-Estimates_clust_size-", cond[condition, "clust_size"],
       "_icc-", cond[condition, "icc"],
       "_num_clust-", cond[condition, "num_clust"],

@@ -387,6 +387,7 @@ AnalysisFunc_Sim2b <- function(PSmodel = "FE",
     # condition info 
     ICC = condition[condition_num, "icc"],
     clust_size = condition[condition_num, "clust_size"],
+    num_clust = condition[condition_num, "num_clust"],
     conditionNum = condition_num, 
     # Mediator model intercept & T (in case needed)
     intercept_medModel_est = as.numeric(summary(med)$coef["(Intercept)", "Estimate"]),

@@ -6,7 +6,7 @@
 #
 # Author: Cameron
 # 
-# Date Created: 04/16/24
+# Date Created: 2024-04-16
 #
 #
 # Script Description:
@@ -18,7 +18,7 @@
 #   intervals. Covariate balance is visualized. Finally, it visualizes the 
 # estimated effects to facilitate interpretation of the results.
 # 
-# Last Updated: 08/15/2024 
+# Last Updated: 2025-03-13 
 #
 #
 # Notes:
@@ -50,6 +50,10 @@ pacman::p_load(
 source("Application/Functions/bootstrap_ci_paral_2.R")
 source("Application/Functions/bootstrap_ci_re_paral_2.R")
 source("Application/Functions/bootstrap_ci_re_mean_paral.R")
+source("Application/Functions/monteCarloCI.R")
+source("Application/Functions/monteCarloCIb.R")
+source("Application/Functions/bootstrapCI.R")
+source("Application/Functions/bootstrapCIb.R")
 
 
 
@@ -166,6 +170,44 @@ data$ps_re_logit <- predict(psmod_re, type = "link") # Log-odds
 
 # Calculate IPTW for the RE model
 data <- cbind(data, iptw_re = with(data, (sportPartic_w1 / ps_re) + (1 - sportPartic_w1) / (1 - ps_re)))
+
+### RE-Mean Propensity Score Model -----------------------------------------------
+
+# # Calculate the cluster mean of covariates 
+# data <- data |> 
+#   group_by(CLUSTER2) |> 
+#   mutate(
+#     cluster_mean_feelings_w1_sc = mean(feelings_w1_sc, na.rm = TRUE), 
+#     cluster_mean_sex_w1 = mean(sex_w1, na.rm = TRUE), 
+#     cluster_mean_age_w1_sc = mean(age_w1_sc, na.rm = TRUE),
+#     cluster_mean_white_w1 = mean(white_w1, na.rm = TRUE),
+#     cluster_mean_black_w1 = mean(black_w1, na.rm = TRUE),
+#     cluster_mean_parentalEdu_w1_sc = mean(parentalEdu_w1_sc, na.rm = TRUE),
+#     cluster_mean_familyStruct_w1 = mean(familyStruct_w1, na.rm = TRUE),
+#     cluster_mean_selfEst_w1_sc = mean(selfEst_w1_sc, na.rm = TRUE)
+#   )
+# 
+# # RE with cluster means logistic regression model for propensity score estimation
+# psmod_remean <- lme4::glmer(
+#   formula = "sportPartic_w1 ~ feelings_w1_sc + sex_w1 + age_w1_sc + 
+#   white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + selfEst_w1_sc +
+#   cluster_mean_feelings_w1_sc + cluster_mean_sex_w1 + cluster_mean_age_w1_sc + 
+#   cluster_mean_white_w1 + cluster_mean_black_w1 + cluster_mean_parentalEdu_w1_sc + 
+#   cluster_mean_familyStruct_w1 + cluster_mean_selfEst_w1_sc + (1 | CLUSTER2)", 
+#   family = "binomial", 
+#   data = data
+# )
+# 
+# # Predict propensity scores and log-odds for the RE-Mean model
+# data$ps_remean <- predict(psmod_remean, type = "response") # Propensity scores
+# data$ps_remean_logit <- predict(psmod_remean, type = "link") # Log-odds
+# 
+# # Calculate IPTW for the RE model
+# data <- cbind(data, iptw_remean = with(data, (sportPartic_w1 / ps_remean) + (1 - sportPartic_w1) / (1 - ps_remean)))
+
+
+
+
 
 
 
@@ -776,22 +818,32 @@ conditions <- c("slsl", "fesl", "resl",
 
 # Extract TNDE estimates
 TNDE <- sapply(conditions, function(cond) {
-  model_name <- paste0("out_", cond)
-  summary(get(model_name))$coef["sportPartic_w1", "Estimate"]
+  med_model_name <- paste0("med_", cond)
+  out_model_name <- paste0("out_", cond) #, "_interac")
+  # model_name <- paste0("out_", cond)
+  summary(get(out_model_name))$coef["sportPartic_w1", "Estimate"]
+  # summary(get(out_model_name))$coef["sportPartic_w1", "Estimate"] + 
+  #   summary(get(out_model_name))$coef["selfEst_w3_sc:sportPartic_w1", "Estimate"] * 
+  #   (summary(get(med_model_name))$coef["(Intercept)", "Estimate"] + 
+  #      summary(get(med_model_name))$coef["sportPartic_w1", "Estimate"])
 })
 
 # Extract PNIE estimates
 PNIE <- sapply(conditions, function(cond) {
   med_model_name <- paste0("med_", cond)
-  out_model_name <- paste0("out_", cond)
+  out_model_name <- paste0("out_", cond) #, "_interac")
+  # out_model_name <- paste0("out_", cond)
   summary(get(med_model_name))$coef["sportPartic_w1", "Estimate"] * 
     summary(get(out_model_name))$coef["selfEst_w3_sc", "Estimate"]
 })
 
 # Extract PNDE estimates
 PNDE <- sapply(conditions, function(cond) {
-  model_name <- paste0("out_", cond, "_interac")
-  summary(get(model_name))$coef["sportPartic_w1", "Estimate"]
+  med_model_name <- paste0("med_", cond)
+  out_model_name <- paste0("out_", cond, "_interac")
+  summary(get(out_model_name))$coef["sportPartic_w1", "Estimate"] + 
+    summary(get(out_model_name))$coef["selfEst_w3_sc:sportPartic_w1", "Estimate"] * 
+    summary(get(med_model_name))$coef["(Intercept)", "Estimate"] 
 })
 
 # Extract TNIE estimates
@@ -799,8 +851,8 @@ TNIE <- sapply(conditions, function(cond) {
   med_model_name <- paste0("med_", cond)
   out_model_name <- paste0("out_", cond, "_interac")
   summary(get(med_model_name))$coef["sportPartic_w1", "Estimate"] * 
-    summary(get(out_model_name))$coef["selfEst_w3_sc", "Estimate"] + 
-    summary(get(out_model_name))$coef["selfEst_w3_sc:sportPartic_w1", "Estimate"]
+    (summary(get(out_model_name))$coef["selfEst_w3_sc", "Estimate"] + 
+    summary(get(out_model_name))$coef["selfEst_w3_sc:sportPartic_w1", "Estimate"])
 })
 
 # Create results DataFrame
@@ -829,9 +881,820 @@ results_DF
 # 11 fere_cm -0.2490276 -0.2494285 -0.12421280 -0.04336970
 # 12 rere_cm -0.2557420 -0.2560127 -0.11442310 -0.04131232
 
+# Save the final dataframe of results
+write_rds(results_DF, file = "Application/Output/Estimates/Effect-Estimates_noCIs.rds")
+
+# Save mediator and outcome models
+sapply(conditions, function(cond) {
+  # Collect object names
+  med_model_name <- paste0("med_", cond)
+  out_model_name <- paste0("out_", cond)
+  outWithInterac_model_name <- paste0("out_", cond, "_interac")
+  # Save objects
+  write_rds(get(med_model_name), file = paste0("Application/Output/mediator-and-outcome-models/", med_model_name, ".rds"))
+  write_rds(get(out_model_name), file = paste0("Application/Output/mediator-and-outcome-models/", out_model_name, ".rds"))
+  write_rds(get(outWithInterac_model_name), file = paste0("Application/Output/mediator-and-outcome-models/", outWithInterac_model_name, ".rds"))
+})
+
+# object_names <- ls(pattern = "^(out_|med_)")
+# for (obj_name in object_names) {
+#   file_path <- file.path("Application/Output/mediator-and-outcome-models", paste0(obj_name, ".rds"))
+#   saveRDS(get(obj_name), file = file_path)
+# }
+
+
 ## Clean Environment -------------------------------------------------------
 # Remove all objects from the environment except for 'data', 'results_DF', and functions
-rm(list = setdiff(ls(), c("data", "results_DF", lsf.str())))
+# rm(list = setdiff(ls(), c("data", "results_DF", lsf.str())))
+
+
+
+
+
+
+
+# Monte Carlo Confidence Intervals (CI) -----------------------------------
+# This section computes Monte Carlo confidence intervals for each effect 
+# using each PS model (SL, FE, & RE) and mediator/outcome model (SL, FE, RE, & RE-Mean). 
+
+# Import all mediator and outcome models
+
+# List all .rds files in the folder (with full paths)
+rds_files <- list.files(path = "Application/Output/mediator-and-outcome-models", pattern = "\\.rds$", full.names = TRUE)
+
+# Loop through each file and assign its content to an object in the global environment
+for (file in rds_files) {
+  # Get the object name from the file name by removing the folder path and ".rds" extension
+  obj_name <- tools::file_path_sans_ext(basename(file))
+  # Read the RDS file and assign it to the object name in the global environment
+  assign(obj_name, readRDS(file), envir = .GlobalEnv)
+}
+
+
+## TNDE & PNIE -------------------------------------------------------------
+# This subsection focuses on TNDE (Total Natural Direct Effect) and PNIE (Pure Natural Indirect Effect) across different mediation/outcome models.
+
+### Single-Level (SL) Mediation/Outcome Models -----------------------------
+# SL PS Model
+slsl_ci_PNIE <- monteCarloCIb(
+  mediator_fit = med_slsl, 
+  outcome_fit = out_slsl, 
+  n_MC = 1000, 
+  seed_MC = 4561, 
+  PS_model_type = "SL", 
+  mediator_model_type = "SL", 
+  outcome_model_type = "SL", 
+  effect_type = "PNIE", 
+  output_type = "dataframe", 
+  use_joint = TRUE
+)
+
+# FE PS Model
+fesl_ci_PNIE <- monteCarloCIb(
+  mediator_fit = med_fesl, 
+  outcome_fit = out_fesl, 
+  n_MC = 1000, 
+  seed_MC = 4561, 
+  PS_model_type = "FE", 
+  mediator_model_type = "SL", 
+  outcome_model_type = "SL", 
+  effect_type = "PNIE", 
+  output_type = "dataframe", 
+  use_joint = TRUE
+)
+
+# RE PS Model
+resl_ci_PNIE <- monteCarloCIb(
+  mediator_fit = med_resl, 
+  outcome_fit = out_resl, 
+  n_MC = 1000, 
+  seed_MC = 4561, 
+  PS_model_type = "RE", 
+  mediator_model_type = "SL", 
+  outcome_model_type = "SL", 
+  effect_type = "PNIE", 
+  output_type = "dataframe", 
+  use_joint = TRUE
+)
+
+### Fixed-Effect (FE) Mediation/Outcome Models -----------------------------
+# SL PS Model
+slfe_ci_PNIE <- monteCarloCIb(
+  mediator_fit = med_slfe, 
+  outcome_fit = out_slfe, 
+  n_MC = 1000, 
+  seed_MC = 4561, 
+  PS_model_type = "SL", 
+  mediator_model_type = "FE", 
+  outcome_model_type = "FE", 
+  effect_type = "PNIE", 
+  output_type = "dataframe", 
+  use_joint = TRUE
+)
+
+# FE PS Model
+fefe_ci_PNIE <- monteCarloCIb(
+  mediator_fit = med_fefe, 
+  outcome_fit = out_fefe, 
+  n_MC = 1000, 
+  seed_MC = 4561, 
+  PS_model_type = "FE", 
+  mediator_model_type = "FE", 
+  outcome_model_type = "FE", 
+  effect_type = "PNIE", 
+  output_type = "dataframe", 
+  use_joint = TRUE
+)
+
+# RE PS Model
+refe_ci_PNIE <- monteCarloCIb(
+  mediator_fit = med_refe, 
+  outcome_fit = out_refe, 
+  n_MC = 1000, 
+  seed_MC = 4561, 
+  PS_model_type = "RE", 
+  mediator_model_type = "FE", 
+  outcome_model_type = "FE", 
+  effect_type = "PNIE", 
+  output_type = "dataframe", 
+  use_joint = TRUE
+)
+
+### Random-Effect (RE) Mediation/Outcome Models ----------------------------
+# SL PS Model
+slre_ci_PNIE <- monteCarloCIb(
+  mediator_fit = med_slre, 
+  outcome_fit = out_slre, 
+  n_MC = 1000, 
+  seed_MC = 4561, 
+  PS_model_type = "SL", 
+  mediator_model_type = "RE", 
+  outcome_model_type = "RE", 
+  effect_type = "PNIE", 
+  output_type = "dataframe", 
+  use_joint = TRUE
+)
+
+# FE PS Model
+fere_ci_PNIE <- monteCarloCIb(
+  mediator_fit = med_fere, 
+  outcome_fit = out_fere, 
+  n_MC = 1000, 
+  seed_MC = 4561, 
+  PS_model_type = "FE", 
+  mediator_model_type = "RE", 
+  outcome_model_type = "RE", 
+  effect_type = "PNIE", 
+  output_type = "dataframe", 
+  use_joint = TRUE
+)
+
+# RE PS Model
+rere_ci_PNIE <- monteCarloCIb(
+  mediator_fit = med_rere, 
+  outcome_fit = out_rere, 
+  n_MC = 1000, 
+  seed_MC = 4561, 
+  PS_model_type = "RE", 
+  mediator_model_type = "RE", 
+  outcome_model_type = "RE", 
+  effect_type = "PNIE", 
+  output_type = "dataframe", 
+  use_joint = TRUE
+)
+
+### Random-Effect with Cluster Means (RE-Mean) Med/Out Models --------------
+# SL PS Model
+slre_cm_ci_PNIE <- monteCarloCIb(
+  mediator_fit = med_slre_cm, 
+  outcome_fit = out_slre_cm, 
+  n_MC = 1000, 
+  seed_MC = 4561, 
+  PS_model_type = "SL", 
+  mediator_model_type = "RE-Mean", 
+  outcome_model_type = "RE-Mean", 
+  effect_type = "PNIE", 
+  output_type = "dataframe", 
+  use_joint = TRUE
+)
+
+# FE PS Model
+fere_cm_ci_PNIE <- monteCarloCIb(
+  mediator_fit = med_fere_cm, 
+  outcome_fit = out_fere_cm, 
+  n_MC = 1000, 
+  seed_MC = 4561, 
+  PS_model_type = "FE", 
+  mediator_model_type = "RE-Mean", 
+  outcome_model_type = "RE-Mean", 
+  effect_type = "PNIE", 
+  output_type = "dataframe", 
+  use_joint = TRUE
+)
+
+# RE PS Model
+rere_cm_ci_PNIE <- monteCarloCIb(
+  mediator_fit = med_rere_cm, 
+  outcome_fit = out_rere_cm, 
+  n_MC = 1000, 
+  seed_MC = 4561, 
+  PS_model_type = "RE", 
+  mediator_model_type = "RE-Mean", 
+  outcome_model_type = "RE-Mean", 
+  effect_type = "PNIE", 
+  output_type = "dataframe",
+  use_joint = TRUE
+)
+
+## PNDE & TNIE -------------------------------------------------------------
+# This subsection focuses on PNDE (Pure Natural Direct Effect) and TNIE (Total Natural Indirect Effect)
+# effects across different mediation/outcome models.
+
+### Single-Level (SL) Mediation/Outcome Models -----------------------------
+# SL PS Model
+slsl_ci_TNIE <- monteCarloCIb(
+  mediator_fit = med_slsl,
+  outcome_fit = out_slsl_interac, 
+  n_MC = 1000, 
+  seed_MC = 4561, 
+  PS_model_type = "SL", 
+  mediator_model_type = "SL", 
+  outcome_model_type = "SL", 
+  effect_type = "TNIE", 
+  output_type = "dataframe", 
+  use_joint = TRUE
+)
+
+# FE PS Model
+fesl_ci_TNIE <- monteCarloCIb(
+  mediator_fit = med_fesl, 
+  outcome_fit = out_fesl_interac, 
+  n_MC = 1000, 
+  seed_MC = 4561, 
+  PS_model_type = "FE", 
+  mediator_model_type = "SL", 
+  outcome_model_type = "SL", 
+  effect_type = "TNIE", 
+  output_type = "dataframe",
+  use_joint = TRUE
+)
+
+# RE PS Model
+resl_ci_TNIE <- monteCarloCIb(
+  mediator_fit = med_resl, 
+  outcome_fit = out_resl_interac, 
+  n_MC = 1000, 
+  seed_MC = 4561, 
+  PS_model_type = "RE", 
+  mediator_model_type = "SL", 
+  outcome_model_type = "SL", 
+  effect_type = "TNIE", 
+  output_type = "dataframe",
+  use_joint = TRUE
+)
+
+### Fixed-Effect (FE) Mediation/Outcome Models -----------------------------
+# SL PS Model
+slfe_ci_TNIE <- monteCarloCIb(
+  mediator_fit = med_slfe, 
+  outcome_fit = out_slfe_interac, 
+  n_MC = 1000, 
+  seed_MC = 4561, 
+  PS_model_type = "SL", 
+  mediator_model_type = "FE", 
+  outcome_model_type = "FE", 
+  effect_type = "TNIE", 
+  output_type = "dataframe"
+)
+
+# FE PS Model
+fefe_ci_TNIE <- monteCarloCIb(
+  mediator_fit = med_fefe, 
+  outcome_fit = out_fefe_interac, 
+  n_MC = 1000, 
+  seed_MC = 4561, 
+  PS_model_type = "FE", 
+  mediator_model_type = "FE", 
+  outcome_model_type = "FE", 
+  effect_type = "TNIE", 
+  output_type = "dataframe"
+)
+
+# RE PS Model
+refe_ci_TNIE <- monteCarloCIb(
+  mediator_fit = med_refe, 
+  outcome_fit = out_refe_interac, 
+  n_MC = 1000, 
+  seed_MC = 4561, 
+  PS_model_type = "RE", 
+  mediator_model_type = "FE", 
+  outcome_model_type = "FE", 
+  effect_type = "TNIE", 
+  output_type = "dataframe"
+)
+
+### Random-Effect (RE) Mediation/Outcome Models ----------------------------
+# SL PS Model
+slre_ci_TNIE <- monteCarloCIb(
+  mediator_fit = med_slre, 
+  outcome_fit = out_slre_interac, 
+  n_MC = 1000, 
+  seed_MC = 4561, 
+  PS_model_type = "SL", 
+  mediator_model_type = "RE",
+  outcome_model_type = "RE", 
+  effect_type = "TNIE", 
+  output_type = "dataframe"
+)
+
+# FE PS Model
+fere_ci_TNIE <- monteCarloCIb(
+  mediator_fit = med_fere, 
+  outcome_fit = out_fere_interac, 
+  n_MC = 1000, 
+  seed_MC = 4561, 
+  PS_model_type = "FE", 
+  mediator_model_type = "RE",
+  outcome_model_type = "RE", 
+  effect_type = "TNIE", 
+  output_type = "dataframe"
+)
+
+# RE PS Model
+rere_ci_TNIE <- monteCarloCIb(
+  mediator_fit = med_rere, 
+  outcome_fit = out_rere_interac, 
+  n_MC = 1000, 
+  seed_MC = 4561, 
+  PS_model_type = "RE", 
+  mediator_model_type = "RE",
+  outcome_model_type = "RE", 
+  effect_type = "TNIE", 
+  output_type = "dataframe"
+)
+
+### Random-Effect with Cluster Means (RE-Mean) Med/Out Models --------------
+# SL PS Model
+slre_cm_ci_TNIE <- monteCarloCIb(
+  mediator_fit = med_slre_cm, 
+  outcome_fit = out_slre_cm_interac, 
+  n_MC = 1000, 
+  seed_MC = 4561, 
+  PS_model_type = "SL", 
+  mediator_model_type = "RE-Mean",
+  outcome_model_type = "RE-Mean", 
+  effect_type = "TNIE", 
+  output_type = "dataframe", 
+  use_joint = TRUE
+)
+
+# FE PS Model
+fere_cm_ci_TNIE <- monteCarloCIb(
+  mediator_fit = med_fere_cm, 
+  outcome_fit = out_fere_cm_interac, 
+  n_MC = 1000, 
+  seed_MC = 4561, 
+  PS_model_type = "FE", 
+  mediator_model_type = "RE-Mean",
+  outcome_model_type = "RE-Mean", 
+  effect_type = "TNIE", 
+  output_type = "dataframe", 
+  use_joint = TRUE
+)
+
+# RE PS Model
+rere_cm_ci_TNIE <- monteCarloCIb(
+  mediator_fit = med_rere_cm, 
+  outcome_fit = out_rere_cm_interac, 
+  n_MC = 1000, 
+  seed_MC = 4561, 
+  PS_model_type = "RE", 
+  mediator_model_type = "RE-Mean",
+  outcome_model_type = "RE-Mean", 
+  effect_type = "TNIE", 
+  output_type = "dataframe", 
+  use_joint = TRUE
+)
+
+
+## Display & Save Monte Carlo CI Estimates -------------------------------------------------------
+
+# # Create PNIE dataframe
+# pnie_df <- rbind(
+#   slsl_ci_PNIE,
+#   fesl_ci_PNIE,
+#   resl_ci_PNIE,
+#   slfe_ci_PNIE,
+#   fefe_ci_PNIE,
+#   refe_ci_PNIE,
+#   slre_ci_PNIE,
+#   fere_ci_PNIE,
+#   rere_ci_PNIE,
+#   slre_cm_ci_PNIE,
+#   fere_cm_ci_PNIE,
+#   rere_cm_ci_PNIE
+# )
+# # rename columns & narrow df 
+# pnie_df <- pnie_df |> 
+#   dplyr::select("PS_model_type":"NDE_UL") |> 
+#   dplyr::rename(PS = PS_model_type, 
+#                 outcome = outcome_model_type, 
+#                 PNIE = NIE_est, 
+#                 PNIE_LL = NIE_LL, 
+#                 PNIE_UL = NIE_UL, 
+#                 TNDE = NDE_est, 
+#                 TNDE_LL = NDE_LL, 
+#                 TNDE_UL = NDE_UL) |> 
+#   dplyr::select(!effect_type)
+# # Create TNIE dataframe
+# tnie_df <- rbind(
+#   slsl_ci_TNIE,
+#   fesl_ci_TNIE,
+#   resl_ci_TNIE,
+#   slfe_ci_TNIE,
+#   fefe_ci_TNIE,
+#   refe_ci_TNIE,
+#   slre_ci_TNIE,
+#   fere_ci_TNIE,
+#   rere_ci_TNIE,
+#   slre_cm_ci_TNIE,
+#   fere_cm_ci_TNIE,
+#   rere_cm_ci_TNIE
+# )
+# # rename columns & narrow df 
+# tnie_df <- tnie_df |> 
+#   dplyr::select("PS_model_type":"NDE_UL") |> 
+#   dplyr::rename(PS = PS_model_type, 
+#                 outcome = outcome_model_type, 
+#                 TNIE = NIE_est, 
+#                 TNIE_LL = NIE_LL, 
+#                 TNIE_UL = NIE_UL, 
+#                 PNDE = NDE_est, 
+#                 PNDE_LL = NDE_LL, 
+#                 PNDE_UL = NDE_UL) |> 
+#   dplyr::select(!effect_type)
+# 
+# # Combine DFs effects 
+# ci_df <- pnie_df |> 
+#   left_join(tnie_df, by = c("PS", "outcome"))
+# 
+# 
+# # Save the final dataframe of results
+# write_rds(ci_df, file = "Application/Output/Estimates/Effect-Estimates_monte-carlo-CIs.rds")
+# 
+
+# Create PNIE dataframe
+pnie_df <- rbind(
+  slsl_ci_PNIE,
+  fesl_ci_PNIE,
+  resl_ci_PNIE,
+  slfe_ci_PNIE,
+  fefe_ci_PNIE,
+  refe_ci_PNIE,
+  slre_ci_PNIE,
+  fere_ci_PNIE,
+  rere_ci_PNIE,
+  slre_cm_ci_PNIE,
+  fere_cm_ci_PNIE,
+  rere_cm_ci_PNIE
+)
+# Create TNIE dataframe
+tnie_df <- rbind(
+  slsl_ci_TNIE,
+  fesl_ci_TNIE,
+  resl_ci_TNIE,
+  slfe_ci_TNIE,
+  fefe_ci_TNIE,
+  refe_ci_TNIE,
+  slre_ci_TNIE,
+  fere_ci_TNIE,
+  rere_ci_TNIE,
+  slre_cm_ci_TNIE,
+  fere_cm_ci_TNIE,
+  rere_cm_ci_TNIE
+)
+
+# Combine relevant columns from each dataset & adjust names 
+monteCI_df <- pnie_df |> 
+  select("analysisCond":"PNIE_UCL") |> 
+  left_join(select(tnie_df, "analysisCond":"PNDE_UCL", "TNIE_est":"TNIE_UCL")) |> 
+  rename_with(~ gsub("_LCL$", "_LL", .)) |> 
+  rename_with(~ gsub("_UCL$", "_UL", .)) |> 
+  rename_with(~ gsub("_est$", "", .))
+
+# Save the final dataframe of results
+write_rds(monteCI_df, file = "Application/Output/Estimates/Effect-Estimates_monte-carlo-CIs.rds")
+
+# Save monte carlo CI objects
+# Define the list of file names
+list_names <- c("slsl_ci_TNIE", "slsl_ci_PNIE", 
+                "fesl_ci_TNIE", "fesl_ci_PNIE",
+                "resl_ci_TNIE", "resl_ci_PNIE", 
+                "slfe_ci_TNIE", "slfe_ci_PNIE", 
+                "fefe_ci_TNIE", "fefe_ci_PNIE",
+                "refe_ci_TNIE", "refe_ci_PNIE", 
+                "slre_ci_TNIE", "slre_ci_PNIE",
+                "fere_ci_TNIE", "fere_ci_PNIE",
+                "rere_ci_TNIE", "rere_ci_PNIE",
+                "slre_cm_ci_TNIE", "slre_cm_ci_PNIE",
+                "fere_cm_ci_TNIE", "fere_cm_ci_PNIE",
+                "rere_cm_ci_TNIE", "rere_cm_ci_PNIE")
+# Save outputs 
+sapply(list_names, function(lstname) {
+  write_rds(get(lstname), file = paste0("Application/Output/Temp-monte-carlo-CIs/", lstname, ".rds"))
+})
+
+
+# Bootstrap CI TESTING  ---------------------------------------------------
+
+# WARNING: Both RE and RE-Mean calculations require extended processing times.
+
+
+## PNDE & TNIE -------------------------------------------------------------
+# This subsection focuses on PNDE (Pure Natural Direct Effect) and TNIE (Total Natural Indirect Effect)
+# effects across different mediation/outcome models.
+
+### Single-Level (SL) Mediation/Outcome Models -----------------------------
+# SL PS Model
+slsl_ci_TNIE <- bootstrapCIb(
+  iterations = 1000,        # Number of bootstrap iterations
+  iptw = iptw_sl,           # IPTW weights from SL PS model
+  data = data,              # Input data
+  model = "SL",             # Specify PS model 
+  cores = 6,                # Number of CPU cores for parallelization
+  core_seeds = c(4561:4566),# Seeds for reproducibility
+  effect_type = "TNIE"      # Effect type: TNIE
+)
+saveRDS(slsl_ci_TNIE, file = "Application/Output/Temp-bootstrap-CIs/slsl_ci_TNIE.rds")
+rm(slsl_ci_TNIE)
+
+# FE PS Model
+fesl_ci_TNIE <- bootstrapCIb(
+  iterations = 1000,
+  iptw = iptw_fe,
+  data = data,
+  model = "SL",
+  cores = 6,
+  core_seeds = c(4561:4566),
+  effect_type = "TNIE"
+)
+saveRDS(fesl_ci_TNIE, file = "Application/Output/Temp-bootstrap-CIs/fesl_ci_TNIE.rds")
+rm(fesl_ci_TNIE)
+
+# RE PS Model
+resl_ci_TNIE <- bootstrapCIb(
+  iterations = 1000,
+  iptw = iptw_re,
+  data = data,
+  model = "SL",
+  cores = 6,
+  core_seeds = c(4561:4566),
+  effect_type = "TNIE"
+)
+saveRDS(resl_ci_TNIE, file = "Application/Output/Temp-bootstrap-CIs/resl_ci_TNIE.rds")
+rm(resl_ci_TNIE)
+
+
+### Fixed-Effect (FE) Mediation/Outcome Models -----------------------------
+# SL PS Model
+slfe_ci_TNIE <- bootstrapCIb(
+  iterations = 1000,
+  iptw = iptw_sl,
+  data = data,
+  model = "FE",
+  cores = 6,
+  core_seeds = c(4561:4566),
+  effect_type = "TNIE"
+)
+saveRDS(slfe_ci_TNIE, file = "Application/Output/Temp-bootstrap-CIs/slfe_ci_TNIE.rds")
+rm(slfe_ci_TNIE)
+
+# FE PS Model
+fefe_ci_TNIE <- bootstrapCIb(
+  iterations = 1000,
+  iptw = iptw_fe,
+  data = data,
+  model = "FE",
+  cores = 6,
+  core_seeds = c(4561:4566),
+  effect_type = "TNIE"
+)
+saveRDS(fefe_ci_TNIE, file = "Application/Output/Temp-bootstrap-CIs/fefe_ci_TNIE.rds")
+rm(fefe_ci_TNIE)
+
+# RE PS Model
+refe_ci_TNIE <- bootstrapCIb(
+  iterations = 1000,
+  iptw = iptw_re,
+  data = data,
+  model = "FE",
+  cores = 6,
+  core_seeds = c(4561:4566),
+  effect_type = "TNIE"
+)
+saveRDS(refe_ci_TNIE, file = "Application/Output/Temp-bootstrap-CIs/refe_ci_TNIE.rds")
+rm(refe_ci_TNIE)
+
+
+## TNDE & PNIE -------------------------------------------------------------
+# This subsection focuses on TNDE (Total Natural Direct Effect) and PNIE (Pure Natural Indirect Effect) across different mediation/outcome models.
+
+### Single-Level (SL) Mediation/Outcome Models -----------------------------
+# SL PS Model
+slsl_ci_PNIE <- bootstrapCIb(
+  iterations = 1000,        # Number of bootstrap iterations
+  iptw = iptw_sl,           # IPTW weights from SL PS model
+  data = data,              # Input data
+  model = "SL",             # Specify mediator & outcome model 
+  cores = 6,                # Number of CPU cores for parallelization
+  core_seeds = c(4561:4566),# Seeds for reproducibility
+  effect_type = "PNIE"      # Effect type: PNIE
+)
+saveRDS(slsl_ci_PNIE, file = "Application/Output/Temp-bootstrap-CIs/slsl_ci_PNIE.rds")
+rm(slsl_ci_PNIE)
+
+# FE PS Model
+fesl_ci_PNIE <- bootstrapCIb(
+  iterations = 1000,
+  iptw = iptw_fe,
+  data = data,
+  model = "SL",
+  cores = 6,
+  core_seeds = c(4561:4566),
+  effect_type = "PNIE"
+)
+saveRDS(fesl_ci_PNIE, file = "Application/Output/Temp-bootstrap-CIs/fesl_ci_PNIE.rds")
+rm(fesl_ci_PNIE)
+
+# RE PS Model
+resl_ci_PNIE <- bootstrapCIb(
+  iterations = 1000,
+  iptw = iptw_re,
+  data = data,
+  model = "SL",
+  cores = 6,
+  core_seeds = c(4561:4566),
+  effect_type = "PNIE"
+)
+saveRDS(resl_ci_PNIE, file = "Application/Output/Temp-bootstrap-CIs/resl_ci_PNIE.rds")
+rm(resl_ci_PNIE)
+
+### Fixed-Effect (FE) Mediation/Outcome Models -----------------------------
+# SL PS Model
+slfe_ci_PNIE <- bootstrapCIb(
+  iterations = 1000,
+  iptw = iptw_sl,
+  data = data,
+  model = "FE",   
+  cores = 6,
+  core_seeds = c(4561:4566),
+  effect_type = "PNIE"
+)
+saveRDS(slfe_ci_PNIE, file = "Application/Output/Temp-bootstrap-CIs/slfe_ci_PNIE.rds")
+rm(slfe_ci_PNIE)
+
+# FE PS Model
+fefe_ci_PNIE <- bootstrapCIb(
+  iterations = 1000,
+  iptw = iptw_fe,
+  data = data,
+  model = "FE",
+  cores = 6,
+  core_seeds = c(4561:4566),
+  effect_type = "PNIE"
+)
+saveRDS(fefe_ci_PNIE, file = "Application/Output/Temp-bootstrap-CIs/fefe_ci_PNIE.rds")
+rm(fefe_ci_PNIE)
+
+# RE PS Model
+refe_ci_PNIE <- bootstrapCIb(
+  iterations = 1000,
+  iptw = iptw_re,
+  data = data,
+  model = "FE",
+  cores = 6,
+  core_seeds = c(4561:4566),
+  effect_type = "PNIE"
+)
+saveRDS(refe_ci_PNIE, file = "Application/Output/Temp-bootstrap-CIs/refe_ci_PNIE.rds")
+rm(refe_ci_PNIE)
+
+
+
+
+
+## Display & Save bootstrap CI Estimates -------------------------------------------------------
+
+
+
+###### Join CI & point estimates for SL & FE med/outcome -------------------
+# This block imports data for SL and FE models, calculates CIs, and combines results.
+
+# Define the list of file names
+list_names <- c("slsl_ci_TNIE", "slsl_ci_PNIE", 
+                "fesl_ci_TNIE", "fesl_ci_PNIE",
+                "resl_ci_TNIE", "resl_ci_PNIE", 
+                "slfe_ci_TNIE", "slfe_ci_PNIE", 
+                "fefe_ci_TNIE", "fefe_ci_PNIE",
+                "refe_ci_TNIE", "refe_ci_PNIE")
+
+# Import RDS files and store them in a list of lists
+lists <- lapply(list_names, function(name) {
+  readRDS(paste0("Application/Output/Temp-bootstrap-CIs/", name, ".rds"))
+})
+
+# Name the elements of the list for easier access
+names(lists) <- list_names
+
+# Extract 'indirect_ci' and store in dataframe
+indirect_df <- do.call(rbind, lapply(seq_along(lists), function(i) {
+  ci_values <- lists[[i]]$indirect_ci
+  data.frame(
+    list_name = list_names[i],
+    indirect_ci_LL = ci_values[1],  # Lower bound
+    indirect_ci_UL = ci_values[2],  # Upper bound
+    stringsAsFactors = FALSE
+  )
+}))
+
+# Extract 'direct_ci' and store in dataframe
+direct_df <- do.call(rbind, lapply(seq_along(lists), function(i) {
+  ci_values <- lists[[i]]$direct_ci
+  data.frame(
+    list_name = list_names[i],
+    direct_ci_LL = ci_values[1],  # Lower bound
+    direct_ci_UL = ci_values[2],  # Upper bound
+    stringsAsFactors = FALSE
+  )
+}))
+
+# Combine both 'indirect' and 'direct' CIs into a single dataframe
+combined_df <- merge(indirect_df, direct_df, by = "list_name")
+
+# Modify dataframe: extract effect and cond labels, and reshape to wide format
+combined_df <- combined_df %>%
+  mutate(effect = substr(list_name, nchar(list_name) - 3, nchar(list_name))) %>%  # Extract effect label
+  mutate(list_name = substr(list_name, 1, 4)) %>%  # Extract cond label
+  pivot_longer(cols = c(indirect_ci_LL, indirect_ci_UL, direct_ci_LL, direct_ci_UL), 
+               names_to = "variable", values_to = "value") %>%
+  unite("variable", effect, variable, sep = "_") %>%
+  pivot_wider(names_from = variable, values_from = value) %>%
+  as.data.frame()
+
+# Update column names for clarity
+colnames(combined_df) <- c("cond", 
+                           "PNIE_LL", "PNIE_UL", "TNDE_LL", "TNDE_UL", 
+                           "TNIE_LL", "TNIE_UL", "PNDE_LL", "PNDE_UL")
+
+# Merge the SL & FE results with the existing results dataframe
+results_DF_noRE <- merge(results_DF[1:6, ], combined_df, by = "cond")
+
+
+
+
+# ═══════════════════
+#    NOTE WE ARE SKIPPING RE & RE-MEAN MED/OUT MODELS FOR NOW 
+# ═══════════════════
+
+
+
+# Add labels for PS model & Mediator/Outcome model
+results_DF_noRE <- results_DF_noRE %>%
+  mutate(
+    PS = case_when(
+      startsWith(cond, "fe") ~ "Fixed-Effect",
+      startsWith(cond, "sl") ~ "Single-Level",
+      startsWith(cond, "re") ~ "Random-Effect",
+      TRUE ~ NA_character_  # Default case
+    ),
+    Model = case_when(
+      endsWith(cond, "fe") ~ "Fixed-Effect",
+      endsWith(cond, "sl") ~ "Single-Level",
+      endsWith(cond, "re") ~ "Random-Effect",
+      endsWith(cond, "re_cm") ~ "Random-Effect with Cluster Means",
+      TRUE ~ NA_character_  # Default case
+    )
+  )
+
+# Display the final dataframe with PS model & Mediator/Outcome labels
+print(results_DF_noRE)
+
+# Save the final dataframe of results
+write_rds(results_DF_noRE, file = "Application/Output/Estimates/Effect-Estimates_bootstrap-CIs.rds")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -851,7 +1714,7 @@ slsl_ci_PNIE <- bootstrap_ci_paral_2(
   iterations = 1000,        # Number of bootstrap iterations
   iptw = iptw_sl,           # IPTW weights from SL PS model
   data = data,              # Input data
-  model = "SL",             # Specify PS model 
+  model = "SL",             # Specify mediator & outcome model 
   cores = 6,                # Number of CPU cores for parallelization
   core_seeds = c(4561:4566),# Seeds for reproducibility
   effect_type = "PNIE"      # Effect type: PNIE
@@ -1621,7 +2484,7 @@ print(results_DF)
 # 12 slre_cm -0.2243275 -0.2245039 -0.11099540 -0.08241447 -0.2777162 0.10351657 -0.4686721 -0.003627143 -0.2800797 0.10432471 -0.4688228 -0.0043952591  Single-Level Random-Effect with Cluster Means
 
 # Save the final dataframe of results
-write_rds(results_DF, file = "Application/Output/Estimates/Effect-Estimates.rds")
+write_rds(results_DF, file = "Application/Output/Estimates/Effect-Estimates_bootstrap-CIs.rds")
 
 
 

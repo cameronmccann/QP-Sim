@@ -305,6 +305,7 @@ AnalysisFunc_Sim1c <- function(
     # condition info 
     ICC = condition[condition_num, "icc"],
     clust_size = condition[condition_num, "clust_size"],
+    num_clust = condition[condition_num, "num_clust"],
     conditionNum = condition_num, 
     # a- & b-path info 
     a_path_est = a_path_est, 
