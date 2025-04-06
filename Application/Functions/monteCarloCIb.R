@@ -108,7 +108,7 @@ monteCarloCIb <- function(mediator_fit, outcome_fit,
   
   
   # PNDE = Y(1, M(0)) - Y(0, M(0)) = c1 + c3*a0
-  # TNDE = Y(1, M(1)) - Y(0, M(1)) = c1 #+ c3*(a0 + a1)
+  # TNDE = Y(1, M(1)) - Y(0, M(1)) = c1 + c3*(a0 + a1)
   # PNIE = Y(0, M(1)) - Y(0, M(0)) = c2*a1
   # TNIE = Y(1, M(1)) - Y(1, M(0)) = a1*(c2 + c3)
   
@@ -124,7 +124,7 @@ monteCarloCIb <- function(mediator_fit, outcome_fit,
     # NIE_est <- a_path_est * b_path_est
     # NDE_est <- direct_est
     PNDE_est <- c1_est + c3_est * a0_est
-    TNDE_est <- c1_est #+ c3_est * (a0_est + a1_est)
+    TNDE_est <- c1_est + c3_est * (a0_est + a1_est)
     PNIE_est <- c2_est * a1_est
     TNIE_est <- a1_est * (c2_est + c3_est)
     
@@ -180,7 +180,7 @@ monteCarloCIb <- function(mediator_fit, outcome_fit,
     
     # g) Compute draws of each effect
     PNDE_draw <- c1_draw + c3_draw * a0_draw
-    TNDE_draw <- c1_draw #+ c3_draw * (a0_draw + a1_draw)
+    TNDE_draw <- c1_draw + c3_draw * (a0_draw + a1_draw)
     PNIE_draw <- c2_draw * a1_draw
     TNIE_draw <- a1_draw * (c2_draw + c3_draw)
     
@@ -239,13 +239,13 @@ monteCarloCIb <- function(mediator_fit, outcome_fit,
     c0_est <- as.numeric(summary(outcome_fit)$coef["(Intercept)", "Estimate"])
     c1_est <- as.numeric(summary(outcome_fit)$coef["sportPartic_w1", "Estimate"]) # c_path_est
     c2_est <- as.numeric(summary(outcome_fit)$coef["selfEst_w3_sc", "Estimate"]) # b_path_est
-    # c3_est <- as.numeric(summary(outcome_fit)$coef["selfEst_w3_sc:sportPartic_w1", "Estimate"])
+    c3_est <- as.numeric(summary(outcome_fit)$coef["selfEst_w3_sc:sportPartic_w1", "Estimate"])
     
     # Point estimates of NDE & NIE --------------------------------------------
     # NIE_est <- a_path_est * b_path_est
     # NDE_est <- direct_est
     # PNDE_est <- c1_est + c3_est * a0_est
-    TNDE_est <- c1_est #+ c3_est * (a0_est + a1_est)
+    TNDE_est <- c1_est + c3_est * (a0_est + a1_est)
     PNIE_est <- c2_est * a1_est
     # TNIE_est <- a1_est * (c2_est + c3_est)
     
@@ -263,7 +263,7 @@ monteCarloCIb <- function(mediator_fit, outcome_fit,
     }
     # subset parameters
     med_params <- c("(Intercept)", "sportPartic_w1")
-    out_params <- c("(Intercept)", "sportPartic_w1", "selfEst_w3_sc") #, "selfEst_w3_sc:sportPartic_w1")
+    out_params <- c("(Intercept)", "sportPartic_w1", "selfEst_w3_sc", "selfEst_w3_sc:sportPartic_w1")
     med_vcov_sub <- med_vcov[med_params, med_params, drop = FALSE]
     out_vcov_sub <- out_vcov[out_params, out_params, drop = FALSE]
     
@@ -273,8 +273,8 @@ monteCarloCIb <- function(mediator_fit, outcome_fit,
       a1_est,          # t in mediator model
       c0_est,          # (Intercept) in outcome model
       c1_est,          # t in outcome model
-      c2_est#,          # m in outcome model
-      # c3_est           # m:t in outcome model
+      c2_est,          # m in outcome model
+      c3_est           # m:t in outcome model
     )
     
     # d) Build block-diagonal covariance matrix
@@ -297,11 +297,11 @@ monteCarloCIb <- function(mediator_fit, outcome_fit,
     c0_draw <- param_draws[, 3]
     c1_draw <- param_draws[, 4]
     c2_draw <- param_draws[, 5]
-    # c3_draw <- param_draws[, 6]
+    c3_draw <- param_draws[, 6]
     
     # g) Compute draws of each effect
     # PNDE_draw <- c1_draw + c3_draw * a0_draw
-    TNDE_draw <- c1_draw #+ c3_draw * (a0_draw + a1_draw)
+    TNDE_draw <- c1_draw + c3_draw * (a0_draw + a1_draw)
     PNIE_draw <- c2_draw * a1_draw
     # TNIE_draw <- a1_draw * (c2_draw + c3_draw)
     
@@ -348,252 +348,11 @@ monteCarloCIb <- function(mediator_fit, outcome_fit,
       t_outModel_est         = as.numeric(summary(outcome_fit)$coef["sportPartic_w1", "Estimate"]),
       t_outModel_se          = as.numeric(summary(outcome_fit)$coef["sportPartic_w1", "Std. Error"]),
       m_outModel_est         = as.numeric(summary(outcome_fit)$coef["selfEst_w3_sc", "Estimate"]),
-      m_outModel_se          = as.numeric(summary(outcome_fit)$coef["selfEst_w3_sc", "Std. Error"])#,
-      # tm_outModel_est        = as.numeric(summary(outcome_fit)$coef["selfEst_w3_sc:sportPartic_w1", "Estimate"]),
-      # tm_outModel_se         = as.numeric(summary(outcome_fit)$coef["selfEst_w3_sc:sportPartic_w1", "Std. Error"])
+      m_outModel_se          = as.numeric(summary(outcome_fit)$coef["selfEst_w3_sc", "Std. Error"]),
+      tm_outModel_est        = as.numeric(summary(outcome_fit)$coef["selfEst_w3_sc:sportPartic_w1", "Estimate"]),
+      tm_outModel_se         = as.numeric(summary(outcome_fit)$coef["selfEst_w3_sc:sportPartic_w1", "Std. Error"])
     )
     
   }
-  
-  
-  # 
-  # # Extract mediator a-path estimate and SE
-  # mediator_summary <- summary(mediator_fit)$coef
-  # if (!(a_coef_name %in% rownames(mediator_summary))) {
-  #   stop(paste("Coefficient", a_coef_name, "not found in mediator model."))
-  # }
-  # a_path_est <- mediator_summary[a_coef_name, "Estimate"]
-  # a_path_se  <- mediator_summary[a_coef_name, "Std. Error"]
-  # 
-  # # Extract outcome model coefficients for treatment and mediator
-  # outcome_summary <- summary(outcome_fit)$coef
-  # if (!(direct_coef_name %in% rownames(outcome_summary))) {
-  #   stop(paste("Coefficient", direct_coef_name, "not found in outcome model (direct effect)."))
-  # }
-  # if (!(b_coef_name %in% rownames(outcome_summary))) {
-  #   stop(paste("Coefficient", b_coef_name, "not found in outcome model (mediator effect)."))
-  # }
-  # direct_est <- outcome_summary[direct_coef_name, "Estimate"]
-  # direct_se  <- outcome_summary[direct_coef_name, "Std. Error"]
-  # b_path_est <- outcome_summary[b_coef_name, "Estimate"]
-  # b_path_se  <- outcome_summary[b_coef_name, "Std. Error"]
-  # 
-  # # For the "TNIE" type, extract the interaction coefficient and SE.
-  # if (effect_type == "TNIE") {
-  #   if (!(interaction_coef_name %in% rownames(outcome_summary))) {
-  #     stop(paste("Interaction coefficient", interaction_coef_name, "not found in outcome model."))
-  #   }
-  #   interaction_coef    <- outcome_summary[interaction_coef_name, "Estimate"]
-  #   interaction_coef_se <- outcome_summary[interaction_coef_name, "Std. Error"]
-  # }
-  # 
-  # # Compute point estimates
-  # if (effect_type == "PNIE") {
-  #   indirect_est <- a_path_est * b_path_est  # PNIE estimate
-  #   # For non-interaction models, the direct effect is TNDE.
-  #   direct_effect_est <- direct_est         # TNDE estimate
-  # } else {  # effect_type == "TNIE"
-  #   indirect_est <- a_path_est * b_path_est + interaction_coef  # TNIE estimate
-  #   direct_effect_est <- direct_est                             # PNDE estimate
-  # }
-  # 
-  # set.seed(seed_MC)
-  # 
-  # #
-  # if (mediator_model_type %in% c("SL", "FE")) {
-  #   med_vcov <- vcov(mediator_fit)
-  # } else {
-  #   med_vcov <- mediator_fit$cov_mat
-  # }
-  # if (outcome_model_type %in% c("SL", "FE")) {
-  #   out_vcov <- vcov(outcome_fit)
-  # } else {
-  #   out_vcov <- outcome_fit$cov_mat
-  # }
-  # # subset parameters
-  # med_params <- c("(Intercept)", "sportPartic_w1") # allow sportPartic_w1 to be changed?
-  # out_params <- c("(Intercept)", "sportPartic_w1", "selfEst_w3_sc", "selfEst_w3_sc:sportPartic_w1")
-  # med_vcov_sub <- med_vcov[med_params, med_params, drop = FALSE]
-  # out_vcov_sub <- out_vcov[out_params, out_params, drop = FALSE]
-  # 
-  # # Build mean vector in correct order
-  # big_mean <- c(
-  #   as.numeric(summary(mediator_fit)$coef["(Intercept)", "Estimate"]),
-  #   as.numeric(summary(mediator_fit)$coef["sportPartic_w1", "Estimate"]), # a_path_est
-  #   as.numeric(summary(outcome_fit)$coef["(Intercept)", "Estimate"]),
-  #   as.numeric(summary(outcome_fit)$coef["sportPartic_w1", "Estimate"]),  # c_path_est
-  #   as.numeric(summary(outcome_fit)$coef["selfEst_w3_sc", "Estimate"]),  # b_path_est
-  #   as.numeric(summary(outcome_fit)$coef["selfEst_w3_sc:sportPartic_w1", "Estimate"])
-  # )
-  # 
-  # # Build block-diagonal covariance matrix
-  # block_cov <- as.matrix(Matrix::bdiag(med_vcov_sub, out_vcov_sub))
-  # # Draw from dist
-  # set.seed(seed_MC)
-  # params_draws <- MASS::mvrnorm(n_MC, mu = c(), Sigma = block_cov)
-  # 
-  # 
-  # #
-  # if (!use_joint) {
-  #   # Draw independent samples from each normal distribution
-  #   a_draws      <- rnorm(n_MC, mean = a_path_est, sd = a_path_se)
-  #   b_draws      <- rnorm(n_MC, mean = b_path_est, sd = b_path_se)
-  #   direct_draws <- rnorm(n_MC, mean = direct_est, sd = direct_se)
-  #   if (effect_type == "TNIE") {
-  #     interaction_draws <- rnorm(n_MC, mean = interaction_coef, sd = interaction_coef_se)
-  #     indirect_draws <- a_draws * b_draws + interaction_draws
-  #   } else {
-  #     indirect_draws <- a_draws * b_draws
-  #   }
-  #   # Confidence intervals for the indirect and direct effects
-  #   indirect_CI <- quantile(indirect_draws, c(0.025, 0.975))
-  #   direct_CI   <- quantile(direct_draws, c(0.025, 0.975))
-  #   
-  # } else {
-  #   # Joint simulation using covariance information
-  #   if (outcome_model_type %in% c("SL", "FE")) {
-  #     vcov_out <- vcov(outcome_fit)
-  #   } else if (outcome_model_type %in% c("RE", "RE-Mean")) {
-  #     vcov_out <- outcome_fit$cov_mat
-  #   } else {
-  #     stop("Invalid outcome_model_type. Choose from 'SL', 'FE', 'RE', or 'RE-Mean'.")
-  #   }
-  #   
-  #   # Identify indices for the outcome parameters
-  #   outcome_coef_names <- rownames(outcome_summary)
-  #   idx_direct <- which(outcome_coef_names == direct_coef_name)
-  #   idx_b      <- which(outcome_coef_names == b_coef_name)
-  #   
-  #   if (length(idx_direct) == 0 || length(idx_b) == 0) {
-  #     stop("Specified coefficient names not found in outcome model covariance matrix.")
-  #   }
-  #   # Build outcome covariance submatrix
-  #   if (effect_type == "TNIE") {
-  #     idx_interaction <- which(outcome_coef_names == interaction_coef_name)
-  #     if (length(idx_interaction) == 0) {
-  #       stop("Interaction coefficient not found in outcome model covariance matrix.")
-  #     }
-  #     out_cov_sub  <- vcov_out[c(idx_direct, idx_b, idx_interaction), c(idx_direct, idx_b, idx_interaction)]
-  #     mean_out_sub <- c(direct_est, b_path_est, interaction_coef)
-  #   } else {
-  #     out_cov_sub  <- vcov_out[c(idx_direct, idx_b), c(idx_direct, idx_b)]
-  #     mean_out_sub <- c(direct_est, b_path_est)
-  #   }
-  #   
-  #   # Create block diagonal covariance with a-path variance
-  #   if (!requireNamespace("Matrix", quietly = TRUE)) {
-  #     stop("The 'Matrix' package is required for joint simulation. Please install it.")
-  #   }
-  #   cov_a <- matrix(a_path_se^2, nrow = 1)
-  #   block_cov <- Matrix::bdiag(cov_a, out_cov_sub)
-  #   block_cov <- as.matrix(block_cov)
-  #   big_mean <- if (effect_type == "TNIE") {
-  #     c(a_path_est, mean_out_sub)  # length 3+1=4? Actually: a, direct, b, interaction (3 parameters from outcome if TNIE)
-  #     # Here: a_path + direct_est + b_path_est + interaction_coef
-  #   } else {
-  #     c(a_path_est, mean_out_sub)  # a and two outcome parameters
-  #   }
-  #   
-  #   # Draw joint samples
-  #   if (!requireNamespace("MASS", quietly = TRUE)) {
-  #     stop("The 'MASS' package is required for joint simulation. Please install it.")
-  #   }
-  #   param_draws <- MASS::mvrnorm(n = n_MC, mu = big_mean, Sigma = block_cov)
-  #   # For effect_type == "PNIE": columns: 1 = a, 2 = direct, 3 = b.
-  #   # For effect_type == "TNIE": columns: 1 = a, 2 = direct, 3 = b, 4 = interaction.
-  #   a_draw_joint      <- param_draws[, 1]
-  #   direct_draw_joint <- param_draws[, 2]
-  #   b_draw_joint      <- param_draws[, if (effect_type == "PNIE") 3 else 3]
-  #   if (effect_type == "TNIE") {
-  #     interaction_draw_joint <- param_draws[, 4]
-  #     indirect_draws <- a_draw_joint * b_draw_joint + interaction_draw_joint
-  #   } else {
-  #     indirect_draws <- a_draw_joint * b_draw_joint
-  #   }
-  #   indirect_CI <- quantile(indirect_draws, c(0.025, 0.975))
-  #   direct_CI   <- quantile(direct_draw_joint, c(0.025, 0.975))
-  # }
-  # 
-  # if (effect_type == "PNIE") {
-  #   if (output_type == "list") {
-  #     return(list(
-  #       PS_model_type = PS_model_type, 
-  #       outcome_model_type = outcome_model_type, 
-  #       effect_type = effect_type,
-  #       a_path_est = a_path_est,
-  #       a_path_se  = a_path_se,
-  #       b_path_est = b_path_est,
-  #       b_path_se  = b_path_se,
-  #       direct_est = direct_est,
-  #       direct_se  = direct_se,
-  #       NIE_est   = indirect_est,
-  #       NDE_est   = direct_est,
-  #       NIE_CI = indirect_CI,
-  #       NDE_CI   = direct_CI, 
-  #       mediator_model = mediator_fit, 
-  #       outcome_model = outcome_fit
-  #     ))
-  #   } else {
-  #     return(data.frame(
-  #       PS_model_type = PS_model_type, 
-  #       outcome_model_type = outcome_model_type, 
-  #       effect_type = effect_type,
-  #       NIE_est   = indirect_est,
-  #       NIE_LL = indirect_CI[1], 
-  #       NIE_UL = indirect_CI[2], 
-  #       NDE_est = direct_est,
-  #       NDE_LL = direct_CI[1], 
-  #       NDE_UL = direct_CI[2],
-  #       a_path_est = a_path_est,
-  #       a_path_se  = a_path_se,
-  #       b_path_est = b_path_est,
-  #       b_path_se  = b_path_se,
-  #       direct_est = direct_est,
-  #       direct_se  = direct_se
-  #     ))
-  #   }
-  #   
-  # } else {  # effect_type == "TNIE"
-  #   if (output_type == "list") {
-  #     return(list(
-  #       PS_model_type = PS_model_type, 
-  #       outcome_model_type = outcome_model_type, 
-  #       effect_type = effect_type,
-  #       a_path_est = a_path_est,
-  #       a_path_se  = a_path_se,
-  #       b_path_est = b_path_est,
-  #       b_path_se  = b_path_se,
-  #       interaction_coef = interaction_coef,
-  #       interaction_coef_se = interaction_coef_se,
-  #       direct_est = direct_est,
-  #       direct_se  = direct_se,
-  #       NIE_est   = indirect_est,
-  #       NDE_est   = direct_est,
-  #       NIE_CI = indirect_CI,
-  #       NDE_CI   = direct_CI, 
-  #       mediator_model = mediator_fit, 
-  #       outcome_model = outcome_fit
-  #     ))
-  #   } else {
-  #     return(data.frame(
-  #       PS_model_type = PS_model_type, 
-  #       outcome_model_type = outcome_model_type, 
-  #       effect_type = effect_type,
-  #       NIE_est   = indirect_est,
-  #       NIE_LL = indirect_CI[1], 
-  #       NIE_UL = indirect_CI[2], 
-  #       NDE_est = direct_est,
-  #       NDE_LL = direct_CI[1], 
-  #       NDE_UL = direct_CI[2],
-  #       a_path_est = a_path_est,
-  #       a_path_se  = a_path_se,
-  #       b_path_est = b_path_est,
-  #       b_path_se  = b_path_se,
-  #       interaction_coef = interaction_coef,
-  #       interaction_coef_se = interaction_coef_se,
-  #       direct_est = direct_est,
-  #       direct_se  = direct_se
-  #     ))
-  #   }
-  # }
+
 }
