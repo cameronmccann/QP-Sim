@@ -14,7 +14,7 @@
 #                       iteration in the relevant Simulation-Output folder. 
 #
 #
-# Last Updated: 2025-02-11
+# Last Updated: 2025-02-24
 #
 #
 # Notes:
@@ -48,23 +48,23 @@ source("Functions/genOneData_Sim1.R")
 
 # ---------------------------- Simulation Conditions  --------------------------------------------------
 
-cond <- expand.grid(num_clust = 100,
+cond <- expand.grid(num_clust = c(70, 100),
                     clust_size = c(20, 40, 100),
                     num_x = 3,
                     icc = c(0.05, 0.2, 0.5))
-# cond <- cond[4:5, ]
+# cond <- cond[1:2, ] #cond[4:5, ]
 
 # ---------------------------- Set Parameters ----------------------------------------------------------
 
 OverallPar_time <- NULL           # To log computation times
 reps <- 1000 #200 #                      # Total number of replications per condition
-dir.create(path = "Output/S1_Simulation-Output/2025-02-11-test_1000-reps", showWarnings = FALSE)
-dir.create(path = "Output/S1_Simulation-Output/2025-02-11-test_1000-reps/interim", showWarnings = FALSE)
-path <- "Output/S1_Simulation-Output/2025-02-11-test_1000-reps"
+dir.create(path = "Output/S1_Simulation-Output/2025-02-24_1000-reps", showWarnings = FALSE)
+dir.create(path = "Output/S1_Simulation-Output/2025-02-24_1000-reps/interim", showWarnings = FALSE)
+path <- "Output/S1_Simulation-Output/2025-02-24_1000-reps"
 
 # ---------------------------- Simulation 1 ------------------------------------------------------------
 
-for (condition in 1:5) {#6:nrow(cond)) {
+for (condition in 1:nrow(cond)) {
   
   cond_num <- condition
   

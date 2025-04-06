@@ -1,5 +1,5 @@
 ################################################################################
-#################### QP Simulation 1 Supplemental A Results ####################
+#################### QP Simulation 1 Supplemental 1 Results ####################
 ################################################################################
 
 ############################ Script Description ################################
@@ -10,17 +10,16 @@
 #
 #
 # Script Description: This code summarizes and reports the results for the 
-#                       first simulation study (i.e., obtains performance measures).  
+#                       first supplemental simulation study, where the type of 
+#                       mediator and outcome models are allowed to differ. 
 #                       This is stored in the relevant Results folder.
 #
 #
-# Last Updated: 2025-03-04
+# Last Updated: 2025-03-30
 #
 #
 # Notes:
 #   To-Do
-#       # UPDATE THIS SCRIPT SUMMARY
-#       # Add coverage table & visual (started viz under "PNIE MC CI Coverage Rate Visual")
 # 
 #   Done: 
 # 
@@ -300,20 +299,20 @@ TNDE <- treat_y
 PNIE <- treat_m * med_y
 
 # Create directory to store reporting of results 
-dir.create(path = "Output/S1_SuppA_Results")
-path <- "Output/S1_SuppA_Results/2025-02-28_1000-reps"
+dir.create(path = "Output/S1_Supp1_Results")
+path <- "Output/S1_Supp1_Results/2025-02-28_1000-reps"
 dir.create(path = path)
 dir.create(path = paste0(path, "/Data"))
 dir.create(path = paste0(path, "/Tables"))
 dir.create(path = paste0(path, "/Figures"))
-retrieval_path <- "Output/S1_SuppA_Simulation-Output/2025-02-28_1000-reps"
+retrieval_path <- "Output/S1_Supp1_Simulation-Output/2025-02-28_1000-reps"
 
 
 # Import data  ------------------------------------------------------------
 
 # List all files matching the pattern.
 file_list <- list.files(path = retrieval_path,
-                        pattern = "^S1_SuppA_Condition-[0-9]+-Overall_Estimates_.*\\.rds$",
+                        pattern = "^S1_Supp1_Condition-[0-9]+-Overall_Estimates_.*\\.rds$",
                         full.names = TRUE)
 # Read each file and combine into one data frame
 sim1_data <- do.call(rbind, lapply(file_list, readRDS))
@@ -375,10 +374,10 @@ perf_measure_DF <- sim1_data |>
 # Export Performance Measures & Simulation Data ---------------------------------------------
 
 write_rds(perf_measure_DF, 
-          file = paste0(path, "/Data/", "S1_SuppA_Performance-Measures.rds"))
+          file = paste0(path, "/Data/", "S1_Supp1_Performance-Measures.rds"))
 
 write_rds(sim1_data, 
-          file = paste0(path, "/Data/", "S1_SuppA_Simulation-Data.rds"))
+          file = paste0(path, "/Data/", "S1_Supp1_Simulation-Data.rds"))
 
 
 # TNDE Relative Bias Table ------------------------------------------------
@@ -868,7 +867,7 @@ gglayer_labs <- list(
 )
 
 # Labels for Supp A 
-gglayer_labs_SuppA <- list(
+gglayer_labs_Supp1 <- list(
   labs(
     x = "\n Absolute Relative Bias",
     y = "Mediator Model \n",
@@ -887,7 +886,7 @@ gglayer_labs_SuppA <- list(
 # ══════════════════════════════
 
 # pdf("Output/S1_Results/Figures/PNIE-Absolute-Relative-Bias-Boxplot_num_clust-70.pdf")
-readRDS(file = paste0(path, "/Data/S1_SuppA_Simulation-Data.rds")) |> 
+readRDS(file = paste0(path, "/Data/S1_Supp1_Simulation-Data.rds")) |> 
   filter(num_clust == 70 & ICC == 0.2) |> 
   # rename PS models 
   mutate(`PS Model` = ifelse(PS == "FE", "Fixed-Effect", 
@@ -907,7 +906,7 @@ readRDS(file = paste0(path, "/Data/S1_SuppA_Simulation-Data.rds")) |>
   # facet_grid(medmodel ~ clust_size) +
   facet_grid( ~ clust_size) +
   # facet_grid(clust_size ~ ICC) +
-  # gglayer_labs_SuppA +
+  # gglayer_labs_Supp1 +
   gglayer_theme +
   labs(
     x = "\n Absolute Relative Bias",
@@ -918,7 +917,7 @@ readRDS(file = paste0(path, "/Data/S1_SuppA_Simulation-Data.rds")) |>
   )
 # dev.off()
 
-readRDS(file = paste0(path, "/Data/S1_SuppA_Simulation-Data.rds")) |> 
+readRDS(file = paste0(path, "/Data/S1_Supp1_Simulation-Data.rds")) |> 
   filter(num_clust == 70 & ICC == 0.2) |> 
   # rename PS models 
   mutate(`PS Model` = ifelse(PS == "FE", "Fixed-Effect", 
@@ -937,7 +936,7 @@ readRDS(file = paste0(path, "/Data/S1_SuppA_Simulation-Data.rds")) |>
                outlier.alpha = 0.5) +
   facet_grid(outModel ~ clust_size) +
   # facet_grid(clust_size ~ ICC) +
-  gglayer_labs_SuppA +
+  gglayer_labs_Supp1 +
   gglayer_theme 
 # Save visual 
 ggsave(filename = paste0(path, "/Figures/PNIE-Absolute-Relative-Bias-Boxplot_num_clust-70_icc-20.png"), 
@@ -947,7 +946,7 @@ ggsave(filename = paste0(path, "/Figures/PNIE-Absolute-Relative-Bias-Boxplot_num
 #    Boxplot (num_clust = 100 & ICC = 0.2) 
 # ══════════════════════════════
 
-readRDS(file = paste0(path, "/Data/S1_SuppA_Simulation-Data.rds")) |> 
+readRDS(file = paste0(path, "/Data/S1_Supp1_Simulation-Data.rds")) |> 
   filter(num_clust == 100 & ICC == 0.2) |> 
   # rename PS models 
   mutate(`PS Model` = ifelse(PS == "FE", "Fixed-Effect", 
@@ -966,7 +965,7 @@ readRDS(file = paste0(path, "/Data/S1_SuppA_Simulation-Data.rds")) |>
                outlier.alpha = 0.5) +
   facet_grid(outModel ~ clust_size) +
   # facet_grid(clust_size ~ ICC) +
-  gglayer_labs_SuppA +
+  gglayer_labs_Supp1 +
   gglayer_theme 
 # Save visual 
 ggsave(filename = paste0(path, "/Figures/PNIE-Absolute-Relative-Bias-Boxplot_num_clust-100_icc-20.png"), 
@@ -979,7 +978,7 @@ ggsave(filename = paste0(path, "/Figures/PNIE-Absolute-Relative-Bias-Boxplot_num
 #    Boxplot (num_clust = 70 & ICC = 0.2) 
 # ══════════════════════════════
 
-readRDS(file = paste0(path, "/Data/S1_SuppA_Simulation-Data.rds")) |> 
+readRDS(file = paste0(path, "/Data/S1_Supp1_Simulation-Data.rds")) |> 
   filter(num_clust == 70 & ICC == 0.2) |> 
   # rename PS models 
   mutate(`PS Model` = ifelse(PS == "FE", "Fixed-Effect", 
@@ -999,7 +998,7 @@ readRDS(file = paste0(path, "/Data/S1_SuppA_Simulation-Data.rds")) |>
                outlier.alpha = 0.5) +
   facet_grid(outModel ~ clust_size) +
   # facet_grid(clust_size ~ ICC) +
-  gglayer_labs_SuppA +
+  gglayer_labs_Supp1 +
   gglayer_theme 
 
 # Save visual 
@@ -1010,7 +1009,7 @@ ggsave(filename = paste0(path, "/Figures/PNIE-Relative-Bias-Boxplot_num_clust-70
 #    Boxplot (num_clust = 100 & ICC = 0.2) 
 # ══════════════════════════════
 
-readRDS(file = paste0(path, "/Data/S1_SuppA_Simulation-Data.rds")) |> 
+readRDS(file = paste0(path, "/Data/S1_Supp1_Simulation-Data.rds")) |> 
   filter(num_clust == 100 & ICC == 0.2) |> 
   # rename PS models 
   mutate(`PS Model` = ifelse(PS == "FE", "Fixed-Effect", 
@@ -1030,7 +1029,7 @@ readRDS(file = paste0(path, "/Data/S1_SuppA_Simulation-Data.rds")) |>
                outlier.alpha = 0.5) +
   facet_grid(outModel ~ clust_size) +
   # facet_grid(clust_size ~ ICC) +
-  gglayer_labs_SuppA +
+  gglayer_labs_Supp1 +
   gglayer_theme 
 
 # Save visual 
@@ -1069,7 +1068,7 @@ gglayer_labs <- list(
 )
 
 # Labels Supp A
-gglayer_labs_SuppA <- list(
+gglayer_labs_Supp1 <- list(
   labs(
     x = "\n Cluster Size",
     y = "NIE Coverage Rate \n",
@@ -1117,7 +1116,7 @@ perf_measure_DF |>
   geom_line(aes(group = PS)) +
   facet_grid(Out ~ Med) +
   gglayer_theme_line +
-  gglayer_labs_SuppA
+  gglayer_labs_Supp1
 
 # Save plot
 ggsave(filename = paste0(path, "/Figures/",

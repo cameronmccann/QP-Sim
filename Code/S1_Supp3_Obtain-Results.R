@@ -10,16 +10,17 @@
 #
 #
 # Script Description: This code summarizes and reports the results for 
-#                       Simulation Study 1 (Supplemental C) (i.e., obtains performance measures).  
+#                       Simulation Study 1 (Supplemental 3), where the 
+#                       unmeasured cluster-level confounding is weakened 
+#                       relative to Simulation Study 1.  
 #                       This is stored in the relevant Results folder.
 #
 #
-# Last Updated: 2025-03-05
+# Last Updated: 2025-03-30
 #
 #
 # Notes:
 #   To-Do
-#       # Add coverage table & visual (started viz under "PNIE MC CI Coverage Rate Visual")
 # 
 #   Done: 
 # 
@@ -469,20 +470,20 @@ TNDE <- treat_y
 PNIE <- treat_m * med_y
 
 # Create directory to store reporting of results 
-dir.create(path = "Output/S1_SuppC_Results")
-path <- "Output/S1_SuppC_Results/2025-03-02_1000-reps"
+dir.create(path = "Output/S1_Supp3_Results")
+path <- "Output/S1_Supp3_Results/2025-03-30_1000-reps"
 dir.create(path = path)
 dir.create(path = paste0(path, "/Data"))
 dir.create(path = paste0(path, "/Tables"))
 dir.create(path = paste0(path, "/Figures"))
-retrieval_path <- "Output/S1_SuppC_Simulation-Output/2025-03-02_1000-reps"
+retrieval_path <- "Output/S1_Supp3_Simulation-Output/2025-03-30_1000-reps"
 
 
 # Import data  ------------------------------------------------------------
 
 # List all files matching the pattern.
 file_list <- list.files(path = retrieval_path,
-                        pattern = "^S1_SuppC_Condition-[0-9]+-Overall_Estimates_.*\\.rds$",
+                        pattern = "^S1_Supp3_Condition-[0-9]+-Overall_Estimates_.*\\.rds$",
                         full.names = TRUE)
 # Read each file and combine into one data frame
 sim1_data <- do.call(rbind, lapply(file_list, readRDS))
@@ -544,10 +545,10 @@ perf_measure_DF <- sim1_data |>
 # Export Performance Measures & Simulation Data ---------------------------------------------
 
 write_rds(perf_measure_DF, 
-          file = paste0(path, "/Data/", "S1_SuppC_Performance-Measures.rds"))
+          file = paste0(path, "/Data/", "S1_Supp3_Performance-Measures.rds"))
 
 write_rds(sim1_data, 
-          file = paste0(path, "/Data/", "S1_SuppC_Simulation-Data.rds"))
+          file = paste0(path, "/Data/", "S1_Supp3_Simulation-Data.rds"))
 
 
 # TNDE Relative Bias Table ------------------------------------------------
@@ -1043,7 +1044,7 @@ gglayer_labs <- list(
 # ══════════════════════════════
 
 # pdf("Output/S1_Results/Figures/PNIE-Absolute-Relative-Bias-Boxplot_num_clust-70.pdf")
-readRDS(file = paste0(path, "/Data/S1_SuppC_Simulation-Data.rds")) |> 
+readRDS(file = paste0(path, "/Data/S1_Supp3_Simulation-Data.rds")) |> 
   filter(num_clust == 70) |> 
   # rename PS models 
   mutate(`PS Model` = ifelse(PS == "FE", "Fixed-Effect", 
@@ -1071,7 +1072,7 @@ ggsave(filename = paste0(path, "/Figures/PNIE-Absolute-Relative-Bias-Boxplot_num
 #    Boxplot (num_clust = 100) 
 # ══════════════════════════════
 
-readRDS(file = paste0(path, "/Data/S1_SuppC_Simulation-Data.rds")) |> 
+readRDS(file = paste0(path, "/Data/S1_Supp3_Simulation-Data.rds")) |> 
   filter(num_clust == 100) |> 
   # rename PS models 
   mutate(`PS Model` = ifelse(PS == "FE", "Fixed-Effect", 
@@ -1101,7 +1102,7 @@ ggsave(filename = paste0(path, "/Figures/PNIE-Absolute-Relative-Bias-Boxplot_num
 #    Boxplot (num_clust = 70) 
 # ══════════════════════════════
 
-readRDS(file = paste0(path, "/Data/S1_SuppC_Simulation-Data.rds")) |> 
+readRDS(file = paste0(path, "/Data/S1_Supp3_Simulation-Data.rds")) |> 
   filter(num_clust == 70) |> 
   # rename PS models 
   mutate(`PS Model` = ifelse(PS == "FE", "Fixed-Effect", 
@@ -1129,7 +1130,7 @@ ggsave(filename = paste0(path, "/Figures/PNIE-Relative-Bias-Boxplot_num_clust-70
 #    Boxplot (num_clust = 100) 
 # ══════════════════════════════
 
-readRDS(file = paste0(path, "/Data/S1_SuppC_Simulation-Data.rds")) |> 
+readRDS(file = paste0(path, "/Data/S1_Supp3_Simulation-Data.rds")) |> 
   filter(num_clust == 100) |> 
   # rename PS models 
   mutate(`PS Model` = ifelse(PS == "FE", "Fixed-Effect", 

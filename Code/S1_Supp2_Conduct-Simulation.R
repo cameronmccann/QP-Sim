@@ -1,5 +1,5 @@
 ################################################################################
-######################## QP Simulation 1 Supplemental B ########################
+######################## QP Simulation 1 Supplemental 2 ########################
 ################################################################################
 
 ############################ Script Description ################################
@@ -9,9 +9,9 @@
 # Date Created: 2025-03-01
 #
 #
-# Script Description: This code runs the supplemental simulation B for the 
-#                       first simulation study (i.e., generates 
-#                       & analyzes data) and stores the estimates for each 
+# Script Description: This code runs the Simulation Study 1 Supplemental 2 
+#                       (i.e., generates & analyzes data) and stores 
+#                       the estimates for each 
 #                       iteration in the relevant Simulation-Output folder. 
 #                       This simulation is identical to Simulation Study 1 
 #                       with the exception that the unmeasured cluster-level 
@@ -43,7 +43,7 @@ pacman::p_load(
 
 # Load Functions 
 source("Functions/AnalysisFunc_Sim1c.R")
-source("Functions/genOneData_Sim1SuppB.R") # has negative Z-M relation 
+source("Functions/genOneData_Sim1Supp2.R") # has negative Z-M relation 
 
 # ---------------------------- Simulation Conditions  --------------------------------------------------
 
@@ -57,10 +57,10 @@ cond <- expand.grid(num_clust = c(100),
 
 OverallPar_time <- NULL           # To log computation times
 reps <- 1000 #200 #                      # Total number of replications per condition
-dir.create(path = "Output/S1_SuppB_Simulation-Output")
-dir.create(path = "Output/S1_SuppB_Simulation-Output/2025-03-02_1000-reps", showWarnings = FALSE)
-dir.create(path = "Output/S1_SuppB_Simulation-Output/2025-03-02_1000-reps/interim", showWarnings = FALSE)
-path <- "Output/S1_SuppB_Simulation-Output/2025-03-02_1000-reps"
+dir.create(path = "Output/S1_Supp2_Simulation-Output")
+dir.create(path = "Output/S1_Supp2_Simulation-Output/2025-03-02_1000-reps", showWarnings = FALSE)
+dir.create(path = "Output/S1_Supp2_Simulation-Output/2025-03-02_1000-reps/interim", showWarnings = FALSE)
+path <- "Output/S1_Supp2_Simulation-Output/2025-03-02_1000-reps"
 
 # ---------------------------- Simulation 1 ------------------------------------------------------------
 
@@ -84,13 +84,13 @@ for (condition in 1:nrow(cond)) {
       block_results <- foreach::foreach(
         i = block:block_end,
         .combine = rbind,
-        .export = c("genOneData_Sim1SuppB", "AnalysisFunc_Sim1c") #"AnalysisFunc_Sim1b")
+        .export = c("genOneData_Sim1Supp2", "AnalysisFunc_Sim1c") #"AnalysisFunc_Sim1b")
       ) %dopar% {
         # Set a seed (here using a combination of 135 and i; adjust as needed)
         set.seed(as.numeric(paste0(135, i)))
         
         # Generate data for the current replication
-        data <- genOneData_Sim1SuppB(
+        data <- genOneData_Sim1Supp2(
           num_clust = cond[cond_num, "num_clust"],
           clust_size = cond[cond_num, "clust_size"],
           num_x = cond[cond_num, "num_x"],
@@ -142,7 +142,7 @@ for (condition in 1:nrow(cond)) {
     # - The condition parameters (clust_size, icc, num_clust, num_x)
     # - The replication range for this block (e.g., reps-1-100)
     file_name <- paste0(
-      path, "/interim/", "/S1_SuppB_Condition-", condition,
+      path, "/interim/", "/S1_Supp2_Condition-", condition,
       "-Estimates_clust_size-", cond[condition, "clust_size"],
       "_icc-", cond[condition, "icc"],
       "_num_clust-", cond[condition, "num_clust"],
@@ -163,7 +163,7 @@ for (condition in 1:nrow(cond)) {
   
   # Save an overall file for the condition (if desired)
   overall_file_name <- paste0(
-    path, "/S1_SuppB_Condition-", condition,
+    path, "/S1_Supp2_Condition-", condition,
     "-Overall_Estimates_clust_size-", cond[condition, "clust_size"],
     "_icc-", cond[condition, "icc"],
     "_num_clust-", cond[condition, "num_clust"],
@@ -194,7 +194,7 @@ OverallPar_time <- as.data.frame(OverallPar_time)
 OverallPar_time$mins <- as.numeric(OverallPar_time$elapsed) / 60
 
 # Check if the file already exists
-output_file <- paste0(path, "/S1_SuppB_Computation-Time.rds")
+output_file <- paste0(path, "/S1_Supp2_Computation-Time.rds")
 if (file.exists(output_file)) {
   existing_data <- readRDS(output_file)
   OverallPar_time <- rbind(existing_data, OverallPar_time)
@@ -208,6 +208,7 @@ saveRDS(OverallPar_time, file = output_file)
 
 
 ################################################################################
+
 
 
 

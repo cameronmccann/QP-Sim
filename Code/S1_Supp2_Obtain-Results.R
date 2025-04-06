@@ -1,5 +1,5 @@
 ################################################################################
-#################### QP Simulation 1 Supplemental B Results ####################
+#################### QP Simulation 1 Supplemental 2 Results ####################
 ################################################################################
 
 ############################ Script Description ################################
@@ -9,8 +9,8 @@
 # Date Created: 2025-03-09
 #
 #
-# Script Description: This code summarizes and reports the results for the 
-#                       first simulation study (i.e., obtains performance measures).  
+# Script Description: This code summarizes and reports the results for 
+#                       Simulation Study 1 Supplemental 2.  
 #                       This is stored in the relevant Results folder.
 #
 #
@@ -19,8 +19,6 @@
 #
 # Notes:
 #   To-Do
-#       # UPDATE THIS SCRIPT SUMMARY
-#       # Add coverage table & visual (started viz under "PNIE MC CI Coverage Rate Visual")
 # 
 #   Done: 
 # 
@@ -60,20 +58,20 @@ TNDE <- treat_y
 PNIE <- treat_m * med_y
 
 # Create directory to store reporting of results 
-dir.create(path = "Output/S1_SuppB_Results")
-path <- "Output/S1_SuppB_Results/2025-03-02_1000-reps"
+dir.create(path = "Output/S1_Supp2_Results")
+path <- "Output/S1_Supp2_Results/2025-03-02_1000-reps"
 dir.create(path = path)
 dir.create(path = paste0(path, "/Data"))
 dir.create(path = paste0(path, "/Tables"))
 dir.create(path = paste0(path, "/Figures"))
-retrieval_path <- "Output/S1_SuppB_Simulation-Output/2025-03-02_1000-reps"
+retrieval_path <- "Output/S1_Supp2_Simulation-Output/2025-03-02_1000-reps"
 
 
 # Import data  ------------------------------------------------------------
 
 # List all files matching the pattern.
 file_list <- list.files(path = retrieval_path,
-                        pattern = "^S1_SuppB_Condition-[0-9]+-Overall_Estimates_.*\\.rds$",
+                        pattern = "^S1_Supp2_Condition-[0-9]+-Overall_Estimates_.*\\.rds$",
                         full.names = TRUE)
 # Read each file and combine into one data frame
 sim1_data <- do.call(rbind, lapply(file_list, readRDS))
@@ -125,10 +123,10 @@ perf_measure_DF <- sim1_data |>
 # Export Performance Measures & Simulation Data ---------------------------------------------
 
 write_rds(perf_measure_DF, 
-          file = paste0(path, "/Data/", "S1_SuppB_Performance-Measures.rds"))
+          file = paste0(path, "/Data/", "S1_Supp2_Performance-Measures.rds"))
 
 write_rds(sim1_data, 
-          file = paste0(path, "/Data/", "S1_SuppB_Simulation-Data.rds"))
+          file = paste0(path, "/Data/", "S1_Supp2_Simulation-Data.rds"))
 
 
 
@@ -382,7 +380,7 @@ gglayer_labs <- list(
 
 ## Absolute Relative Bias Visual -----------------------------------------------
 
-readRDS(file = paste0(path, "/Data/S1_SuppB_Simulation-Data.rds")) |> 
+readRDS(file = paste0(path, "/Data/S1_Supp2_Simulation-Data.rds")) |> 
   # rename PS models 
   mutate(`PS Model` = ifelse(PS == "FE", "Fixed-Effect", 
                              ifelse(PS == "RE", "Random-Effect", 
@@ -408,7 +406,7 @@ ggsave(filename = paste0(path, "/Figures/PNIE-Absolute-Relative-Bias-Boxplot_num
 
 ## Relative Bias Visual -----------------------------------------------
 
-readRDS(file = paste0(path, "/Data/S1_SuppB_Simulation-Data.rds")) |> 
+readRDS(file = paste0(path, "/Data/S1_Supp2_Simulation-Data.rds")) |> 
   # rename PS models 
   mutate(`PS Model` = ifelse(PS == "FE", "Fixed-Effect", 
                              ifelse(PS == "RE", "Random-Effect", 
