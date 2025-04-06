@@ -19,7 +19,6 @@
 #
 # Notes:
 #   To-Do
-#       # Add coverage table & visual (started viz under "PNIE MC CI Coverage Rate Visual")
 # 
 #   Done: 
 # 

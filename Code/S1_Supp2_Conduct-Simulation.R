@@ -11,12 +11,12 @@
 #
 # Script Description: This code runs the Simulation Study 1 Supplemental 2 
 #                       (i.e., generates & analyzes data) and stores 
-#                       the estimates for each 
-#                       iteration in the relevant Simulation-Output folder. 
-#                       This simulation is identical to Simulation Study 1 
-#                       with the exception that the unmeasured cluster-level 
-#                       confounder (Z) has a negative relationship with the 
-#                       mediator (M) instead of positive. 
+#                       the estimates for each iteration in the 
+#                       relevant Simulation-Output folder. This simulation 
+#                       is identical to Simulation Study 1 with the exception 
+#                       that the unmeasured cluster-level confounder (Z) has 
+#                       a negative relationship with the mediator (M) instead 
+#                       of positive. 
 #
 # Last Updated: 2025-03-02
 #

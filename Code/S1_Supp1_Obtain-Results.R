@@ -9,11 +9,10 @@
 # Date Created: 2025-03-04
 #
 #
-# Script Description: This code summarizes and reports the results for the 
-#                       first supplemental simulation study, where the type of 
+# Script Description: This code summarizes and reports the results for  
+#                       Simulation Study 1 Supplemental 1, where the type of 
 #                       mediator and outcome models are allowed to differ. 
 #                       This is stored in the relevant Results folder.
-#
 #
 # Last Updated: 2025-03-30
 #

@@ -1,5 +1,5 @@
 ################################################################################
-######################## QP Simulation 1 Supplemental C ########################
+######################## QP Simulation 1 Supplemental 3 ########################
 ################################################################################
 
 ############################ Script Description ################################
@@ -9,14 +9,15 @@
 # Date Created: 2025-03-01
 #
 #
-# Script Description: This code runs the supplemental simulation B for the 
-#                       first simulation study (i.e., generates 
-#                       & analyzes data) and stores the estimates for each 
-#                       iteration in the relevant Simulation-Output folder. 
-#                       This simulation is identical to Simulation Study 1 
-#                       with the exception that the unmeasured cluster-level 
-#                       confounder (Z) has a negative relationship with the 
-#                       mediator (M) instead of positive. 
+# Script Description: This code runs the Simulation Study 1 Supplemental 3 
+#                       (i.e., generates & analyzes data) and stores the 
+#                       estimates for each iteration in the relevant 
+#                       Simulation-Output folder. This simulation is 
+#                       identical to Simulation Study 1 with the exception that 
+#                       the unmeasured cluster-level confounder (Z) has a 
+#                       weaker relationship with the treatment (T) and 
+#                       mediator (M).
+#                       
 #
 # Last Updated: 2025-03-30
 #

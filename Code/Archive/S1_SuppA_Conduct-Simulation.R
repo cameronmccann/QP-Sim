@@ -1,5 +1,5 @@
 ################################################################################
-######################## QP Simulation 1 Supplemental 1 ########################
+######################## QP Simulation 1 Supplemental A ########################
 ################################################################################
 
 ############################ Script Description ################################
@@ -9,10 +9,11 @@
 # Date Created: 2025-02-08
 #
 #
-# Script Description: This code runs the Simulation Study 1 Supplemental 1 
-#                       (i.e., generates & analyzes data) and stores the 
-#                       estimates for each iteration in the relevant 
-#                       Simulation-Output folder. 
+# Script Description: This code runs the supplemental simulation for the 
+#                       first simulation study (i.e., generates 
+#                       & analyzes data) and stores the estimates for each 
+#                       iteration in the relevant Simulation-Output folder. 
+#
 #
 # Last Updated: 2025-02-28
 #
@@ -56,10 +57,10 @@ cond <- expand.grid(num_clust = c(70, 100),
 
 OverallPar_time <- NULL           # To log computation times
 reps <- 1000                      # Total number of replications per condition
-dir.create(path = "Output/S1_Supp1_Simulation-Output")
-dir.create(path = "Output/S1_Supp1_Simulation-Output/2025-02-28_1000-reps", showWarnings = FALSE)
-dir.create(path = "Output/S1_Supp1_Simulation-Output/2025-02-28_1000-reps/interim", showWarnings = FALSE)
-path <- "Output/S1_Supp1_Simulation-Output/2025-02-28_1000-reps"
+dir.create(path = "Output/S1_SuppA_Simulation-Output")
+dir.create(path = "Output/S1_SuppA_Simulation-Output/2025-02-28_1000-reps", showWarnings = FALSE)
+dir.create(path = "Output/S1_SuppA_Simulation-Output/2025-02-28_1000-reps/interim", showWarnings = FALSE)
+path <- "Output/S1_SuppA_Simulation-Output/2025-02-28_1000-reps"
 
 # ---------------------------- Supp Simulation 1 ------------------------------------------------------------
 
@@ -168,7 +169,7 @@ for (condition in 1:nrow(cond)) {
   
   # Save an overall file for the condition (if desired)
   overall_file_name <- paste0(
-    path, "/S1_Supp1_Condition-", condition,
+    path, "/S1_SuppA_Condition-", condition,
     "-Overall_Estimates_clust_size-", cond[condition, "clust_size"],
     "_icc-", cond[condition, "icc"],
     "_num_clust-", cond[condition, "num_clust"],
@@ -199,7 +200,7 @@ OverallPar_time <- as.data.frame(OverallPar_time)
 OverallPar_time$mins <- as.numeric(OverallPar_time$elapsed) / 60
 
 # Check if the file already exists
-output_file <- paste0(path, "/S1_Supp1_Computation-Time.rds")
+output_file <- paste0(path, "/S1_SuppA_Computation-Time.rds")
 if (file.exists(output_file)) {
   existing_data <- readRDS(output_file)
   OverallPar_time <- rbind(existing_data, OverallPar_time)
