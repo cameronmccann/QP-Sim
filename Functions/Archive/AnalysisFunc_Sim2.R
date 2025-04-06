@@ -2,13 +2,13 @@
 # QP Project 
 # Data Analysis for Simulation 2 
 #' 
-#' `AnalysisFunc_Sim2()` analyzes simulated clustered data for Simulation 2 based 
-#' on the specified propensity score, mediation, and outcome models. The function 
-#' returns, in addition to the specified models, the estimated direct (Total 
-#' Natural Direct Effect; TNDE) & indirect (Pure Natural Indirect Effect; PNIE) 
-#' as well as the simulation condition (including the level of ICC & cluster size). 
-#' The a- & b-path estimates and standard errors are returned too.  
-#' 
+#' `AnalysisFunc_Sim2()` analyzes simulated clustered data for Simulation 2 
+#' based on the specified propensity score, mediation, and outcome models. The 
+#' function returns, in addition to the specified models, the estimated 
+#' direct (Pure Natural Direct Effect; PNDE) & indirect (Total Natural Indirect 
+#' Effect; TNIE) as well as the simulation condition (including the level of ICC 
+#' & cluster size). The a- & b-path estimates and standard errors are returned too.  
+  #' 
 #' @param PSmodel Model to use for propensity score (SL, FE, or RE) 
 #' @param Medmodel Mediation model to use (SL, FE, RE, or RE-Mean) 
 #' @param Outcomemodel Outcome model to use (SL, FE, RE, or RE-Mean) 
@@ -16,7 +16,7 @@
 #' @param condition DF containing a row for each condition & the following 
 #' variables (columns): num_clust, clust_size, num_x, & icc 
 #' @param condition_num condition number, which corresponds to the row number 
-#'  in condition dataframe
+#' in condition dataframe
 #' @returns Returns a dataframe containing seed number, replication number, 
 #' the PS model used (PS), the mediator and outcome model used (outModel), 
 #' the direct effect estimate (NDE_est) and indirect effect estimate (NIE_est). 
@@ -24,11 +24,11 @@
 #' AnalysisFunc_Sim2(PSmodel = "FE", Medmodel = "FE", Outcomemodel = "FE", data = data)
 #' 
 AnalysisFunc_Sim2 <- function(PSmodel = "FE",
-                         Medmodel = "FE",
-                         Outcomemodel = "FE",
-                         data = data, 
-                         condition = cond, 
-                         condition_num = cond_num) {
+                               Medmodel = "FE",
+                               Outcomemodel = "FE",
+                               data = data, 
+                               condition = cond, 
+                               condition_num = cond_num) {
   # PS Models ---------------------------------------------------------------
   ## Single-Level
   if (PSmodel == "SL") {
@@ -133,7 +133,7 @@ AnalysisFunc_Sim2 <- function(PSmodel = "FE",
   ## Single-Level
   if (Outcomemodel == "SL") {
     out <- glm(
-      formula = y ~ m + t + x1 + x2 + x3 + x4 + x5 + x6,
+      formula = y ~ m + t + t:m + x1 + x2 + x3 + x4 + x5 + x6,
       data = data,
       weights = iptw
     )
@@ -141,7 +141,7 @@ AnalysisFunc_Sim2 <- function(PSmodel = "FE",
   ## Fixed-Effect
   if (Outcomemodel == "FE") {
     out <- glm(
-      formula = y ~ m + t + x1 + x2 + x3 + x4 + x5 + x6 + as.factor(school),
+      formula = y ~ m + t + t:m + x1 + x2 + x3 + x4 + x5 + x6 + as.factor(school),
       data = data,
       weights = iptw
     )
@@ -152,7 +152,7 @@ AnalysisFunc_Sim2 <- function(PSmodel = "FE",
     data <- cbind(data, L2weight = rep(1, nrow(data)))
     out <-
       WeMix::mix(
-        formula = y ~ m + t + x1 + x2 + x3 + x4 + x5 + x6 + (1 | school),
+        formula = y ~ m + t + t:m + x1 + x2 + x3 + x4 + x5 + x6 + (1 | school),
         data = data,
         weights = c("iptw", "L2weight")
       )
@@ -170,7 +170,7 @@ AnalysisFunc_Sim2 <- function(PSmodel = "FE",
     data <- cbind(data, L2weight = rep(1, nrow(data)))
     out <-
       WeMix::mix(
-        formula = y ~ m + m_mean + t + t_mean + x1 + x2 + x3 + x4 + x5 + x6 + (1 | school),
+        formula = y ~ m + m_mean + t + t_mean + t:m + t_mean:m_mean + x1 + x2 + x3 + x4 + x5 + x6 + (1 | school),
         data = data,
         weights = c("iptw", "L2weight")
       )
@@ -178,26 +178,46 @@ AnalysisFunc_Sim2 <- function(PSmodel = "FE",
   
   
   # Store results  -----------------------------------------------------------
-  results <- c(
-    analysisCond = paste0(PSmodel, "_", Outcomemodel),
-    PS = PSmodel,
-    outModel = Outcomemodel,
-    NDE_est = summary(out)$coef["t", "Estimate"],
-    NIE_est = summary(med)$coef["t", "Estimate"] *
-      summary(out)$coef["m", "Estimate"],
-    ICC = condition[condition_num, "icc"],
-    clust_size = condition[condition_num, "clust_size"],
-    conditionNum = condition_num, 
+  
+  results <- data.frame(
+    # Analysis conditions
+    analysisCond = paste0(PSmodel, "_", Outcomemodel), # Combined PS and outcome model name
+    PS = PSmodel,          # Propensity Score model
+    outModel = Outcomemodel, # Outcome model
     
-    # Extra info 
-    a_path_est = summary(med)$coef["t", "Estimate"], 
-    a_path_se = summary(med)$coef["t", "Std. Error"], 
+    # Direct Effects 
+    ## Pure Natural Direct Effect
+    PNDE_est = as.numeric(summary(out)$coef["t", "Estimate"] + summary(out)$coef["m:t", "Estimate"] * summary(med)$coef["(Intercept)", "Estimate"]), 
+    ## Total Natural Direct Effect
+    TNDE_est = as.numeric(summary(out)$coef["t", "Estimate"] + summary(out)$coef["m:t", "Estimate"] * (summary(med)$coef["(Intercept)", "Estimate"] + summary(med)$coef["t", "Estimate"])), 
     
-    b_path_est = summary(out)$coef["m", "Estimate"], 
-    b_path_se = summary(out)$coef["m", "Std. Error"], 
+    # Indirect Effects 
+    ## Total Natural Indirect Effect
+    TNIE_est = as.numeric(summary(med)$coef["t", "Estimate"] * (summary(out)$coef["m", "Estimate"] + summary(out)$coef["m:t", "Estimate"])), 
+    ## Pure Natural Indirect Effect
+    PNIE_est = as.numeric(summary(med)$coef["t", "Estimate"] * summary(out)$coef["m", "Estimate"]), 
     
-    direct_est = summary(out)$coef["t", "Estimate"], 
-    direct_se = summary(out)$coef["t", "Std. Error"] 
+    # Simulation condition info 
+    ICC = condition[condition_num, "icc"],                # Intraclass Correlation
+    clust_size = condition[condition_num, "clust_size"],  # Cluster size
+    conditionNum = condition_num,                         # Condition ID 
+    
+    # Mediator model details
+    intercept_medModel_est = as.numeric(summary(med)$coef["(Intercept)", "Estimate"]),   # Intercept estimate
+    intercept_medModel_se = as.numeric(summary(med)$coef["(Intercept)", "Std. Error"]),  # Intercept SE
+    t_medModel_est = as.numeric(summary(med)$coef["t", "Estimate"]),                     # T-M estimate 
+    t_medModel_se = as.numeric(summary(med)$coef["t", "Std. Error"]),                    # T-M SE
+    
+    # Outcome model details
+    intercept_outModel_est = as.numeric(summary(out)$coef["(Intercept)", "Estimate"]),   # Intercept estimate
+    intercept_outModel_se = as.numeric(summary(out)$coef["(Intercept)", "Std. Error"]),  # Intercept SE
+    t_outModel_est = as.numeric(summary(out)$coef["t", "Estimate"]),                     # T-Y estimate 
+    t_outModel_se = as.numeric(summary(out)$coef["t", "Std. Error"]),                    # T-Y SE 
+    m_outModel_est = as.numeric(summary(out)$coef["m", "Estimate"]),                     # M-Y estimate 
+    m_outModel_se = as.numeric(summary(out)$coef["m", "Std. Error"]),                    # M-Y SE 
+    tm_outModel_est = as.numeric(summary(out)$coef["m:t", "Estimate"]),                  # TM interaction estimate 
+    tm_outModel_se = as.numeric(summary(out)$coef["m:t", "Std. Error"])                  # TM interaction SE 
+    
   )
   
   return(results)

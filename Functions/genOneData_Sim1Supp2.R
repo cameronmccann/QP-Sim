@@ -1,8 +1,8 @@
 #---------------------------------------------------#
 # QP Project 
-# Data Generation for Simulation 1 Supplemental C (weaker confounding)
+# Data Generation for Simulation 1 Supplemental B (negative Z-M relation)
 #' 
-#' `genOneData_Sim1SuppC()` generates clustered data consisting of a level-1 treatment, 
+#' `genOneData_Sim1Supp2()` generates clustered data consisting of a level-1 treatment, 
 #' 3 level-1 confounders, a level-1 mediator, and a level-1 outcome as well as 
 #' a level-2 confounder, with control over the number of clusters, cluster size, 
 #' and ICC. Specifically, the dataframe returned from this function consists of 
@@ -17,9 +17,9 @@
 #' @param iccx,icct,iccm,iccy The intraclass correlation (ICC) for covariate x, treatment, mediator, and outcome
 #' @returns Returns a dataframe of generated data
 #' @examples
-#' genOneData_Sim1SuppC(num_clust = 30, clust_size = 30)
+#' genOneData_Sim1Supp2(num_clust = 30, clust_size = 30)
 #' 
-genOneData_Sim1SuppC <-
+genOneData_Sim1Supp2 <-
   function(num_clust,
            clust_size,
            num_x = 3,
@@ -30,19 +30,19 @@ genOneData_Sim1SuppC <-
     
     ## set parameters
     # x 
-    a_x <- 0.25 # on trt R^2=0.03313884  #((a_x^2)*num_x * (1 - 0.2)) / ((a_x^2)*num_x + a_z^2 + (pi^2/3)/4 + (pi^2/3))
-    b_x <- 0.3 # on med R^2=0.03568045  #((b_x^2)*num_x * (1 - 0.2)) / ((b_x^2)*num_x + b_z^2 + treat_m^2 + (pi^2/3)/4 + (pi^2/3)) 
-    c_x <- 0.35 # on outcome R^2=0.03607637  #((c_x^2)*num_x * (1 - 0.2)) / (c_z^2 + treat_y^2 + (c_x^2)*num_x + med_y^2 + (pi^2/3)/4 + (pi^2/3)) 
+    a_x <- 0.25 # on trt R^2=0.02798124  #((a_x^2)*num_x * (1 - 0.2)) / ((a_x^2)*num_x + a_z^2 + (pi^2/3)/4 + (pi^2/3))
+    b_x <- 0.3 # on med R^2=0.02993624  #((b_x^2)*num_x * (1 - 0.2)) / ((b_x^2)*num_x + b_z^2 + treat_m^2 + (pi^2/3)/4 + (pi^2/3)) 
+    c_x <- 0.35 # on outcome R^2=0.03030198  #((c_x^2)*num_x * (1 - 0.2)) / (c_z^2 + treat_y^2 + (c_x^2)*num_x + med_y^2 + (pi^2/3)/4 + (pi^2/3)) 
     # z 
-    a_z <- 1.03 # on trt R^2=0.05005643  #(a_z^2) / ((a_x^2)*num_x + a_z^2 + (pi^2/3)/4 + (pi^2/3)) 
-    b_z <- 1.21 # on med R^2=0.04996915  #(b_z^2) / ((b_x^2)*num_x + b_z^2 + treat_m^2 + (pi^2/3)/4 + (pi^2/3)) 
-    c_z <- 1.4 # on outcome R^2=0.04994785  #(c_z^2) / (c_z^2 + treat_y^2 + (c_x^2)*num_x + med_y^2 + (pi^2/3)/4 + (pi^2/3)) 
+    a_z <- 1.03 # on trt R^2=0.197902  #(a_z^2) / ((a_x^2)*num_x + a_z^2 + (pi^2/3)/4 + (pi^2/3)) 
+    b_z <- -1.21 # on med R^2=0.202915  #(b_z^2) / ((b_x^2)*num_x + b_z^2 + treat_m^2 + (pi^2/3)/4 + (pi^2/3)) 
+    c_z <- 1.4 # on outcome R^2=0.2020132  #(c_z^2) / (c_z^2 + treat_y^2 + (c_x^2)*num_x + med_y^2 + (pi^2/3)/4 + (pi^2/3)) 
     # effects 
-    treat_m <- 1.17 # trt on med   R^2=0.1808999  #(treat_m^2 * (1 - 0.2)) / (b_z^2 + treat_m^2 + (b_x^2)*num_x + (pi^2/3)/4 + (pi^2/3)) 
-    treat_y <- 1.35 # trt on outcome  R^2=0.1789093  #(treat_y^2 * (1 - 0.2)) / (c_z^2 + treat_y^2 + (c_x^2)*num_x + med_y^2 + (pi^2/3)/4 + (pi^2/3)) 
-    med_y <- 1.2 # med on outcome     R^2=0.1413605  #(med_y^2 * (1 - 0.2)) / (c_z^2 + treat_y^2 + (c_x^2)*num_x + med_y^2 + (pi^2/3)/4 + (pi^2/3))  
+    treat_m <- 1.17 # trt on med   R^2=0.1517767  #(treat_m^2 * (1 - 0.2)) / (b_z^2 + treat_m^2 + (b_x^2)*num_x + (pi^2/3)/4 + (pi^2/3)) 
+    treat_y <- 1.35 # trt on outcome  R^2=0.1502731  #(treat_y^2 * (1 - 0.2)) / (c_z^2 + treat_y^2 + (c_x^2)*num_x + med_y^2 + (pi^2/3)/4 + (pi^2/3)) 
+    med_y <- 1.2 # med on outcome     R^2=0.1187343  #(med_y^2 * (1 - 0.2)) / (c_z^2 + treat_y^2 + (c_x^2)*num_x + med_y^2 + (pi^2/3)/4 + (pi^2/3))  
     sd_logit <- 1.81 #
-  
+    
     N <- num_clust * clust_size
     
     
