@@ -4,7 +4,7 @@
 
 ############################ Script Description ################################
 #
-# Author: Cameron McCann
+# Author: 
 # 
 # Date Created: 2024-03-20
 #
