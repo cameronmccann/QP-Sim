@@ -1,6 +1,6 @@
 # Evaluating Propensity Score Models for Estimating Causal Mediation Effects under Unmeasured Cluster-level Confounding
 
-## Overview
+## Overvie
 
 We conducted two simulation studies (with several supplemental versions) and an empirical application to assess the performance of four propensity score (PS) models in estimating mediation effects with clustered data when an unmeasured cluster-level confounder is present. This repository contains the code and data used at each stage of the study (i.e., Simulation Study 1, Simulation Study 2, and Empirical Application).
 
