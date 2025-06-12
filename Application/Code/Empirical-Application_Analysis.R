@@ -49,7 +49,11 @@ pacman::p_load(
 # Load Functions 
 # source("Application/Functions/monteCarloCI.R")
 source("Application/Functions/monteCarloCIb.R")
-
+# 
+source("Application/Functions/bootstrapCIb.R")              # SL / FE helpers
+source("Application/Functions/bootstrap_ci_paral_2.R")      # SL / FE (parallel)
+source("Application/Functions/bootstrap_ci_re_paral_2.R")   # RE helpers (parallel)
+source("Application/Functions/bootstrap_ci_re_mean_paral.R")# RE-Mean helpers
 
 
 # Import Data -----------------------------------------------------

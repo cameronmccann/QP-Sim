@@ -13,7 +13,7 @@
 #   This R script displays tables & visualizes the estimated effects to 
 #     facilitate interpretation of the results.
 # 
-# Last Updated: 2025-03-19 
+# Last Updated: 2025-06-12 
 #
 #
 # Notes:
@@ -50,19 +50,69 @@ pacman::p_load(
 
 
 # Import Data -----------------------------------------------------
-# Load clean dataset 
-# boot_ci_df <- read_rds(file = "Application/Output/Estimates/Effect-Estimates_bootstrap-CIs.rds")
-monte_ci_df <- read_rds(file = "Application/Output/Estimates/Effect-Estimates_monte-carlo-CIs.rds")
 estimates_df <- read_rds(file = "Application/Output/Estimates/Effect-Estimates_noCIs.rds")
 
-# 
-# monte_ci_df <- monte_ci_df |> 
-#   select("analysisCond":"PNDE_UL", "TNIE":"TNIE_UL")
-# 
-# boot_ci_df <- boot_ci_df |> 
-#   select("cond", starts_with("PNDE"), starts_with("TNIE"), "PS", "Model") 
+# Percentile Bootstrap -----------------------------------------------------
+
+# 1. Get all .rds files
+rds_files <- list.files(
+  path = "Application/Output/Temp-bootstrap-CIs",
+  pattern = "\\.rds$", 
+  full.names = TRUE
+)
+
+# 2. Helper: read + clean a single file
+read_and_clean <- function(file_path) {
+  x <- readRDS(file_path)
+  
+  # Drop _est elements
+  keep <- names(x)[!str_detect(names(x), "_est$")]
+  x <- x[keep]
+  
+  # Convert list -> tibble row
+  tibble(
+    file    = basename(file_path),
+    # effect_type = x$effect_type,
+    med_converged_count = x$mediator_converged_count, 
+    out_converged_count  = x$outcome_converged_count, 
+    both_converged_count = x$both_converged_count, 
+    analysisCond = x$analysisCond,
+    PS = x$PS,
+    !!!map(x[str_detect(names(x), "_LCL$|_UCL$")], 
+           ~ as.numeric(.x))  # flatten LCL/UCL values to numeric
+  )
+}
+
+# 3. Apply to all files and bind together
+df_all <- map_dfr(rds_files, read_and_clean)
+
+# 4. merge effect estimates with CIs
+df_all <- df_all |>
+  mutate(cond = str_extract(file, "^[^_]+(_cm)?")) |>
+  left_join(estimates_df, by = "cond") |>
+  select(
+    file,
+    analysisCond,
+    cond,
+    # Effect estimates first, followed by their corresponding confidence intervals
+    PS,
+    matches("^TNDE"),
+    matches("^PNDE"),
+    matches("^TNIE"),
+    matches("^PNIE"),
+    everything()  # To keep any other columns that are not explicitly matched
+  )
+
+# df_all
+as.data.frame(df_all) |> 
+  mutate(outcome_mod = sub(".*_(.*)$", "\\1", analysisCond)) |> 
+  # mutate(outcome_mod = substr(analysisCond, nchar(analysisCond)-1, nchar(analysisCond))) |> 
+  arrange(outcome_mod)
 
 
+# Monte Carlo -------------------------------------------------------------
+
+monte_ci_df <- read_rds(file = "Application/Output/Estimates/Effect-Estimates_monte-carlo-CIs.rds")
 
 names(monte_ci_df)#; names(boot_ci_df)
 
@@ -96,7 +146,7 @@ rownames(monte_ci_df) <- NULL
 # results_df <- bind_rows(cbind(monte_ci_df, ci = "MC"),
 #                         cbind(boot_ci_df, ci = "Bootstrap"))
 
-
+monte_ci_df
 
 
 

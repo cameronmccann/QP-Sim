@@ -1,8 +1,7 @@
 #---------------------------------------------------#
 # QP Project - Empirical Application 
-
-
-
+# Last edited: 2025-06-12
+#---------------------------------------------------#
 
 #' Bootstrap Confidence Interval Estimation for Mediation Analysis
 #'
@@ -10,10 +9,8 @@
 #' intervals for direct and indirect effects in a mediation analysis using clustered 
 #' data with propensity score weighting. The function supports multiple model specifications 
 #' including single-level ("SL"), fixed-effects ("FE"), random effects ("RE"), and 
-#' random effects with cluster means ("RECM"). Note that the direct (TNDE or PNDE) and 
-#' indirect effects (TNIE or PNIE) may differ across these approaches due to the different 
-#' ways in which clustering is handled.
-#'
+#' random effects with cluster means ("RECM"). 
+#' 
 #' @param iterations Number of bootstrap iterations to perform (default is 50).
 #' @param iptw Inverse probability of treatment weights to be used in model fitting.
 #' @param data The dataset containing the variables needed for the mediation analysis.
@@ -25,13 +22,16 @@
 #' @param cores Number of CPU cores to use for parallel processing (default is 2).
 #' @param core_seeds Optional vector of seeds for each core; if NULL, random seeds will be generated.
 #' @param effect_type Type of indirect effect to estimate: `"PNIE"` for Pure Natural Indirect Effect or 
-#'   `"TNIE"` for Total Natural Indirect Effect (default is `"PNIE"`).
+#'   `"TNIE"` for Total Natural Indirect Effect (default is `"TNIE"`). Deprecated: parameter is forced to TNIE since output provides all effects.
 #'
 #' @returns A list containing:
-#'   - `indirect_ci`: Confidence interval for the indirect effect.
-#'   - `direct_ci`: Confidence interval for the direct effect.
-#'   - `indirect_effects`: Vector of estimated indirect effects from each bootstrap iteration.
-#'   - `direct_effects`: Vector of estimated direct effects from each bootstrap iteration.
+#'   - `effect_type`: Type of effect estimated ("PNIE" or "TNIE").
+#'   - `analysisCond`: Condition specifying the analysis type (e.g., "iptw_FE_SL").
+#'   - `PS`: Propensity score weights applied in the analysis.
+#'   - `PNDE_est`, `PNDE_LCL`, `PNDE_UCL`: Estimated Pure Natural Direct Effect and its confidence intervals.
+#'   - `TNDE_est`, `TNDE_LCL`, `TNDE_UCL`: Estimated Total Natural Direct Effect and its confidence intervals.
+#'   - `PNIE_est`, `PNIE_LCL`, `PNIE_UCL`: Estimated Pure Natural Indirect Effect and its confidence intervals.
+#'   - `TNIE_est`, `TNIE_LCL`, `TNIE_UCL`: Estimated Total Natural Indirect Effect and its confidence intervals.
 #'   - `mediator_converged_count`: Count of bootstrap iterations where the mediator model converged.
 #'   - `outcome_converged_count`: Count of bootstrap iterations where the outcome model converged.
 #'   - `both_converged_count`: Count of iterations where both models converged.
@@ -43,8 +43,7 @@
 #'                          data = data, 
 #'                          model = "SL", 
 #'                          cores = 4, 
-#'                          core_seeds = c(4561, 4562, 4563, 4564), 
-#'                          effect_type = "PNIE")
+#'                          core_seeds = c(4561, 4562, 4563, 4564))
 #'
 #' # Example usage for fixed-effects:
 #' result_fe <- bootstrapCIb(iterations = 100,
@@ -52,8 +51,7 @@
 #'                          data = data, 
 #'                          model = "FE", 
 #'                          cores = 4, 
-#'                          core_seeds = c(4561, 4562, 4563, 4564), 
-#'                          effect_type = "TNIE")
+#'                          core_seeds = c(4561, 4562, 4563, 4564))
 #'
 #' # Example usage for random effects:
 #' result_re <- bootstrapCIb(iterations = 100,
@@ -61,8 +59,7 @@
 #'                          data = data, 
 #'                          model = "RE", 
 #'                          cores = 4, 
-#'                          core_seeds = c(4561, 4562, 4563, 4564), 
-#'                          effect_type = "PNIE")
+#'                          core_seeds = c(4561, 4562, 4563, 4564))
 #'
 #' # Example usage for random effects with cluster means:
 #' result_recm <- bootstrapCIb(iterations = 100,
@@ -70,10 +67,13 @@
 #'                            data = data, 
 #'                            model = "RECM", 
 #'                            cores = 4, 
-#'                            core_seeds = c(4561, 4562, 4563, 4564), 
-#'                            effect_type = "TNIE")
+#'                            core_seeds = c(4561, 4562, 4563, 4564))
 #'
 bootstrapCIb <- function(iterations = 50, iptw, data, model = "SL", cores = 2, core_seeds = NULL, effect_type = "PNIE") {
+  
+  # always set to TNIE to have interaction in models
+  effect_type <- "TNIE"
+  
   # Load required libraries for parallel processing and model fitting
   library(parallel)
   library(WeMix)
@@ -108,13 +108,19 @@ bootstrapCIb <- function(iterations = 50, iptw, data, model = "SL", cores = 2, c
       }, error = function(e) NULL)
       
       # Outcome model for SL
-      outcome_formula <- if (effect_type == "TNIE") {
-        depress_w4 ~ selfEst_w3_sc * sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 +
-          parentalEdu_w1_sc + familyStruct_w1
-      } else {
-        depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 +
-          parentalEdu_w1_sc + familyStruct_w1
-      }
+      outcome_formula <- depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + 
+        selfEst_w3_sc:sportPartic_w1 + age_w1_sc + sex_w1 + 
+        white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1
+      # outcome_formula <- if (effect_type == "TNIE") {
+      #   depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + 
+      #     selfEst_w3_sc:sportPartic_w1 + age_w1_sc + sex_w1 + 
+      #     white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1
+      #   # depress_w4 ~ selfEst_w3_sc * sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 +
+      #   #   parentalEdu_w1_sc + familyStruct_w1
+      # } else {
+      #   depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 +
+      #     parentalEdu_w1_sc + familyStruct_w1
+      # }
       
       outcome <- tryCatch({
         glm(
@@ -136,13 +142,16 @@ bootstrapCIb <- function(iterations = 50, iptw, data, model = "SL", cores = 2, c
       }, error = function(e) NULL)
       
       # Outcome model for FE
-      outcome_formula <- if (effect_type == "TNIE") {
-        depress_w4 ~ selfEst_w3_sc * sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 +
-          parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)
-      } else {
-        depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 +
-          parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)
-      }
+      outcome_formula <- depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + 
+        selfEst_w3_sc:sportPartic_w1 + age_w1_sc + sex_w1 + 
+        white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)
+      # outcome_formula <- if (effect_type == "TNIE") {
+      #   depress_w4 ~ selfEst_w3_sc * sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 +
+      #     parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)
+      # } else {
+      #   depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 +
+      #     parentalEdu_w1_sc + familyStruct_w1 + as.factor(CLUSTER2)
+      # }
       
       outcome <- tryCatch({
         glm(
@@ -165,13 +174,16 @@ bootstrapCIb <- function(iterations = 50, iptw, data, model = "SL", cores = 2, c
       }, error = function(e) NULL)
       
       # Outcome model for RE
-      outcome_formula <- if (effect_type == "TNIE") {
-        depress_w4 ~ selfEst_w3_sc * sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 +
-          parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2)
-      } else {
-        depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 +
-          parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2)
-      }
+      outcome_formula <- depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + 
+        selfEst_w3_sc:sportPartic_w1 + age_w1_sc + sex_w1 + 
+        white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2)
+      # outcome_formula <- if (effect_type == "TNIE") {
+      #   depress_w4 ~ selfEst_w3_sc * sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 +
+      #     parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2)
+      # } else {
+      #   depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + age_w1_sc + sex_w1 + white_w1 + black_w1 +
+      #     parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2)
+      # }
       
       outcome <- tryCatch({
         WeMix::mix(
@@ -204,13 +216,16 @@ bootstrapCIb <- function(iterations = 50, iptw, data, model = "SL", cores = 2, c
       }, error = function(e) NULL)
       
       # Outcome model for RECM
-      outcome_formula <- if (effect_type == "TNIE") {
-        depress_w4 ~ selfEst_w3_sc * sportPartic_w1 + cluster_mean_sportPartic_w1 + cluster_mean_selfEst_w3_sc +
-          age_w1_sc + sex_w1 + white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2)
-      } else {
-        depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + cluster_mean_sportPartic_w1 + cluster_mean_selfEst_w3_sc +
-          age_w1_sc + sex_w1 + white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2)
-      }
+      outcome_formula <- depress_w4 ~ selfEst_w3_sc * sportPartic_w1 + selfEst_w3_sc:sportPartic_w1 + 
+        cluster_mean_sportPartic_w1 + cluster_mean_selfEst_w3_sc +
+        age_w1_sc + sex_w1 + white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2)
+      # outcome_formula <- if (effect_type == "TNIE") {
+      #   depress_w4 ~ selfEst_w3_sc * sportPartic_w1 + cluster_mean_sportPartic_w1 + cluster_mean_selfEst_w3_sc +
+      #     age_w1_sc + sex_w1 + white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2)
+      # } else {
+      #   depress_w4 ~ selfEst_w3_sc + sportPartic_w1 + cluster_mean_sportPartic_w1 + cluster_mean_selfEst_w3_sc +
+      #     age_w1_sc + sex_w1 + white_w1 + black_w1 + parentalEdu_w1_sc + familyStruct_w1 + (1 | CLUSTER2)
+      # }
       
       outcome <- tryCatch({
         WeMix::mix(
@@ -230,30 +245,58 @@ bootstrapCIb <- function(iterations = 50, iptw, data, model = "SL", cores = 2, c
     
     # Calculate indirect and direct effects if both models converged
     if (mediator_converged && outcome_converged) {
-      if (effect_type == "TNIE") {
-        # TNIE (Total Natural Indirect Effect)
-        indirect_effect <- summary(mediator)$coef["sportPartic_w1", "Estimate"] *
-          (summary(outcome)$coef["selfEst_w3_sc", "Estimate"] +
-             summary(outcome)$coef["selfEst_w3_sc:sportPartic_w1", "Estimate"])
-        # PNDE (Pure Natural Direct Effect)
-        direct_effect <- summary(outcome)$coef["sportPartic_w1", "Estimate"] +
-          summary(outcome)$coef["selfEst_w3_sc:sportPartic_w1", "Estimate"] *
-          summary(mediator)$coef["(Intercept)", "Estimate"]
-      } else {
-        # PNIE (Pure Natural Indirect Effect)
-        indirect_effect <- summary(mediator)$coef["sportPartic_w1", "Estimate"] *
-          summary(outcome)$coef["selfEst_w3_sc", "Estimate"]
-        # TNDE (Total Natural Direct Effect)
-        direct_effect <- summary(outcome)$coef["sportPartic_w1", "Estimate"]
-      }
+      # if (effect_type == "TNIE") {
+        a0_est <- as.numeric(summary(mediator)$coef["(Intercept)", "Estimate"])
+        a1_est <- as.numeric(summary(mediator)$coef["sportPartic_w1", "Estimate"]) # a_path_est
+        c0_est <- as.numeric(summary(outcome)$coef["(Intercept)", "Estimate"])
+        c1_est <- as.numeric(summary(outcome)$coef["sportPartic_w1", "Estimate"]) # c_path_est
+        c2_est <- as.numeric(summary(outcome)$coef["selfEst_w3_sc", "Estimate"]) # b_path_est
+        c3_est <- as.numeric(summary(outcome)$coef["selfEst_w3_sc:sportPartic_w1", "Estimate"])
+        # NIE_est <- a_path_est * b_path_est
+        # NDE_est <- direct_est
+        PNDE_est <- c1_est + c3_est * a0_est
+        TNDE_est <- c1_est + c3_est * (a0_est + a1_est)
+        PNIE_est <- c2_est * a1_est
+        TNIE_est <- a1_est * (c2_est + c3_est)
+      #   
+      #   # # TNIE (Total Natural Indirect Effect)
+      #   # indirect_effect <- summary(mediator)$coef["sportPartic_w1", "Estimate"] *
+      #   #   (summary(outcome)$coef["selfEst_w3_sc", "Estimate"] +
+      #   #      summary(outcome)$coef["selfEst_w3_sc:sportPartic_w1", "Estimate"])
+      #   # # PNDE (Pure Natural Direct Effect)
+      #   # direct_effect <- summary(outcome)$coef["sportPartic_w1", "Estimate"] +
+      #   #   summary(outcome)$coef["selfEst_w3_sc:sportPartic_w1", "Estimate"] *
+      #   #   summary(mediator)$coef["(Intercept)", "Estimate"]
+      # } else {
+      #   # PNIE (Pure Natural Indirect Effect)
+      #   indirect_effect <- summary(mediator)$coef["sportPartic_w1", "Estimate"] *
+      #     summary(outcome)$coef["selfEst_w3_sc", "Estimate"]
+      #   # TNDE (Total Natural Direct Effect)
+      #   # direct_effect <- summary(outcome)$coef["sportPartic_w1", "Estimate"] + summary(outcome)$coef["selfEst_w3_sc:sportPartic_w1", "Estimate"] * (summary(mediator_fit)$coef["(Intercept)", "Estimate"] + summary(mediator_fit)$coef["sportPartic_w1", "Estimate"])
+      #   direct_effect <- summary(outcome)$coef["sportPartic_w1", "Estimate"]
+      # }
     } else {
       indirect_effect <- NA
       direct_effect <- NA
     }
     
     # Return a list of effects and convergence status
-    list(indirect_effect = indirect_effect, direct_effect = direct_effect,
-         mediator_converged = mediator_converged, outcome_converged = outcome_converged)
+    # list(indirect_effect = indirect_effect, direct_effect = direct_effect,
+    #      mediator_converged = mediator_converged, outcome_converged = outcome_converged)
+    list(PNDE_est = PNDE_est, 
+         # PNDE_LCL = PNDE_CI[1],
+         # PNDE_UCL = PNDE_CI[2],
+         TNDE_est = TNDE_est,
+         # TNDE_LCL = TNDE_CI[1],
+         # TNDE_UCL = TNDE_CI[2],
+         PNIE_est = PNIE_est,
+         # PNIE_LCL = PNIE_CI[1],
+         # PNIE_UCL = PNIE_CI[2],
+         TNIE_est = TNIE_est,
+         # TNIE_LCL = TNIE_CI[1],
+         # TNIE_UCL = TNIE_CI[2],
+         mediator_converged = mediator_converged, 
+         outcome_converged = outcome_converged)
   }
   
   # Execute bootstrap iterations in parallel
@@ -263,22 +306,36 @@ bootstrapCIb <- function(iterations = 50, iptw, data, model = "SL", cores = 2, c
   }, mc.cores = cores)
   
   # Extract results from bootstrap iterations
-  indirect_effects <- sapply(results, function(x) x$indirect_effect)
-  direct_effects <- sapply(results, function(x) x$direct_effect)
   mediator_converged <- sapply(results, function(x) x$mediator_converged)
   outcome_converged <- sapply(results, function(x) x$outcome_converged)
+  PNDE_est <- sapply(results, function(x) x$PNDE_est)
+  TNDE_est <- sapply(results, function(x) x$TNDE_est)
+  PNIE_est <- sapply(results, function(x) x$PNIE_est)
+  TNIE_est <- sapply(results, function(x) x$TNIE_est)
   
   # Calculate percentile bootstrap confidence intervals for effects
-  indirect_ci <- quantile(indirect_effects, probs = c(0.025, 0.975), na.rm = TRUE)
-  direct_ci <- quantile(direct_effects, probs = c(0.025, 0.975), na.rm = TRUE)
+  PNDE_CI <- stats::quantile(PNDE_est, probs = c(0.025, 0.975), na.rm = TRUE)
+  TNDE_CI <- stats::quantile(TNDE_est, probs = c(0.025, 0.975), na.rm = TRUE)
+  PNIE_CI <- stats::quantile(PNIE_est, probs = c(0.025, 0.975), na.rm = TRUE)
+  TNIE_CI <- stats::quantile(TNIE_est, probs = c(0.025, 0.975), na.rm = TRUE)
   
   # Return a comprehensive list of results
   list(
     effect_type = effect_type, 
-    indirect_ci = indirect_ci,
-    direct_ci = direct_ci,
-    indirect_effects = indirect_effects,
-    direct_effects = direct_effects,
+    analysisCond = paste0(toupper(sub("^iptw_", "", iptw_str)), "_", model, "_", model), 
+    PS = paste0(toupper(sub("^iptw_", "", iptw_str))),  
+    PNDE_est = PNDE_est,
+    PNDE_LCL = PNDE_CI[1],
+    PNDE_UCL = PNDE_CI[2],
+    TNDE_est = TNDE_est,
+    TNDE_LCL = TNDE_CI[1],
+    TNDE_UCL = TNDE_CI[2],
+    PNIE_est = PNIE_est,
+    PNIE_LCL = PNIE_CI[1],
+    PNIE_UCL = PNIE_CI[2],
+    TNIE_est = TNIE_est,
+    TNIE_LCL = TNIE_CI[1],
+    TNIE_UCL = TNIE_CI[2],
     mediator_converged_count = sum(mediator_converged),
     outcome_converged_count = sum(outcome_converged),
     both_converged_count = sum(mediator_converged & outcome_converged)
