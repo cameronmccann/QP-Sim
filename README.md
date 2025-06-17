@@ -13,6 +13,8 @@ In Simulation Study 1 and 2, there are individual-level treatment (binary), medi
 
 In **Simulation Study 2**, we modified the simulation design so that the unmeasured cluster-level confounder influences only the treatment-outcome relationship. The three individual-level covariates still influence both the treatment-mediator and mediator-outcome relationships; however, an additional set of three covariates was introduced to influence only the treatment-outcome relationship. Simulation Study 2 also includes two versions of the direct and indirect effect estimates: the Total Natural Direct Effect (TNDE), the Pure Natural Direct Effect (PNDE), the Total Natural Indirect Effect (TNIE), and the Pure Natural Indirect Effect (PNIE).
 
+*Note*: In the manuscript, Simulation Study 2 is presented in Appendix F, with a brief summary included in the main text.
+
 The **Empirical Application** uses data from the National Longitudinal Study of Adolescent to Adult Health (Add Health; Harris & Udry, 2008) to illustrate the application of the methods evaluated. The cleaned version of the dataset used is included in the `Application/Data/Cleaned` folder.
 
 
@@ -54,6 +56,7 @@ The repository is organized into four main folders, which include the following 
         ├── Visuals/               
         ├── Estimates/
         ├── Temp-monte-carlo-CIs/        
+        ├── Temp-bootstrap-CIs/        
         └── mediator-and-outcome-models/
 ```
 
@@ -116,9 +119,14 @@ To conduct the simulations and obtain results, follow these steps:
         
 ### Running the Empirical Application
 
-1. Navigate to the `Application/Code` folder.
-2. Run `Empirical-Application_Data-Cleaning.R` to prepare the data for analysis.
-3. Execute `Empirical-Application_Analysis.R` to analyze the empirical dataset and obtain the effect estimates.
-4. The results, including visualizations and estimates, will be saved in the `Application/Output` folder.
+To reproduce the empirical application results, follow these steps:
 
+1. Clone or download the repository.
+2. Navigate to the `Application/Code` folder.
+3. Run the application scripts in the following order:
+    - `Empirical-Application_Data-Cleaning.R` *(optional)*: Prepares the raw dataset for analysis. You can skip this step, as a cleaned dataset is already saved in the `Application/Data/Cleaned` folder.
+    - `Empirical-Application_Analysis.R`: Analyzes the cleaned data and saves effect estimates and other outputs in the `Application/Output` folder.
+    - `Empirical-Application_Confidence-Intervals.R`: Computes Monte Carlo and percentile bootstrap confidence intervals and saves the results to subfolders in `Application/Output`.
+    - `Empirical-Application_Results.R`: Summarizes results by generating tables and visualizations based on the outputs from the analysis and confidence interval scripts.
+4. All results, including estimates, visuals, and supporting files, will be saved in the `Application/Output` folder.
         
